@@ -1,0 +1,29 @@
+The page url can be found with the result:
+result.url
+
+If we want to execute any js, we have to do it through a CrawlerRunConfig() for ex:
+CrawlerRunConfig(
+    js_code=[
+        f"""
+        (() => {{
+            const email = document.querySelector('input[type="email"]');
+            const password = document.querySelector('input[type="password"]');
+            const submit = document.querySelector('button[type="submit"]');
+            
+            if (!email || !password || !submit) return false;
+            
+            email.value = '{email}';
+            password.value = '{password}';
+            submit.click();
+            return true;
+        }})()
+        """
+    ]
+)
+
+
+crawler does not have a eval_js method, so don't try.
+
+raise exceptions a lot inside the crawlers. 
+I want it to crash if it's not succesful.
+Elegant handling can be done later.
