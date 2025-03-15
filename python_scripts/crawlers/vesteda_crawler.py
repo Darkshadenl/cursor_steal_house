@@ -1,43 +1,44 @@
-import os
 import asyncio
-from crawl4ai import AsyncWebCrawler, BrowserConfig
+import os
+import time
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from dotenv import load_dotenv
+from .vesteda_steps.login_step import execute_login_step
+from .vesteda_steps.search_navigation_step import execute_search_navigation
+from .vesteda_steps.property_extraction_step import execute_property_extraction
+from .vesteda_steps.cookie_acceptor import accept_cookies
 
-class VestedaCrawler:
+# ANSI color codes
+GREEN = "\033[92m"
+RED = "\033[91m"
+YELLOW = "\033[93m"
+RESET = "\033[0m"
+
+class VestedaCrawler():
     def __init__(self):
+        # Create browser config first
+        self.browser_config = BrowserConfig(
+            user_data_dir="./browser_data/vesteda",  # Persistent profile directory
+            headless=False,  # Initially false for setup
+            verbose=True,     # For debugging
+            use_managed_browser=True,  # For persistent sessions
+        )
         load_dotenv()
-        self.base_url = "https://hurenbij.vesteda.com/login/"
+        self.base_url = "https://hurenbij.vesteda.com"
+        self.search_url = f"{self.base_url}/zoekopdracht/"
         self.email = os.getenv("VESTEDA_EMAIL")
         self.password = os.getenv("VESTEDA_PASSWORD")
         
-        # Set up browser config with persistent profile
-        self.browser_config = BrowserConfig(
-            user_data_dir="./browser_data/vesteda",  # Persistent profile directory
-            headless=False  # Initially false for setup, can be changed to True later
-        )
+    async def run_full_crawl(self):
+        """Run the complete crawling process"""
+        async with AsyncWebCrawler(config=self.browser_config) as crawler:
+            pass
         
-    async def login(self):
-        async with AsyncWebCrawler(browser_config=self.browser_config) as crawler:
-            # Navigate to login page
-            await crawler.goto(self.base_url)
-            
-            # Fill in login form
-            await crawler.fill('input[type="email"]', self.email)
-            await crawler.fill('input[type="password"]', self.password)
-            
-            # Click login button
-            await crawler.click('button[type="submit"]')
-            
-            # Wait for navigation to complete
-            await crawler.wait_for_navigation()
-            
-            return await crawler.get_current_url()
-
-    async def crawl_portal(self):
-        # Implementation for crawling after login
-        pass
-
 if __name__ == "__main__":
-    # Test the crawler
     crawler = VestedaCrawler()
-    asyncio.run(crawler.login()) 
+    try:
+        result = asyncio.run(crawler.run_full_crawl())
+        print("Crawl result:", result) 
+    except Exception as e:
+        print(f"Error during crawl: {str(e)}")
+        raise e 
