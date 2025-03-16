@@ -27,3 +27,6 @@ crawler does not have a eval_js method, so don't try.
 raise exceptions a lot inside the crawlers. 
 I want it to crash if it's not succesful.
 Elegant handling can be done later.
+
+If we use javascript in a runconfig we can find the javascript results like this:
+result._results[0].js_execution_result

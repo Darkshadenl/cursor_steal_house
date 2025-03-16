@@ -21,7 +21,7 @@ class VestedaCrawler():
             user_data_dir="./browser_data/vesteda",  # Persistent profile directory
             headless=False,  # Initially false for setup
             verbose=True,     # For debugging
-            use_managed_browser=False,  # For persistent sessions
+            use_managed_browser=True,  # For persistent sessions
         )
         self.base_url = "https://hurenbij.vesteda.com"
         self.email = os.getenv("VESTEDA_EMAIL")
