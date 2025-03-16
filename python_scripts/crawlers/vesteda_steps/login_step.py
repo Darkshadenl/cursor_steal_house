@@ -1,12 +1,12 @@
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
 from typing import Optional
 from playwright.async_api import Page, BrowserContext
-
-async def execute_login_step(crawler: AsyncWebCrawler, email: str, password: str, max_retries: int = 3) -> str:
+import asyncio
+async def execute_login_step(crawler: AsyncWebCrawler, email: str, password: str, session_id: str, max_retries: int = 3) -> str:
     expected_url = 'https://hurenbij.vesteda.com/'
     
     run_config = CrawlerRunConfig(
-        session_id="vesteda_session",
+        session_id=session_id,
         cache_mode=CacheMode.BYPASS,
         js_only=True,
         js_code=[
@@ -22,23 +22,12 @@ async def execute_login_step(crawler: AsyncWebCrawler, email: str, password: str
         raise Exception(f"Login form submission failed: {result.error_message}")
     
     check_config = CrawlerRunConfig(
-        session_id="vesteda_session",
+        session_id=session_id,
         cache_mode=CacheMode.BYPASS,
-        js_only=True,
-        js_code=[
-            """
-            (() => {
-                return {
-                    currentUrl: window.location.href,
-                    isLoggedIn: !document.querySelector('input[type="password"]') && 
-                };
-            })()
-            """
-        ]
+        js_only=True
     )
     
     # Wait a moment for the redirect to complete
-    import asyncio
     await asyncio.sleep(2)
     
     check_result = await crawler.arun(url="https://hurenbij.vesteda.com/", config=check_config)

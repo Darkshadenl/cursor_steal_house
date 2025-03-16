@@ -5,11 +5,7 @@ from typing import Optional
 # Global variable to track if we've already accepted cookies
 _cookies_accepted = False
 
-async def accept_cookies(crawler: AsyncWebCrawler, current_url: str) -> bool:
-    """
-    Check for cookie popup and accept analytics cookies if present
-    Returns True if cookies were accepted or already handled, False on error
-    """
+async def accept_cookies(crawler: AsyncWebCrawler, current_url: str, session_id: str) -> bool:
     global _cookies_accepted
     
     if _cookies_accepted:
@@ -19,52 +15,47 @@ async def accept_cookies(crawler: AsyncWebCrawler, current_url: str) -> bool:
     cookie_config = CrawlerRunConfig(
         cache_mode=CacheMode.BYPASS,
         js_only=True,
-        wait_for=
-        """
-            (() => {
-                const cookieButton = document.querySelector('a[href="javascript:Cookiebot.submitCustomConsent(false, true, false); Cookiebot.hide()"]');
-                if (cookieButton) {
-                    console.log("Cookie button found");
-                    return true;
-                }
-                console.log("Cookie button not found");
-                return false;
-            }
-        """,
+        session_id=session_id,
         js_code=
         """
-            () => {
+            (async () => {
+                Cookiebot.submitCustomConsent(false, true, false); Cookiebot.hide();
                 const cookieButton = document.querySelector('a[href="javascript:Cookiebot.submitCustomConsent(false, true, false); Cookiebot.hide()"]');
                 
                 if (cookieButton) {
                     cookieButton.click();
+                    console.log("Cookie button clicked");
+                } else {
+                    console.log("Cookie button not found");
                     return true;
                 }
-                console.log("Cookie button not found");
-                return false;
-            }
+                
+                while (true) {
+                    await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
+                    const cookieButton = document.querySelector('a[href="javascript:Cookiebot.submitCustomConsent(false, true, false); Cookiebot.hide()"]');
+                    if (cookieButton) {
+                        cookieButton.click();
+                        console.log("Cookie button clicked");
+                        return true;
+                    }
+                }
+            })();
             """
     )
     
-    try:
-        # Run the cookie check on the current page
-        result = await crawler.arun(
-            url=current_url,
-            config=cookie_config
-        )
-        
-        if not result.success:
-            print("Cookie check failed:", result.error_message)
-            return False
-        elif result.success:
-            print(f"Cookies successfully accepted. Current URL: {result.url}")
-            _cookies_accepted = True
-            return True
-        else:
-            print("Cookie popup not found or already accepted")
-            _cookies_accepted = True 
-            return True
-        
-    except Exception as e:
-        print(f"Error handling cookie popup: {str(e)}")
-        raise Exception(f"Failed to accept cookies: {str(e)}") 
+    result = await crawler.arun(
+        url=current_url,
+        config=cookie_config
+    )
+    
+    if not result.success:
+        print("Cookie check failed:", result.error_message)
+        return False
+    elif result.success:
+        print(f"Cookies successfully accepted. Current URL: {result.url}")
+        _cookies_accepted = True
+        return True
+    else:
+        print("Cookie popup not found or already accepted")
+        _cookies_accepted = True 
+        return True
