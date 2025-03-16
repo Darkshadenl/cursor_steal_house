@@ -16,23 +16,28 @@ RESET = "\033[0m"
 
 class VestedaCrawler():
     def __init__(self):
-        # Create browser config first
+        load_dotenv()
         self.browser_config = BrowserConfig(
             user_data_dir="./browser_data/vesteda",  # Persistent profile directory
             headless=False,  # Initially false for setup
             verbose=True,     # For debugging
             use_managed_browser=True,  # For persistent sessions
         )
-        load_dotenv()
         self.base_url = "https://hurenbij.vesteda.com"
-        self.search_url = f"{self.base_url}/zoekopdracht/"
         self.email = os.getenv("VESTEDA_EMAIL")
         self.password = os.getenv("VESTEDA_PASSWORD")
         
     async def run_full_crawl(self):
         """Run the complete crawling process"""
         async with AsyncWebCrawler(config=self.browser_config) as crawler:
-            pass
+            # await execute_login_step(crawler, self.email, self.password)
+            url = await execute_search_navigation(crawler)
+            
+            if (url == 'https://hurenbij.vesteda.com/login/'):
+                await execute_login_step(crawler, self.email, self.password)
+                url = await execute_search_navigation(crawler)
+            
+            await execute_property_extraction(crawler, url)
         
 if __name__ == "__main__":
     crawler = VestedaCrawler()
