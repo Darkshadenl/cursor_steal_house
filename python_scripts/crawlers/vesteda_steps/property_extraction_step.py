@@ -1,7 +1,32 @@
-from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode, DefaultMarkdownGenerator, PruningContentFilter
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 from typing import List, Dict, Any
 from .cookie_acceptor import accept_cookies
 
 async def execute_property_extraction(crawler: AsyncWebCrawler, url: str) -> List[Dict[str, Any]]:
-    pass
+    
+    correct_urls = ['https://hurenbij.vesteda.com/zoekopdracht/', 'https://hurenbij.vesteda.com/zoekopdracht/#tab-content-inloggen']
+    
+    if (url not in correct_urls):
+        raise Exception("Invalid URL")
+    
+    print(f"Extracting properties from {url}")
+    
+    md_generator = DefaultMarkdownGenerator(
+        content_filter=PruningContentFilter(threshold=0.4, threshold_type="fixed")
+    )
+    
+    run_config = CrawlerRunConfig(
+        session_id="vesteda_session",
+        cache_mode=CacheMode.BYPASS,
+        markdown_generator=md_generator
+    )
+    
+    result = await crawler.arun(url=url, config=run_config)
+    print("Fit Markdown length:", len(result.markdown.fit_markdown))
+    print(result.markdown.fit_markdown)
+    
+    print("Raw Markdown length:", len(result.markdown.raw_markdown))
+    print(result.markdown.raw_markdown)
+    
+    
