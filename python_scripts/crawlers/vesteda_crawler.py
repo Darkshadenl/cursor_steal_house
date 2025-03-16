@@ -21,23 +21,23 @@ class VestedaCrawler():
             user_data_dir="./browser_data/vesteda",  # Persistent profile directory
             headless=False,  # Initially false for setup
             verbose=True,     # For debugging
-            use_managed_browser=True,  # For persistent sessions
+            use_managed_browser=False,  # For persistent sessions
         )
         self.base_url = "https://hurenbij.vesteda.com"
         self.email = os.getenv("VESTEDA_EMAIL")
         self.password = os.getenv("VESTEDA_PASSWORD")
+        self.session_id = "vesteda_session"
         
     async def run_full_crawl(self):
-        """Run the complete crawling process"""
         async with AsyncWebCrawler(config=self.browser_config) as crawler:
-            # await execute_login_step(crawler, self.email, self.password)
-            url = await execute_search_navigation(crawler)
+            url = await execute_search_navigation(crawler, self.session_id)
             
             if (url == 'https://hurenbij.vesteda.com/login/'):
-                await execute_login_step(crawler, self.email, self.password)
-                url = await execute_search_navigation(crawler)
+                await accept_cookies(crawler, url, self.session_id)
+                await execute_login_step(crawler, self.email, self.password, self.session_id)
+                url = await execute_search_navigation(crawler, self.session_id)
             
-            await execute_property_extraction(crawler, url)
+            await execute_property_extraction(crawler, url, self.session_id)
         
 if __name__ == "__main__":
     crawler = VestedaCrawler()

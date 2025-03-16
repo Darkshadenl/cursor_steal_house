@@ -3,7 +3,7 @@ from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 from typing import List, Dict, Any
 from .cookie_acceptor import accept_cookies
 
-async def execute_property_extraction(crawler: AsyncWebCrawler, url: str) -> List[Dict[str, Any]]:
+async def execute_property_extraction(crawler: AsyncWebCrawler, url: str, session_id: str) -> List[Dict[str, Any]]:
     
     correct_urls = ['https://hurenbij.vesteda.com/zoekopdracht/', 'https://hurenbij.vesteda.com/zoekopdracht/#tab-content-inloggen']
     
@@ -17,7 +17,7 @@ async def execute_property_extraction(crawler: AsyncWebCrawler, url: str) -> Lis
     )
     
     run_config = CrawlerRunConfig(
-        session_id="vesteda_session",
+        session_id=session_id,
         cache_mode=CacheMode.BYPASS,
         markdown_generator=md_generator
     )
