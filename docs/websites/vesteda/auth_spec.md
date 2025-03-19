@@ -18,5 +18,4 @@
 
 ## Rate Limiting & Ethics
 - Implement polite crawling (delays between requests)
-- Respect robots.txt
 - Store credentials securely in .env
