@@ -3,6 +3,8 @@ import os
 import time
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from dotenv import load_dotenv
+
+from python_scripts.crawlers.vesteda_steps.detailed_property_extraction import execute_detailed_property_extraction
 from .vesteda_steps.login_step import execute_login_step
 from .vesteda_steps.search_navigation_step import execute_search_navigation
 from .vesteda_steps.property_extraction_step import execute_property_extraction
@@ -19,7 +21,7 @@ class VestedaCrawler():
         load_dotenv()
         self.browser_config = BrowserConfig(
             user_data_dir="./browser_data/vesteda",  # Persistent profile directory
-            headless=False,  # Initially false for setup
+            headless=True,  # Initially false for setup
             verbose=True,     # For debugging
             use_managed_browser=True,  # For persistent sessions
         )
@@ -27,6 +29,7 @@ class VestedaCrawler():
         self.email = os.getenv("VESTEDA_EMAIL")
         self.password = os.getenv("VESTEDA_PASSWORD")
         self.session_id = "vesteda_session"
+        self.deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
         
     async def run_full_crawl(self):
         async with AsyncWebCrawler(config=self.browser_config) as crawler:
@@ -37,7 +40,8 @@ class VestedaCrawler():
                 await execute_login_step(crawler, self.email, self.password, self.session_id)
                 url = await execute_search_navigation(crawler, self.session_id)
             
-            await execute_property_extraction(crawler, url, self.session_id)
+            data = await execute_property_extraction(crawler, url, self.session_id, self.deepseek_api_key)
+            await execute_detailed_property_extraction(crawler, data, self.session_id, self.deepseek_api_key)
         
 if __name__ == "__main__":
     crawler = VestedaCrawler()
