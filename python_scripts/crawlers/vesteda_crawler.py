@@ -1,6 +1,7 @@
 import asyncio
 import os
 import time
+import logging
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from dotenv import load_dotenv
 
@@ -9,6 +10,18 @@ from .vesteda_steps.login_step import execute_login_step
 from .vesteda_steps.search_navigation_step import execute_search_navigation
 from .vesteda_steps.property_extraction_step import execute_property_extraction
 from .vesteda_steps.cookie_acceptor import accept_cookies
+from python_scripts.db_models.house_service import HouseService
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('vesteda_crawler.log')
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # ANSI color codes
 GREEN = "\033[92m"
@@ -30,24 +43,47 @@ class VestedaCrawler():
         self.password = os.getenv("VESTEDA_PASSWORD")
         self.session_id = "vesteda_session"
         self.deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
+        self.house_service = HouseService()
         
     async def run_full_crawl(self):
-        async with AsyncWebCrawler(config=self.browser_config) as crawler:
-            url = await execute_search_navigation(crawler, self.session_id)
-            
-            if (url == 'https://hurenbij.vesteda.com/login/'):
-                await accept_cookies(crawler, url, self.session_id)
-                await execute_login_step(crawler, self.email, self.password, self.session_id)
+        """Run a full crawl of Vesteda website and store results in database"""
+        try:
+            async with AsyncWebCrawler(config=self.browser_config) as crawler:
+                # Navigate to search page
                 url = await execute_search_navigation(crawler, self.session_id)
-            
-            data = await execute_property_extraction(crawler, url, self.session_id, self.deepseek_api_key)
-            await execute_detailed_property_extraction(crawler, data, self.session_id, self.deepseek_api_key)
+                
+                # Handle login if needed
+                if (url == 'https://hurenbij.vesteda.com/login/'):
+                    logger.info("Login required. Accepting cookies and logging in...")
+                    await accept_cookies(crawler, url, self.session_id)
+                    await execute_login_step(crawler, self.email, self.password, self.session_id)
+                    url = await execute_search_navigation(crawler, self.session_id)
+                
+                # Extract property listings
+                logger.info("Extracting property listings...")
+                gallery_data = await execute_property_extraction(crawler, url, self.session_id, self.deepseek_api_key)
+                
+                # Store gallery data only
+                logger.info(f"Storing {len(gallery_data)} gallery houses to database...")
+                db_result = self.house_service.store_crawler_results(gallery_data)
+                
+                return {
+                    'gallery_count': len(gallery_data),
+                    'success': db_result['success'],
+                    'gallery_ids': db_result.get('gallery_ids', [])
+                }
+                
+        except Exception as e:
+            logger.error(f"{RED}Error during crawl: {str(e)}{RESET}")
+            raise e
         
 if __name__ == "__main__":
     crawler = VestedaCrawler()
     try:
         result = asyncio.run(crawler.run_full_crawl())
-        print("Crawl result:", result) 
+        print(f"{GREEN}Crawl completed successfully!{RESET}")
+        print(f"Processed {result['gallery_count']} properties")
+        print(f"Stored {len(result['gallery_ids'])} properties in database")
     except Exception as e:
-        print(f"Error during crawl: {str(e)}")
+        print(f"{RED}Error during crawl: {str(e)}{RESET}")
         raise e 
