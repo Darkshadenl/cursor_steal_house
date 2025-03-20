@@ -48,22 +48,19 @@ async def execute_detailed_property_extraction(crawler: AsyncWebCrawler, data: L
     )
     
     dispatcher = SemaphoreDispatcher(
-        memory_threshold_percent=70.0,
-        check_interval=1.0,
-        max_session_permit=5,  # Maximum concurrent tasks
+        semaphore_count=5,
         monitor=CrawlerMonitor(
-        # Maximum rows in live display
-        max_visible_rows=20,          
-
-        # DETAILED or AGGREGATED view
-        display_mode=DisplayMode.DETAILED  
-    ),
+            # Maximum rows in live display
+            max_visible_rows=20,          
+            # DETAILED or AGGREGATED view
+            display_mode=DisplayMode.DETAILED  
+        ),
         rate_limiter=RateLimiter(
         base_delay=(2.0, 4.0),  # Random delay between 2-4 seconds
         max_delay=30.0,         # Cap delay at 30 seconds
         max_retries=3,          # Retry up to 5 times on rate-limiting errors
         rate_limit_codes=[429, 503]  # Handle these HTTP status codes
-    )
+        )
     )
 
     list_of_house_details = []
