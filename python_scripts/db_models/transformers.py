@@ -15,13 +15,13 @@ class GalleryHouseTransformer:
     def to_db_model(gallery_house: PydanticGalleryHouse) -> Dict[str, Any]:
         """Transform Pydantic GalleryHouse to database model dict"""
         return {
-            'address': gallery_house.address,
-            'city': gallery_house.city,
-            'status': gallery_house.status,
-            'image_url': gallery_house.image_url,
-            'high_demand': gallery_house.high_demand,
-            'demand_message': gallery_house.demand_message,
-            'detail_url': gallery_house.detail_url
+            'address': getattr(gallery_house, 'address', ''),
+            'city': getattr(gallery_house, 'city', ''),
+            'status': getattr(gallery_house, 'status', ''),
+            'image_url': getattr(gallery_house, 'image_url', None),
+            'high_demand': getattr(gallery_house, 'high_demand', False),
+            'demand_message': getattr(gallery_house, 'demand_message', None),
+            'detail_url': getattr(gallery_house, 'detail_url', None)
         }
     
     @staticmethod
@@ -45,8 +45,8 @@ class FloorPlanTransformer:
     def to_db_model(floor_plan: PydanticFloorPlan, house_id: Optional[int] = None) -> Dict[str, Any]:
         """Transform Pydantic FloorPlan to database model dict"""
         model_dict = {
-            'image_url': floor_plan.image_url,
-            'description': floor_plan.description
+            'image_url': getattr(floor_plan, 'image_url', ''),
+            'description': getattr(floor_plan, 'description', None)
         }
         
         if house_id:
@@ -81,21 +81,22 @@ class DetailHouseTransformer:
         """Transform Pydantic DetailHouse to database model dict"""
         # Basic model data
         model_dict = {
-            'address': detail_house.address,
-            'postal_code': detail_house.postal_code,
-            'city': detail_house.city,
-            'neighborhood': detail_house.neighborhood,
-            'rental_price': detail_house.rental_price,
-            'service_costs': detail_house.service_costs,
-            'square_meters': detail_house.square_meters,
-            'bedrooms': detail_house.bedrooms,
-            'energy_label': detail_house.energy_label,
-            'status': detail_house.status,
-            'available_from': detail_house.available_from,
-            'complex': detail_house.complex,
-            'description': detail_house.description,
-            'location_map_url': detail_house.location_map_url,
-            'options': detail_house.options
+            'address': getattr(detail_house, 'address', ''),
+            'postal_code': getattr(detail_house, 'postal_code', ''),
+            'city': getattr(detail_house, 'city', ''),
+            'neighborhood': getattr(detail_house, 'neighborhood', None),
+            'rental_price': getattr(detail_house, 'rental_price', ''),
+            'service_costs': getattr(detail_house, 'service_costs', None),
+            'square_meters': getattr(detail_house, 'square_meters', 0),
+            'bedrooms': getattr(detail_house, 'bedrooms', 0),
+            'energy_label': getattr(detail_house, 'energy_label', None),
+            'status': getattr(detail_house, 'status', ''),
+            'available_from': getattr(detail_house, 'available_from', None),
+            'complex': getattr(detail_house, 'complex', None),
+            'description': getattr(detail_house, 'description', ''),
+            'location_map_url': getattr(detail_house, 'location_map_url', None),
+            'request_viewing_url': getattr(detail_house, 'request_viewing_url', None),
+            'options': getattr(detail_house, 'options', None)
         }
         
         # Add gallery_id if provided
@@ -103,26 +104,29 @@ class DetailHouseTransformer:
             model_dict['gallery_id'] = gallery_id
         
         # Income requirements
-        if detail_house.income_requirements:
-            model_dict['min_income_single'] = detail_house.income_requirements.min_income_single
-            model_dict['min_income_joint'] = detail_house.income_requirements.min_income_joint
-            model_dict['read_more_url'] = detail_house.income_requirements.read_more_url
+        income_requirements = getattr(detail_house, 'income_requirements', None)
+        if income_requirements:
+            model_dict['min_income_single'] = getattr(income_requirements, 'min_income_single', None)
+            model_dict['min_income_joint'] = getattr(income_requirements, 'min_income_joint', None)
+            model_dict['read_more_url'] = getattr(income_requirements, 'read_more_url', None)
         
         # Complex information
-        if detail_house.complex_info:
-            model_dict['complex_name'] = detail_house.complex_info.name
-            model_dict['complex_description'] = detail_house.complex_info.description
-            model_dict['year_of_construction'] = detail_house.complex_info.year_of_construction
-            model_dict['number_of_objects'] = detail_house.complex_info.number_of_objects
-            model_dict['number_of_floors'] = detail_house.complex_info.number_of_floors
-            model_dict['complex_image_url'] = detail_house.complex_info.image_url
+        complex_info = getattr(detail_house, 'complex_info', None)
+        if complex_info:
+            model_dict['complex_name'] = getattr(complex_info, 'name', None)
+            model_dict['complex_description'] = getattr(complex_info, 'description', None)
+            model_dict['year_of_construction'] = getattr(complex_info, 'year_of_construction', None)
+            model_dict['number_of_objects'] = getattr(complex_info, 'number_of_objects', None)
+            model_dict['number_of_floors'] = getattr(complex_info, 'number_of_floors', None)
+            model_dict['complex_image_url'] = getattr(complex_info, 'image_url', None)
         
         # Floor plans
-        if detail_house.floor_plans:
-            floor_plans = []
-            for plan in detail_house.floor_plans:
-                floor_plans.append(FloorPlanTransformer.to_db_model(plan))
-            model_dict['floor_plans'] = floor_plans
+        floor_plans = getattr(detail_house, 'floor_plans', None)
+        if floor_plans:
+            floor_plans_list = []
+            for plan in floor_plans:
+                floor_plans_list.append(FloorPlanTransformer.to_db_model(plan))
+            model_dict['floor_plans'] = floor_plans_list
         
         return model_dict
     
@@ -145,6 +149,7 @@ class DetailHouseTransformer:
             'complex': data.get('complex'),
             'description': data.get('description', ''),
             'location_map_url': data.get('location_map_url'),
+            'request_viewing_url': data.get('request_viewing_url'),
             'options': data.get('options')
         }
         

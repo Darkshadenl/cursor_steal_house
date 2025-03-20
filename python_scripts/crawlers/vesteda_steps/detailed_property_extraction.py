@@ -35,6 +35,8 @@ async def execute_detailed_property_extraction(crawler: AsyncWebCrawler, data: L
         cache_mode=CacheMode.BYPASS
     )
     
+    list_of_house_details = []
+    
     for house in data:
         url = house['detail_url']
         result = await crawler.arun(url=url, config=config)
@@ -42,7 +44,9 @@ async def execute_detailed_property_extraction(crawler: AsyncWebCrawler, data: L
         if result.success:
             house_detail_data = json.loads(result.extracted_content)
             llm_config.show_usage()  #prints token usage
-            print(f"Extracted house: {data}")
+            print(f"Extracted house: ")
+            print(house_detail_data)
+            list_of_house_details.append(house_detail_data)
         else:
             print("Error extracting properties", result.error_message)
             raise Exception("Error extracting properties", result.error_message)

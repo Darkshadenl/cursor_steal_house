@@ -1,10 +1,10 @@
 import asyncio
 import os
-import time
 import logging
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+from crawl4ai import AsyncWebCrawler, BrowserConfig
 from dotenv import load_dotenv
 
+from python_scripts.crawlers.vesteda_steps import detailed_property_extraction
 from python_scripts.crawlers.vesteda_steps.detailed_property_extraction import execute_detailed_property_extraction
 from .vesteda_steps.login_step import execute_login_step
 from .vesteda_steps.search_navigation_step import execute_search_navigation
@@ -65,13 +65,9 @@ class VestedaCrawler():
                 
                 # Store gallery data only
                 logger.info(f"Storing {len(gallery_data)} gallery houses to database...")
-                db_result = self.house_service.store_crawler_results(gallery_data)
+                self.house_service.store_crawler_results(gallery_data)
+                await execute_detailed_property_extraction(crawler, gallery_data, self.session_id, self.deepseek_api_key)
                 
-                return {
-                    'gallery_count': len(gallery_data),
-                    'success': db_result['success'],
-                    'gallery_ids': db_result.get('gallery_ids', [])
-                }
                 
         except Exception as e:
             logger.error(f"{RED}Error during crawl: {str(e)}{RESET}")
