@@ -66,8 +66,18 @@ class VestedaCrawler():
                 # Store gallery data only
                 logger.info(f"Storing {len(gallery_data)} gallery houses to database...")
                 self.house_service.store_crawler_results(gallery_data)
-                await execute_detailed_property_extraction(crawler, gallery_data, self.session_id, self.deepseek_api_key)
+                detail_houses = await execute_detailed_property_extraction(crawler, gallery_data, self.session_id, self.deepseek_api_key)
                 
+                # Match detail houses with gallery houses based on address and city
+                for detail_house in detail_houses:
+                    for gallery_house in gallery_data:
+                        if detail_house['address'] == gallery_house['address'] and detail_house['city'] == gallery_house['city']:
+                            detail_house.gallery_reference = gallery_house
+                            break
+                
+                # Store detail houses
+                logger.info(f"Storing {len(detail_houses)} detail houses to database...")
+                self.house_service.store_detail_houses(detail_houses)
                 
         except Exception as e:
             logger.error(f"{RED}Error during crawl: {str(e)}{RESET}")

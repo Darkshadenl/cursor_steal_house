@@ -75,6 +75,12 @@ class HouseService:
         """Store a detail house and return its ID"""
         with get_repositories(self.session) as repos:
             try:
+                if gallery_id is None and detail_house.gallery_reference is not None:
+                    gallery_id = detail_house.gallery_reference.id
+                elif gallery_id is None:
+                    logger.warning(f"No gallery ID provided for detail house: {detail_house}")
+                    return None
+                
                 # Transform data
                 db_data = DetailHouseTransformer.from_dict(detail_house, gallery_id)
                 
