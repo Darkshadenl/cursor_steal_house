@@ -1,0 +1,157 @@
+{
+  "name": "Vesteda Property Listing",
+  "baseSelector": "//main",
+  "fields": [
+    {
+      "name": "title",
+      "selector": ".//h1",
+      "type": "text"
+    },
+    {
+      "name": "description",
+      "selector": ".//div[contains(., 'Description')]/following-sibling::div//p",
+      "type": "text"
+    },
+    {
+      "name": "features",
+      "type": "nested",
+      "selector": ".//div[contains(., 'Features')]/following-sibling::div//table",
+      "fields": [
+        {
+          "name": "rental_price",
+          "selector": ".//tr[th='Rental price']/td",
+          "type": "text"
+        },
+        {
+          "name": "service_costs",
+          "selector": ".//tr[th='Service costs']/td",
+          "type": "text"
+        },
+        {
+          "name": "income_requirements",
+          "selector": ".//tr[th='Income requirements']/td",
+          "type": "text"
+        },
+        {
+          "name": "square_meters",
+          "selector": ".//tr[th='Square meters']/td",
+          "type": "text"
+        },
+        {
+          "name": "bedrooms",
+          "selector": ".//tr[th='Bedrooms']/td",
+          "type": "text"
+        },
+        {
+          "name": "energy_label",
+          "selector": ".//tr[th='Energy label']/td",
+          "type": "text"
+        },
+        {
+          "name": "status",
+          "selector": ".//tr[th='Status']/td",
+          "type": "text"
+        },
+        {
+          "name": "available_from",
+          "selector": ".//tr[th='Available from']/td",
+          "type": "text"
+        },
+        {
+          "name": "complex",
+          "selector": ".//tr[th='Complex']/td",
+          "type": "text"
+        },
+        {
+          "name": "more_information",
+          "selector": ".//tr[th='More information']/td/a",
+          "type": "attribute",
+          "attribute": "href"
+        }
+      ]
+    },
+    {
+      "name": "location",
+      "type": "nested",
+      "selector": ".//div[contains(., 'Location')]/following-sibling::div//table",
+      "fields": [
+        {
+          "name": "address",
+          "selector": ".//tr[th='Address']/td",
+          "type": "text"
+        },
+        {
+          "name": "postal_code",
+          "selector": ".//tr[th='Postal code']/td",
+          "type": "text"
+        },
+        {
+          "name": "city",
+          "selector": ".//tr[th='City']/td",
+          "type": "text"
+        },
+        {
+          "name": "neighbourhood",
+          "selector": ".//tr[th='Neighbourhood']/td",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "about_complex",
+      "type": "nested",
+      "selector": ".//div[contains(., 'About complex')]/following-sibling::div",
+      "fields": [
+        {
+          "name": "description",
+          "selector": ".//tr[th='Description']/td",
+          "type": "text"
+        },
+        {
+          "name": "area",
+          "selector": ".//tr[th='Area']/td",
+          "type": "text"
+        },
+        {
+          "name": "parking",
+          "selector": ".//tr[th='Parking']/td",
+          "type": "text"
+        },
+        {
+          "name": "year_of_construction",
+          "selector": ".//tr[th='Year of construction']/td",
+          "type": "text"
+        },
+        {
+          "name": "number_of_objects",
+          "selector": ".//tr[th='Number of objects']/td",
+          "type": "text"
+        },
+        {
+          "name": "number_of_floors",
+          "selector": ".//tr[th='Number of floors']/td",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "options",
+      "type": "nested",
+      "selector": ".//div[contains(., 'Options')]/following-sibling::div",
+      "fields": [
+        {
+          "name": "save_object",
+          "selector": ".//a[contains(., 'Save this object')]",
+          "type": "attribute",
+          "attribute": "href"
+        },
+        {
+          "name": "request_viewing",
+          "selector": ".//a[contains(., 'Request viewing')]",
+          "type": "attribute",
+          "attribute": "href"
+        }
+      ]
+    }
+  ]
+}
