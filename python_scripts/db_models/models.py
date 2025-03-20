@@ -80,6 +80,9 @@ class DetailHouse(Base):
     # Location information
     location_map_url = Column(String, nullable=True)
     
+    # Action links
+    request_viewing_url = Column(String, nullable=True)
+    
     # Extra options
     options = Column(Text, nullable=True)
     

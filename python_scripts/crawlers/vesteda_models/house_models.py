@@ -76,6 +76,9 @@ class DetailHouse(BaseModel):
     # Location information
     location_map_url: Optional[str] = Field(None, description="URL to the map with the location")
     
+    # Action links
+    request_viewing_url: Optional[str] = Field(None, description="URL to request a viewing of the property")
+    
     # Extra options
     options: Optional[str] = Field(None, description="Extra options or possibilities for the house")
     

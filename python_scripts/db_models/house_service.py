@@ -32,20 +32,42 @@ class HouseService:
     def store_gallery_houses(self, gallery_houses: List[Dict[str, Any]]) -> List[int]:
         """Store a list of gallery houses and return their IDs"""
         gallery_ids = []
+        skipped_count = 0
         
         with get_repositories(self.session) as repos:
             for house_data in gallery_houses:
                 try:
+                    # Extract address and city for checking
+                    address = house_data.get('address')
+                    city = house_data.get('city')
+                    
+                    if not address or not city:
+                        logger.warning(f"Skipping house with missing address or city: {house_data}")
+                        continue
+                    
+                    # Check if the house already exists
+                    existing_house = repos['gallery'].get_by_address(address, city)
+                    
+                    if existing_house:
+                        # House already exists, add its ID and skip creation
+                        gallery_ids.append(existing_house.id)
+                        skipped_count += 1
+                        logger.info(f"House already exists: {address}, {city}, using ID: {existing_house.id}")
+                        continue
+                    
                     # Transform data
                     db_data = GalleryHouseTransformer.from_dict(house_data)
                     
                     # Store in database
-                    gallery_house = repos['gallery'].get_or_create(db_data)
+                    gallery_house = repos['gallery'].create(db_data)
                     gallery_ids.append(gallery_house.id)
                     
                     logger.info(f"Stored gallery house: {gallery_house.address}, {gallery_house.city}")
                 except Exception as e:
                     logger.error(f"Error storing gallery house: {str(e)}")
+        
+        if skipped_count > 0:
+            logger.info(f"Skipped {skipped_count} existing houses")
         
         return gallery_ids
     
@@ -96,4 +118,4 @@ class HouseService:
             logger.error(f"Error in store_crawler_results: {str(e)}")
             result['error'] = str(e)
         
-        return result 
+        logger.info(f"Crawler results stored successfully", result)
