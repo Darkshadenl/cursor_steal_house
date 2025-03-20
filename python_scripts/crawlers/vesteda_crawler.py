@@ -61,7 +61,7 @@ class VestedaCrawler():
                 
                 # Extract property listings
                 logger.info("Extracting property listings...")
-                gallery_data = await execute_property_extraction(crawler, url, self.session_id, self.deepseek_api_key)
+                gallery_data = await execute_property_extraction(crawler, url, self.session_id)
                 
                 # Store gallery data only
                 logger.info(f"Storing {len(gallery_data)} gallery houses to database...")

@@ -27,12 +27,19 @@ class GalleryHouseTransformer:
     @staticmethod
     def from_dict(data: Dict[str, Any]) -> Dict[str, Any]:
         """Transform raw dictionary data to database model dict"""
+        
+        if (data.get('demand_message') 
+            == 'This house has many viewing requests. Increase you chance by selecting a different property.'):
+            high_demand = True
+        else:
+            high_demand = False
+        
         return {
             'address': data.get('address', ''),
             'city': data.get('city', ''),
             'status': data.get('status', ''),
             'image_url': data.get('image_url'),
-            'high_demand': data.get('high_demand', False),
+            'high_demand': high_demand,
             'demand_message': data.get('demand_message'),
             'detail_url': data.get('detail_url')
         }
