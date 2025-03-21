@@ -1,7 +1,7 @@
 from typing import Dict, Any, List, Optional
 import logging
-from sqlalchemy.orm import Session
-from contextlib import contextmanager
+from sqlalchemy.ext.asyncio import AsyncSession
+from contextlib import asynccontextmanager
 
 from .repositories import GalleryHouseRepository, DetailHouseRepository, FloorPlanRepository
 from .transformers import GalleryHouseTransformer, DetailHouseTransformer
@@ -9,8 +9,8 @@ from .db_connection import get_db_session
 
 logger = logging.getLogger(__name__)
 
-@contextmanager
-def get_repositories(session=None):
+@asynccontextmanager
+async def get_repositories(session=None):
     """Context manager to get all repositories with a shared session"""
     session = session or get_db_session()
     try:
@@ -20,21 +20,21 @@ def get_repositories(session=None):
             'floor_plan': FloorPlanRepository(session)
         }
     finally:
-        session.close()
+        await session.close()
 
 class HouseService:
     """Service for handling house data storage"""
     
-    def __init__(self, session: Optional[Session] = None):
+    def __init__(self, session: Optional[AsyncSession] = None):
         """Initialize with optional session"""
         self.session = session or get_db_session()
     
-    def store_gallery_houses(self, gallery_houses: List[Dict[str, Any]]) -> List[int]:
+    async def store_gallery_houses(self, gallery_houses: List[Dict[str, Any]]) -> List[int]:
         """Store a list of gallery houses and return their IDs"""
         gallery_ids = []
         skipped_count = 0
         
-        with get_repositories(self.session) as repos:
+        async with get_repositories(self.session) as repos:
             for house_data in gallery_houses:
                 try:
                     # Extract address and city for checking
@@ -46,7 +46,7 @@ class HouseService:
                         continue
                     
                     # Check if the house already exists
-                    existing_house = repos['gallery'].get_by_address(address, city)
+                    existing_house = await repos['gallery'].get_by_address(address, city)
                     
                     if existing_house:
                         # House already exists, add its ID and skip creation
@@ -59,7 +59,7 @@ class HouseService:
                     db_data = GalleryHouseTransformer.from_dict(house_data)
                     
                     # Store in database
-                    gallery_house = repos['gallery'].create(db_data)
+                    gallery_house = await repos['gallery'].create(db_data)
                     gallery_ids.append(gallery_house.id)
                     
                     logger.info(f"Stored gallery house: {gallery_house.address}, {gallery_house.city}")
@@ -71,9 +71,18 @@ class HouseService:
         
         return gallery_ids
     
-    def store_detail_house(self, detail_house: Dict[str, Any], gallery_id: Optional[int] = None) -> Optional[int]:
+    async def store_detail_houses(self, detail_houses: List[Dict[str, Any]]) -> List[int]:
+        """Store a list of detail houses and return their IDs"""
+        detail_ids = []
+        for detail_house in detail_houses:
+            detail_id = await self.store_detail_house(detail_house)
+            if detail_id:
+                detail_ids.append(detail_id)
+        return detail_ids
+            
+    async def store_detail_house(self, detail_house: Dict[str, Any], gallery_id: Optional[int] = None) -> Optional[int]:
         """Store a detail house and return its ID"""
-        with get_repositories(self.session) as repos:
+        async with get_repositories(self.session) as repos:
             try:
                 if gallery_id is None and detail_house.gallery_reference is not None:
                     gallery_id = detail_house.gallery_reference.id
@@ -85,7 +94,7 @@ class HouseService:
                 db_data = DetailHouseTransformer.from_dict(detail_house, gallery_id)
                 
                 # Store in database
-                detail_house_obj = repos['detail'].get_or_create(db_data, gallery_id)
+                detail_house_obj = await repos['detail'].get_or_create(db_data, gallery_id)
                 
                 logger.info(f"Stored detail house: {detail_house_obj.address}, {detail_house_obj.city}")
                 return detail_house_obj.id
@@ -93,7 +102,7 @@ class HouseService:
                 logger.error(f"Error storing detail house: {str(e)}")
                 return None
     
-    def store_crawler_results(self, gallery_data: List[Dict[str, Any]], detail_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def store_crawler_results(self, gallery_data: List[Dict[str, Any]], detail_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Store crawler results including gallery and detail data"""
         result = {
             'gallery_ids': [],
@@ -104,7 +113,7 @@ class HouseService:
         try:
             # Store gallery houses
             if gallery_data:
-                gallery_ids = self.store_gallery_houses(gallery_data)
+                gallery_ids = await self.store_gallery_houses(gallery_data)
                 result['gallery_ids'] = gallery_ids
                 logger.info(f"Stored {len(gallery_ids)} gallery houses")
             
@@ -113,7 +122,7 @@ class HouseService:
                 # If we have gallery data, link to the last gallery house
                 gallery_id = result['gallery_ids'][-1] if result['gallery_ids'] else None
                 
-                detail_id = self.store_detail_house(detail_data, gallery_id)
+                detail_id = await self.store_detail_house(detail_data, gallery_id)
                 result['detail_id'] = detail_id
                 
                 if detail_id:
@@ -125,3 +134,4 @@ class HouseService:
             result['error'] = str(e)
         
         logger.info(f"Crawler results stored successfully", result)
+        return result

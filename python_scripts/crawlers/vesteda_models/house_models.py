@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict
-from datetime import date
+from typing import Optional, List
 
 class GalleryHouse(BaseModel):
     """Model for basic house information in gallery view"""
@@ -84,3 +83,18 @@ class DetailHouse(BaseModel):
     
     # Gallery reference - will be filled in after processing
     gallery_reference: Optional[GalleryHouse] = Field(None, description="Reference to the gallery model of this house")
+
+class FetchedPage(BaseModel):
+    """Model for a fetched property page with its content and extraction results"""
+    url: str = Field(..., description="The URL of the fetched page")
+    markdown: str = Field(..., description="The raw markdown content of the page")
+    success: bool = Field(..., description="Whether the page was successfully fetched")
+
+__all__ = [
+    'GalleryHouse',
+    'DetailHouse',
+    'IncomeRequirement',
+    'FloorPlan',
+    'ComplexInfo',
+    'FetchedPage'
+]

@@ -4,13 +4,16 @@ import logging
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 from dotenv import load_dotenv
 
-from python_scripts.crawlers.vesteda_steps import detailed_property_extraction
 from python_scripts.crawlers.vesteda_steps.detailed_property_extraction import execute_detailed_property_extraction
 from .vesteda_steps.login_step import execute_login_step
 from .vesteda_steps.search_navigation_step import execute_search_navigation
 from .vesteda_steps.property_extraction_step import execute_property_extraction
 from .vesteda_steps.cookie_acceptor import accept_cookies
+from .vesteda_steps.llm_extraction_step import execute_llm_extraction
 from python_scripts.db_models.house_service import HouseService
+from python_scripts.crawlers.vesteda_models.house_models import FetchedPage
+from python_scripts.services.llm_service import LLMProvider
+from typing import List
 
 # Configure logging
 logging.basicConfig(
@@ -43,6 +46,7 @@ class VestedaCrawler():
         self.password = os.getenv("VESTEDA_PASSWORD")
         self.session_id = "vesteda_session"
         self.deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
+        self.google_api_key = os.getenv("GOOGLE_API_KEY")
         self.house_service = HouseService()
         
     async def run_full_crawl(self):
@@ -66,13 +70,19 @@ class VestedaCrawler():
                 # Store gallery data only
                 logger.info(f"Storing {len(gallery_data)} gallery houses to database...")
                 self.house_service.store_crawler_results(gallery_data)
-                detail_houses = await execute_detailed_property_extraction(crawler, gallery_data, self.session_id, self.deepseek_api_key)
+                detail_houses: List[FetchedPage] = await execute_detailed_property_extraction(crawler, gallery_data, self.session_id)
+                
+                # Extract structured data using LLM
+                logger.info("Extracting structured data using LLM...")
+                detail_houses = await execute_llm_extraction(detail_houses, provider=LLMProvider.GEMINI)
                 
                 # Match detail houses with gallery houses based on address and city
                 for detail_house in detail_houses:
+                    if not detail_house.success or not detail_house.llm_output:
+                        continue
                     for gallery_house in gallery_data:
-                        if detail_house['address'] == gallery_house['address'] and detail_house['city'] == gallery_house['city']:
-                            detail_house.gallery_reference = gallery_house
+                        if detail_house.llm_output.address == gallery_house.address and detail_house.llm_output.city == gallery_house.city:
+                            detail_house.llm_output.gallery_reference = gallery_house
                             break
                 
                 # Store detail houses
