@@ -49,7 +49,7 @@ async def execute_detailed_property_extraction(crawler: AsyncWebCrawler, data: L
 
     urls = []
     for house in data:
-        url = main_url + house['detail_url']
+        url = main_url + house.detail_url
         urls.append(url)
     
     logger.info(f"Starting fetch for {len(urls)} properties...")

@@ -1,5 +1,6 @@
 from typing import Dict, Any, List, Optional
 import logging
+from python_scripts.crawlers.vesteda_models.house_models import DetailHouse, FetchedPage, GalleryHouse
 from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
 
@@ -29,7 +30,7 @@ class HouseService:
         """Initialize with optional session"""
         self.session = session or get_db_session()
     
-    async def store_gallery_houses(self, gallery_houses: List[Dict[str, Any]]) -> List[int]:
+    async def store_gallery_houses(self, gallery_houses: List[GalleryHouse]) -> List[int]:
         """Store a list of gallery houses and return their IDs"""
         gallery_ids = []
         skipped_count = 0
@@ -38,8 +39,8 @@ class HouseService:
             for house_data in gallery_houses:
                 try:
                     # Extract address and city for checking
-                    address = house_data.get('address')
-                    city = house_data.get('city')
+                    address = house_data.address
+                    city = house_data.city
                     
                     if not address or not city:
                         logger.warning(f"Skipping house with missing address or city: {house_data}")
@@ -56,7 +57,7 @@ class HouseService:
                         continue
                     
                     # Transform data
-                    db_data = GalleryHouseTransformer.from_dict(house_data)
+                    db_data = GalleryHouseTransformer.to_db_model(house_data)
                     
                     # Store in database
                     gallery_house = await repos['gallery'].create(db_data)
@@ -71,21 +72,21 @@ class HouseService:
         
         return gallery_ids
     
-    async def store_detail_houses(self, detail_houses: List[Dict[str, Any]]) -> List[int]:
+    async def store_detail_houses(self, detail_houses: List[FetchedPage]) -> List[int]:
         """Store a list of detail houses and return their IDs"""
         detail_ids = []
-        for detail_house in detail_houses:
-            detail_id = await self.store_detail_house(detail_house)
+        for page in detail_houses:
+            detail_id = await self.store_detail_house(page.llm_output)
             if detail_id:
                 detail_ids.append(detail_id)
         return detail_ids
             
-    async def store_detail_house(self, detail_house: Dict[str, Any], gallery_id: Optional[int] = None) -> Optional[int]:
+    async def store_detail_house(self, detail_house: DetailHouse, gallery_id: Optional[int] = None) -> Optional[int]:
         """Store a detail house and return its ID"""
         async with get_repositories(self.session) as repos:
             try:
                 if gallery_id is None and detail_house.gallery_reference is not None:
-                    gallery_id = detail_house.gallery_reference.id
+                    gallery_id = detail_house.gallery_reference
                 elif gallery_id is None:
                     logger.warning(f"No gallery ID provided for detail house: {detail_house}")
                     return None
@@ -102,7 +103,7 @@ class HouseService:
                 logger.error(f"Error storing detail house: {str(e)}")
                 return None
     
-    async def store_crawler_results(self, gallery_data: List[Dict[str, Any]], detail_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def store_crawler_results(self, gallery_data: List[GalleryHouse], detail_data: Optional[DetailHouse] = None) -> Dict[str, Any]:
         """Store crawler results including gallery and detail data"""
         result = {
             'gallery_ids': [],

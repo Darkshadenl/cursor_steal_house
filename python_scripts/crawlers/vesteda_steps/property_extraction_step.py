@@ -54,7 +54,7 @@ async def execute_property_extraction(crawler: AsyncWebCrawler, url: str, sessio
     
     if result.success:
         raw_data = json.loads(result.extracted_content)
-        transformed_data = [GalleryHouseTransformer.from_dict(house) for house in raw_data]
+        transformed_data = [GalleryHouseTransformer.dict_to_pydantic(house) for house in raw_data]
         logger.info(f"{GREEN}Successfully extracted and transformed {len(transformed_data)} properties{RESET}")        
         return transformed_data
     else:

@@ -11,7 +11,7 @@ from .vesteda_steps.property_extraction_step import execute_property_extraction
 from .vesteda_steps.cookie_acceptor import accept_cookies
 from .vesteda_steps.llm_extraction_step import execute_llm_extraction
 from python_scripts.db_models.house_service import HouseService
-from python_scripts.crawlers.vesteda_models.house_models import FetchedPage
+from python_scripts.crawlers.vesteda_models.house_models import DetailHouse, FetchedPage, GalleryHouse
 from python_scripts.services.llm_service import LLMProvider
 from typing import List
 
@@ -65,29 +65,33 @@ class VestedaCrawler():
                 
                 # Extract property listings
                 logger.info("Extracting property listings...")
-                gallery_data = await execute_property_extraction(crawler, url, self.session_id)
+                gallery_data: List[GalleryHouse] = await execute_property_extraction(crawler, url, self.session_id)
                 
                 # Store gallery data only
                 logger.info(f"Storing {len(gallery_data)} gallery houses to database...")
                 self.house_service.store_crawler_results(gallery_data)
-                detail_houses: List[FetchedPage] = await execute_detailed_property_extraction(crawler, gallery_data, self.session_id)
+                fetched_pages: List[FetchedPage] = await execute_detailed_property_extraction(crawler, gallery_data, self.session_id)
                 
                 # Extract structured data using LLM
                 logger.info("Extracting structured data using LLM...")
-                detail_houses = await execute_llm_extraction(detail_houses, provider=LLMProvider.GEMINI)
+                fetched_pages = await execute_llm_extraction(fetched_pages, provider=LLMProvider.GEMINI)
                 
                 # Match detail houses with gallery houses based on address and city
-                for detail_house in detail_houses:
-                    if not detail_house.success or not detail_house.llm_output:
+                for page in fetched_pages:
+                    if not page.success or not page.llm_output:
                         continue
                     for gallery_house in gallery_data:
-                        if detail_house.llm_output.address == gallery_house.address and detail_house.llm_output.city == gallery_house.city:
-                            detail_house.llm_output.gallery_reference = gallery_house
+                        detail_house: DetailHouse = page.llm_output
+                        gHouse: GalleryHouse = gallery_house
+                        
+                        if detail_house.address == gHouse.address and detail_house.city == gHouse.city:
+                            page.llm_output.gallery_reference = gHouse
                             break
                 
                 # Store detail houses
-                logger.info(f"Storing {len(detail_houses)} detail houses to database...")
-                self.house_service.store_detail_houses(detail_houses)
+                logger.info(f"Storing {len(fetched_pages)} detail houses to database...")
+                await self.house_service.store_detail_houses(fetched_pages)
+                
                 
         except Exception as e:
             logger.error(f"{RED}Error during crawl: {str(e)}{RESET}")

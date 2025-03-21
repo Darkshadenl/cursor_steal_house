@@ -12,6 +12,11 @@ class GalleryHouseTransformer:
     """Transforms gallery house data from crawler to database format"""
     
     @staticmethod
+    def dict_to_pydantic(data: Dict[str, Any]) -> PydanticGalleryHouse:
+        """Transform raw dictionary data to Pydantic GalleryHouse"""
+        return PydanticGalleryHouse(**data)
+    
+    @staticmethod
     def to_db_model(gallery_house: PydanticGalleryHouse) -> Dict[str, Any]:
         """Transform Pydantic GalleryHouse to database model dict"""
         return {
@@ -82,6 +87,11 @@ class FloorPlanTransformer:
 
 class DetailHouseTransformer:
     """Transforms detail house data from crawler to database format"""
+    
+    @staticmethod
+    def dict_to_pydantic(data: Dict[str, Any]) -> PydanticDetailHouse:
+        """Transform raw dictionary data to Pydantic DetailHouse"""
+        return PydanticDetailHouse(**data)
     
     @staticmethod
     def to_db_model(detail_house: PydanticDetailHouse, gallery_id: Optional[int] = None) -> Dict[str, Any]:
