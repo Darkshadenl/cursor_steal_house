@@ -11,7 +11,6 @@ async def execute_llm_extraction(fetched_pages: List[FetchedPage], provider: LLM
     """Extract structured data from markdown using LLM"""
     llm_service = LLMService()
     schema = DetailHouse.model_json_schema()
-    detail_houses: List[DetailHouse] = []
     
     for page in fetched_pages:
         if not page.success:
@@ -22,7 +21,7 @@ async def execute_llm_extraction(fetched_pages: List[FetchedPage], provider: LLM
                 
             if extracted_data:
                 json_data = json.loads(extracted_data)
-                detail_houses.append(DetailHouseTransformer.from_dict(json_data))
+                page.llm_output = DetailHouseTransformer.dict_to_pydantic(json_data)
                 logger.info(f"Successfully extracted data for {page.url}")
             else:
                 logger.warning(f"No data extracted for {page.url}")
@@ -30,4 +29,4 @@ async def execute_llm_extraction(fetched_pages: List[FetchedPage], provider: LLM
         except Exception as e:
             logger.error(f"Error extracting data for {page.url}: {str(e)}")
             
-    return detail_houses 
+    return fetched_pages
