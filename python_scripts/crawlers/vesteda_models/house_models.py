@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
+from python_scripts.db_models.models import GalleryHouse as DBGalleryHouse
 
 class GalleryHouse(BaseModel):
     """Model for basic house information in gallery view"""
@@ -81,8 +82,6 @@ class DetailHouse(BaseModel):
     # Extra options
     options: Optional[str] = Field(None, description="Extra options or possibilities for the house")
     
-    # Gallery reference - will be filled in after processing
-    gallery_reference: Optional[GalleryHouse] = Field(None, description="Reference to the gallery model of this house")
     gallery_id: Optional[int] = Field(None, description="ID of the gallery model of this house")
 
 class FetchedPage(BaseModel):
@@ -90,7 +89,8 @@ class FetchedPage(BaseModel):
     url: str = Field(..., description="The URL of the fetched page")
     markdown: str = Field(..., description="The raw markdown content of the page")
     success: bool = Field(..., description="Whether the page was successfully fetched")
-    llm_output: Optional[DetailHouse] = Field(None, description="The output of the LLM extraction")
+    
+
 __all__ = [
     'GalleryHouse',
     'DetailHouse',

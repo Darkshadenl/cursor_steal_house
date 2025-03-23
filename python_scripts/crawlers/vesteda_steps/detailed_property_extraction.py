@@ -55,7 +55,7 @@ async def execute_detailed_property_extraction(crawler: AsyncWebCrawler, data: L
     logger.info(f"Starting fetch for {len(urls)} properties...")
     
     results = await crawler.arun_many(
-                    urls=urls[0:2],
+                    urls=urls[0:1],
                     config=config,
                     dispatcher=dispatcher
                 )

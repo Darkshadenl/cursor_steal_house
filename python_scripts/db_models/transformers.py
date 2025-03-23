@@ -1,199 +1,190 @@
-from typing import Dict, Any, List, Optional
+from typing import List, Optional, Dict, Any
 import logging
 
 # Import Pydantic models
 from python_scripts.crawlers.vesteda_models.house_models import GalleryHouse as PydanticGalleryHouse
 from python_scripts.crawlers.vesteda_models.house_models import DetailHouse as PydanticDetailHouse
 from python_scripts.crawlers.vesteda_models.house_models import FloorPlan as PydanticFloorPlan
+from .models import GalleryHouse as DBGalleryHouse, DetailHouse as DBDetailHouse, FloorPlan as DBFloorPlan
 
 logger = logging.getLogger(__name__)
 
 class GalleryHouseTransformer:
-    """Transforms gallery house data from crawler to database format"""
+    """Transforms between GalleryHouse models and their representations"""
     
     @staticmethod
     def dict_to_pydantic(data: Dict[str, Any]) -> PydanticGalleryHouse:
-        """Transform raw dictionary data to Pydantic GalleryHouse"""
+        """Convert dictionary to GalleryHouse Pydantic model"""
         return PydanticGalleryHouse(**data)
     
     @staticmethod
-    def to_db_model(gallery_house: PydanticGalleryHouse) -> Dict[str, Any]:
-        """Transform Pydantic GalleryHouse to database model dict"""
-        return {
-            'address': getattr(gallery_house, 'address', ''),
-            'city': getattr(gallery_house, 'city', ''),
-            'status': getattr(gallery_house, 'status', ''),
-            'image_url': getattr(gallery_house, 'image_url', None),
-            'high_demand': getattr(gallery_house, 'high_demand', False),
-            'demand_message': getattr(gallery_house, 'demand_message', None),
-            'detail_url': getattr(gallery_house, 'detail_url', None)
-        }
+    def pydantic_to_dict(house: PydanticGalleryHouse) -> Dict[str, Any]:
+        """Convert GalleryHouse Pydantic model to dictionary"""
+        return house.model_dump()
     
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> Dict[str, Any]:
-        """Transform raw dictionary data to database model dict"""
-        
-        if (data.get('demand_message') 
-            == 'This house has many viewing requests. Increase you chance by selecting a different property.'):
-            high_demand = True
-        else:
-            high_demand = False
-        
-        return {
-            'address': data.get('address', ''),
-            'city': data.get('city', ''),
-            'status': data.get('status', ''),
-            'image_url': data.get('image_url'),
-            'high_demand': high_demand,
-            'demand_message': data.get('demand_message'),
-            'detail_url': data.get('detail_url')
-        }
+    def pydantic_to_db(house: PydanticGalleryHouse) -> DBGalleryHouse:
+        """Convert GalleryHouse Pydantic model to DB model"""
+        return DBGalleryHouse(
+            address=house.address,
+            city=house.city,
+            status=house.status,
+            image_url=house.image_url,
+            high_demand=house.high_demand,
+            demand_message=house.demand_message,
+            detail_url=house.detail_url
+        )
+    
+    @staticmethod
+    def db_to_pydantic(db_house: DBGalleryHouse) -> PydanticGalleryHouse:
+        """Convert DB model to GalleryHouse Pydantic model"""
+        return PydanticGalleryHouse(
+            address=db_house.address,
+            city=db_house.city,
+            status=db_house.status,
+            image_url=db_house.image_url,
+            high_demand=db_house.high_demand,
+            demand_message=db_house.demand_message,
+            detail_url=db_house.detail_url
+        )
 
 
 class FloorPlanTransformer:
-    """Transforms floor plan data from crawler to database format"""
+    """Transforms between FloorPlan models and their representations"""
     
     @staticmethod
-    def to_db_model(floor_plan: PydanticFloorPlan, house_id: Optional[int] = None) -> Dict[str, Any]:
-        """Transform Pydantic FloorPlan to database model dict"""
-        model_dict = {
-            'image_url': getattr(floor_plan, 'image_url', ''),
-            'description': getattr(floor_plan, 'description', None)
-        }
-        
-        if house_id:
-            model_dict['house_id'] = house_id
-            
-        return model_dict
+    def dict_to_pydantic(data: Dict[str, Any]) -> PydanticFloorPlan:
+        """Convert dictionary to FloorPlan Pydantic model"""
+        return PydanticFloorPlan(**data)
     
     @staticmethod
-    def from_dict(data: Dict[str, Any], house_id: Optional[int] = None) -> Dict[str, Any]:
-        """Transform raw dictionary data to database model dict"""
-        model_dict = {
-            'image_url': data.get('image_url', ''),
-            'description': data.get('description')
-        }
-        
-        if house_id:
-            model_dict['house_id'] = house_id
-            
-        return model_dict
+    def pydantic_to_dict(plan: PydanticFloorPlan) -> Dict[str, Any]:
+        """Convert FloorPlan Pydantic model to dictionary"""
+        return plan.model_dump()
     
     @staticmethod
-    def transform_list(floor_plans: List[Dict[str, Any]], house_id: Optional[int] = None) -> List[Dict[str, Any]]:
-        """Transform a list of floor plans"""
-        return [FloorPlanTransformer.from_dict(plan, house_id) for plan in floor_plans]
+    def pydantic_to_db(plan: PydanticFloorPlan, house_id: int) -> DBFloorPlan:
+        """Convert FloorPlan Pydantic model to DB model"""
+        return DBFloorPlan(
+            house_id=house_id,
+            image_url=plan.image_url,
+            description=plan.description
+        )
+    
+    @staticmethod
+    def db_to_pydantic(db_plan: DBFloorPlan) -> PydanticFloorPlan:
+        """Convert DB model to FloorPlan Pydantic model"""
+        return PydanticFloorPlan(
+            image_url=db_plan.image_url,
+            description=db_plan.description
+        )
 
 
 class DetailHouseTransformer:
-    """Transforms detail house data from crawler to database format"""
+    """Transforms between DetailHouse models and their representations"""
     
     @staticmethod
     def dict_to_pydantic(data: Dict[str, Any]) -> PydanticDetailHouse:
-        """Transform raw dictionary data to Pydantic DetailHouse"""
+        """Convert dictionary to DetailHouse Pydantic model"""
         return PydanticDetailHouse(**data)
     
     @staticmethod
-    def to_db_model(detail_house: PydanticDetailHouse, gallery_id: Optional[int] = None) -> Dict[str, Any]:
-        """Transform Pydantic DetailHouse to database model dict"""
-        # Basic model data
-        model_dict = {
-            'address': getattr(detail_house, 'address', ''),
-            'postal_code': getattr(detail_house, 'postal_code', ''),
-            'city': getattr(detail_house, 'city', ''),
-            'neighborhood': getattr(detail_house, 'neighborhood', None),
-            'rental_price': getattr(detail_house, 'rental_price', ''),
-            'service_costs': getattr(detail_house, 'service_costs', None),
-            'square_meters': getattr(detail_house, 'square_meters', 0),
-            'bedrooms': getattr(detail_house, 'bedrooms', 0),
-            'energy_label': getattr(detail_house, 'energy_label', None),
-            'status': getattr(detail_house, 'status', ''),
-            'available_from': getattr(detail_house, 'available_from', None),
-            'complex': getattr(detail_house, 'complex', None),
-            'description': getattr(detail_house, 'description', ''),
-            'location_map_url': getattr(detail_house, 'location_map_url', None),
-            'request_viewing_url': getattr(detail_house, 'request_viewing_url', None),
-            'options': getattr(detail_house, 'options', None)
-        }
-        
-        # Add gallery_id if provided
-        if gallery_id:
-            model_dict['gallery_id'] = gallery_id
-        
-        # Income requirements
-        income_requirements = getattr(detail_house, 'income_requirements', None)
-        if income_requirements:
-            model_dict['min_income_single'] = getattr(income_requirements, 'min_income_single', None)
-            model_dict['min_income_joint'] = getattr(income_requirements, 'min_income_joint', None)
-            model_dict['read_more_url'] = getattr(income_requirements, 'read_more_url', None)
-        
-        # Complex information
-        complex_info = getattr(detail_house, 'complex_info', None)
-        if complex_info:
-            model_dict['complex_name'] = getattr(complex_info, 'name', None)
-            model_dict['complex_description'] = getattr(complex_info, 'description', None)
-            model_dict['year_of_construction'] = getattr(complex_info, 'year_of_construction', None)
-            model_dict['number_of_objects'] = getattr(complex_info, 'number_of_objects', None)
-            model_dict['number_of_floors'] = getattr(complex_info, 'number_of_floors', None)
-            model_dict['complex_image_url'] = getattr(complex_info, 'image_url', None)
-        
-        # Floor plans
-        floor_plans = getattr(detail_house, 'floor_plans', None)
-        if floor_plans:
-            floor_plans_list = []
-            for plan in floor_plans:
-                floor_plans_list.append(FloorPlanTransformer.to_db_model(plan))
-            model_dict['floor_plans'] = floor_plans_list
-        
-        return model_dict
+    def pydantic_to_dict(house: PydanticDetailHouse) -> Dict[str, Any]:
+        """Convert DetailHouse Pydantic model to dictionary"""
+        return house.model_dump()
     
     @staticmethod
-    def from_dict(data: Dict[str, Any], gallery_id: Optional[int] = None) -> Dict[str, Any]:
-        """Transform raw dictionary data to database model dict"""
-        # Basic model data
-        model_dict = {
-            'address': data.get('address', ''),
-            'postal_code': data.get('postal_code', ''),
-            'city': data.get('city', ''),
-            'neighborhood': data.get('neighborhood'),
-            'rental_price': data.get('rental_price', ''),
-            'service_costs': data.get('service_costs'),
-            'square_meters': data.get('square_meters', 0),
-            'bedrooms': data.get('bedrooms', 0),
-            'energy_label': data.get('energy_label'),
-            'status': data.get('status', ''),
-            'available_from': data.get('available_from'),
-            'complex': data.get('complex'),
-            'description': data.get('description', ''),
-            'location_map_url': data.get('location_map_url'),
-            'request_viewing_url': data.get('request_viewing_url'),
-            'options': data.get('options')
-        }
+    def pydantic_to_db(house: PydanticDetailHouse) -> DBDetailHouse:
+        """Convert DetailHouse Pydantic model to DB model"""
+        db_house = DBDetailHouse(
+            gallery_id=house.gallery_id,
+            address=house.address,
+            postal_code=house.postal_code,
+            city=house.city,
+            neighborhood=house.neighborhood,
+            rental_price=house.rental_price,
+            service_costs=house.service_costs,
+            square_meters=house.square_meters,
+            bedrooms=house.bedrooms,
+            energy_label=house.energy_label,
+            status=house.status,
+            available_from=house.available_from,
+            complex=house.complex,
+            description=house.description,
+            location_map_url=house.location_map_url,
+            request_viewing_url=house.request_viewing_url,
+            options=house.options
+        )
         
-        # Add gallery_id if provided
-        if gallery_id:
-            model_dict['gallery_id'] = gallery_id
+        # Set income requirements if they exist
+        if house.income_requirements:
+            db_house.min_income_single = house.income_requirements.min_income_single
+            db_house.min_income_joint = house.income_requirements.min_income_joint
+            db_house.read_more_url = house.income_requirements.read_more_url
         
-        # Income requirements
-        income_requirements = data.get('income_requirements')
-        if income_requirements:
-            model_dict['min_income_single'] = income_requirements.get('min_income_single')
-            model_dict['min_income_joint'] = income_requirements.get('min_income_joint')
-            model_dict['read_more_url'] = income_requirements.get('read_more_url')
+        # Set complex info if it exists
+        if house.complex_info:
+            db_house.complex_name = house.complex_info.name
+            db_house.complex_description = house.complex_info.description
+            db_house.year_of_construction = house.complex_info.year_of_construction
+            db_house.number_of_objects = house.complex_info.number_of_objects
+            db_house.number_of_floors = house.complex_info.number_of_floors
+            db_house.complex_image_url = house.complex_info.image_url
         
-        # Complex information
-        complex_info = data.get('complex_info')
-        if complex_info:
-            model_dict['complex_name'] = complex_info.get('name')
-            model_dict['complex_description'] = complex_info.get('description')
-            model_dict['year_of_construction'] = complex_info.get('year_of_construction')
-            model_dict['number_of_objects'] = complex_info.get('number_of_objects')
-            model_dict['number_of_floors'] = complex_info.get('number_of_floors')
-            model_dict['complex_image_url'] = complex_info.get('image_url')
+        return db_house
+    
+    @staticmethod
+    def db_to_pydantic(db_house: DBDetailHouse) -> PydanticDetailHouse:
+        """Convert DB model to DetailHouse Pydantic model"""
+        # Create floor plans list
+        floor_plans = []
+        if hasattr(db_house, 'floor_plans'):
+            for plan in db_house.floor_plans:
+                floor_plans.append(PydanticFloorPlan(
+                    image_url=plan.image_url,
+                    description=plan.description
+                ))
         
-        # Floor plans
-        floor_plans = data.get('floor_plans')
-        if floor_plans and isinstance(floor_plans, list):
-            model_dict['floor_plans'] = FloorPlanTransformer.transform_list(floor_plans)
+        # Create income requirements if they exist
+        income_requirements = None
+        if any([db_house.min_income_single, db_house.min_income_joint, db_house.read_more_url]):
+            income_requirements = {
+                'min_income_single': db_house.min_income_single,
+                'min_income_joint': db_house.min_income_joint,
+                'read_more_url': db_house.read_more_url
+            }
         
-        return model_dict 
+        # Create complex info if it exists
+        complex_info = None
+        if any([db_house.complex_name, db_house.complex_description, db_house.year_of_construction,
+                db_house.number_of_objects, db_house.number_of_floors, db_house.complex_image_url]):
+            complex_info = {
+                'name': db_house.complex_name,
+                'description': db_house.complex_description,
+                'year_of_construction': db_house.year_of_construction,
+                'number_of_objects': db_house.number_of_objects,
+                'number_of_floors': db_house.number_of_floors,
+                'image_url': db_house.complex_image_url
+            }
+        
+        return PydanticDetailHouse(
+            address=db_house.address,
+            postal_code=db_house.postal_code,
+            city=db_house.city,
+            neighborhood=db_house.neighborhood,
+            rental_price=db_house.rental_price,
+            service_costs=db_house.service_costs,
+            square_meters=db_house.square_meters,
+            bedrooms=db_house.bedrooms,
+            energy_label=db_house.energy_label,
+            status=db_house.status,
+            available_from=db_house.available_from,
+            complex=db_house.complex,
+            description=db_house.description,
+            location_map_url=db_house.location_map_url,
+            request_viewing_url=db_house.request_viewing_url,
+            options=db_house.options,
+            income_requirements=income_requirements,
+            complex_info=complex_info,
+            floor_plans=floor_plans
+        ) 
