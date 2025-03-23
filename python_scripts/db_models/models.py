@@ -89,6 +89,14 @@ class DetailHouse(Base):
     # Floor plans are stored in a related table
     floor_plans = relationship("FloorPlan", back_populates="house")
 
+    def has_changes(self, other: 'DetailHouse') -> bool:
+        """Compare this instance with another DetailHouse instance to check for changes"""
+        for field in self.__dict__:
+            if not field.startswith('_') and hasattr(other, field):
+                if getattr(self, field) != getattr(other, field):
+                    return True
+        return False
+
 
 class FloorPlan(Base):
     """SQLAlchemy model for floor plans"""

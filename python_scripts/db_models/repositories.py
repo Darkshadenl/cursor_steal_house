@@ -1,10 +1,12 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from typing import List, Optional, Dict, Any
+from sqlalchemy import select, delete
+from typing import List, Optional
 import logging
 
-from .models import GalleryHouse, DetailHouse, FloorPlan
+from .models import GalleryHouse as DBGalleryHouse, DetailHouse as DBDetailHouse, FloorPlan as DBFloorPlan
+from python_scripts.crawlers.vesteda_models.house_models import GalleryHouse, DetailHouse, FloorPlan
 from .db_connection import get_db_session
+from .transformers import GalleryHouseTransformer, DetailHouseTransformer, FloorPlanTransformer
 
 logger = logging.getLogger(__name__)
 
@@ -14,73 +16,76 @@ class GalleryHouseRepository:
     def __init__(self, session: Optional[AsyncSession] = None):
         self.session = session or get_db_session()
     
-    async def get_by_id(self, gallery_id: int) -> Optional[GalleryHouse]:
+    async def get_by_id(self, gallery_id: int) -> Optional[DBGalleryHouse]:
         """Get a gallery house by ID"""
         result = await self.session.execute(
-            select(GalleryHouse).where(GalleryHouse.id == gallery_id)
+            select(DBGalleryHouse).where(DBGalleryHouse.id == gallery_id)
         )
         return result.scalar_one_or_none()
     
-    async def get_by_address(self, address: str, city: str) -> Optional[GalleryHouse]:
+    async def get_by_address(self, address: str, city: str) -> Optional[DBGalleryHouse]:
         """Get a gallery house by address and city"""
         result = await self.session.execute(
-            select(GalleryHouse).where(
-                GalleryHouse.address == address,
-                GalleryHouse.city == city
+            select(DBGalleryHouse).where(
+                DBGalleryHouse.address == address,
+                DBGalleryHouse.city == city
             )
         )
         return result.scalar_one_or_none()
     
-    async def create(self, gallery_data: Dict[str, Any]) -> GalleryHouse:
+    async def create(self, gallery_house: GalleryHouse) -> DBGalleryHouse:
         """Create a new gallery house"""
-        gallery_house = GalleryHouse(**gallery_data)
-        self.session.add(gallery_house)
+        self.high_demand_update(gallery_house)
+        db_house = GalleryHouseTransformer.pydantic_to_db(gallery_house)
+        self.session.add(db_house)
         await self.session.commit()
-        logger.info(f"Created gallery house: {gallery_house.address}, {gallery_house.city}")
-        return gallery_house
+        logger.info(f"Created gallery house: {db_house.address}, {db_house.city}")
+        return db_house
+
+    def high_demand_update(self, gallery_house: DBGalleryHouse):
+        if (gallery_house.demand_message == 'This house has many viewing requests. Increase you chance by selecting a different property.'):
+            gallery_house.high_demand = True
     
-    async def update(self, gallery_id: int, gallery_data: Dict[str, Any]) -> Optional[GalleryHouse]:
+    async def update(self, gallery_house: DBGalleryHouse) -> Optional[DBGalleryHouse]:
         """Update an existing gallery house"""
-        gallery_house = await self.get_by_id(gallery_id)
-        if not gallery_house:
+        db_house = await self.session.execute(
+            select(DBGalleryHouse).where(DBGalleryHouse.id == gallery_house.id)
+        )
+        db_house = db_house.scalar_one_or_none()
+        if not db_house:
             return None
         
-        for key, value in gallery_data.items():
-            if hasattr(gallery_house, key):
-                setattr(gallery_house, key, value)
+        self.high_demand_update(gallery_house)
+        updated_db = GalleryHouseTransformer.pydantic_to_db(gallery_house)
+        for key, value in updated_db.__dict__.items():
+            if not key.startswith('_'):
+                setattr(db_house, key, value)
         
         await self.session.commit()
-        logger.info(f"Updated gallery house: {gallery_house.address}, {gallery_house.city}")
-        return gallery_house
+        logger.info(f"Updated gallery house: {db_house.address}, {db_house.city}")
+        return db_house
     
-    async def get_or_create(self, gallery_data: Dict[str, Any]) -> GalleryHouse:
+    async def get_or_create(self, gallery_house: GalleryHouse) -> DBGalleryHouse:
         """Get an existing gallery house or create a new one"""
-        address = gallery_data.get('address')
-        city = gallery_data.get('city')
-        
-        if not address or not city:
+        if not gallery_house.address or not gallery_house.city:
             raise ValueError("Address and city are required for gallery house")
         
-        existing = await self.get_by_address(address, city)
+        existing = await self.get_by_address(gallery_house.address, gallery_house.city)
         if existing:
-            # Update with new data
-            for key, value in gallery_data.items():
-                if hasattr(existing, key):
-                    setattr(existing, key, value)
-            await self.session.commit()
-            logger.info(f"Updated existing gallery house: {existing.address}, {existing.city}")
             return existing
         
-        # Create new
-        return await self.create(gallery_data)
+        return await self.create(gallery_house)
     
     async def delete(self, gallery_id: int) -> bool:
         """Delete a gallery house"""
-        gallery_house = await self.get_by_id(gallery_id)
-        if not gallery_house:
+        db_house = await self.session.execute(
+            select(DBGalleryHouse).where(DBGalleryHouse.id == gallery_id)
+        )
+        db_house = db_house.scalar_one_or_none()
+        if not db_house:
             return False
         
-        await self.session.delete(gallery_house)
+        await self.session.delete(db_house)
         await self.session.commit()
         logger.info(f"Deleted gallery house with ID: {gallery_id}")
         return True
@@ -92,117 +97,103 @@ class DetailHouseRepository:
     def __init__(self, session: Optional[AsyncSession] = None):
         self.session = session or get_db_session()
     
-    async def get_by_id(self, detail_id: int) -> Optional[DetailHouse]:
+    async def get_by_id(self, detail_id: int) -> Optional[DBDetailHouse]:
         """Get a detail house by ID"""
         result = await self.session.execute(
-            select(DetailHouse).where(DetailHouse.id == detail_id)
+            select(DBDetailHouse).where(DBDetailHouse.id == detail_id)
         )
         return result.scalar_one_or_none()
     
-    async def get_by_address(self, address: str, postal_code: str, city: str) -> Optional[DetailHouse]:
+    async def get_by_address(self, address: str, postal_code: str, city: str) -> Optional[DBDetailHouse]:
         """Get a detail house by address, postal code, and city"""
         result = await self.session.execute(
-            select(DetailHouse).where(
-                DetailHouse.address == address,
-                DetailHouse.postal_code == postal_code,
-                DetailHouse.city == city
+            select(DBDetailHouse).where(
+                DBDetailHouse.address == address,
+                DBDetailHouse.postal_code == postal_code,
+                DBDetailHouse.city == city
             )
         )
         return result.scalar_one_or_none()
     
-    async def get_by_gallery_id(self, gallery_id: int) -> Optional[DetailHouse]:
+    async def get_by_gallery_id(self, gallery_id: int) -> Optional[DBDetailHouse]:
         """Get a detail house by gallery ID"""
         result = await self.session.execute(
-            select(DetailHouse).where(DetailHouse.gallery_id == gallery_id)
+            select(DBDetailHouse).where(DBDetailHouse.gallery_id == gallery_id)
         )
         return result.scalar_one_or_none()
     
-    async def create(self, detail_data: Dict[str, Any], gallery_id: Optional[int] = None) -> DetailHouse:
+    async def create(self, detail_house: DetailHouse, gallery_id: Optional[int] = None) -> DBDetailHouse:
         """Create a new detail house"""
-        if gallery_id:
-            detail_data['gallery_id'] = gallery_id
-            
-        # Extract floor plans if they exist
-        floor_plans_data = detail_data.pop('floor_plans', None)
-        
-        detail_house = DetailHouse(**detail_data)
-        self.session.add(detail_house)
+        db_house = DetailHouseTransformer.pydantic_to_db(detail_house, gallery_id)
+        self.session.add(db_house)
         await self.session.flush()  # Get ID without committing
         
         # Add floor plans if they exist
-        if floor_plans_data and isinstance(floor_plans_data, list):
-            for plan_data in floor_plans_data:
-                plan = FloorPlan(house_id=detail_house.id, **plan_data)
-                self.session.add(plan)
+        if detail_house.floor_plans:
+            for plan in detail_house.floor_plans:
+                db_plan = FloorPlanTransformer.pydantic_to_db(plan, db_house.id)
+                self.session.add(db_plan)
         
         await self.session.commit()
-        logger.info(f"Created detail house: {detail_house.address}, {detail_house.city}")
-        return detail_house
+        logger.info(f"Created detail house: {db_house.address}, {db_house.city}")
+        return db_house
     
-    async def update(self, detail_id: int, detail_data: Dict[str, Any]) -> Optional[DetailHouse]:
+    async def update(self, detail_id: int, detail_house: DetailHouse) -> Optional[DBDetailHouse]:
         """Update an existing detail house"""
-        detail_house = await self.get_by_id(detail_id)
-        if not detail_house:
+        db_house = await self.session.execute(
+            select(DBDetailHouse).where(DBDetailHouse.id == detail_id)
+        )
+        db_house = db_house.scalar_one_or_none()
+        if not db_house:
             return None
         
-        # Extract floor plans if they exist
-        floor_plans_data = detail_data.pop('floor_plans', None)
-        
-        # Update detail house attributes
-        for key, value in detail_data.items():
-            if hasattr(detail_house, key):
-                setattr(detail_house, key, value)
-        
-        # Handle floor plans update
-        if floor_plans_data and isinstance(floor_plans_data, list):
-            # Remove existing floor plans
-            await self.session.execute(
-                select(FloorPlan).where(FloorPlan.house_id == detail_id)
-            ).delete()
-            
-            # Add new floor plans
-            for plan_data in floor_plans_data:
-                plan = FloorPlan(house_id=detail_id, **plan_data)
-                self.session.add(plan)
+        # Update basic fields
+        updated_db = DetailHouseTransformer.pydantic_to_db(detail_house)
+        for key, value in updated_db.__dict__.items():
+            if not key.startswith('_'):
+                setattr(db_house, key, value)
         
         await self.session.commit()
-        logger.info(f"Updated detail house: {detail_house.address}, {detail_house.city}")
-        return detail_house
+        logger.info(f"Updated detail house: {db_house.address}, {db_house.city}")
+        return db_house
     
-    async def get_or_create(self, detail_data: Dict[str, Any], gallery_id: Optional[int] = None) -> DetailHouse:
+    async def get_or_create(self, detail_house: DetailHouse) -> DBDetailHouse:
         """Get an existing detail house or create a new one"""
-        address = detail_data.get('address')
-        postal_code = detail_data.get('postal_code')
-        city = detail_data.get('city')
-        
-        if not all([address, postal_code, city]):
+        if not all([detail_house.address, detail_house.postal_code, detail_house.city]):
             raise ValueError("Address, postal code, and city are required for detail house")
         
         existing = None
         
         # Try to find by gallery_id if provided
-        if gallery_id:
-            existing = await self.get_by_gallery_id(gallery_id)
+        if detail_house.gallery_id:
+            existing = await self.get_by_gallery_id(detail_house.gallery_id)
         
         # If not found, try to find by address
         if not existing:
-            existing = await self.get_by_address(address, postal_code, city)
+            existing = await self.get_by_address(
+                detail_house.address,
+                detail_house.postal_code,
+                detail_house.city
+            )
         
         if existing:
-            # Update with new data
-            return await self.update(existing.id, detail_data)
+            if existing.has_changes(detail_house):
+                return await self.update(existing.id, detail_house)
+            return existing
         
-        # Create new
-        return await self.create(detail_data, gallery_id)
+        return await self.create(detail_house)
     
     async def delete(self, detail_id: int) -> bool:
         """Delete a detail house"""
-        detail_house = await self.get_by_id(detail_id)
-        if not detail_house:
+        db_house = await self.session.execute(
+            select(DBDetailHouse).where(DBDetailHouse.id == detail_id)
+        )
+        db_house = db_house.scalar_one_or_none()
+        if not db_house:
             return False
         
         # Floor plans will be automatically deleted due to cascade
-        await self.session.delete(detail_house)
+        await self.session.delete(db_house)
         await self.session.commit()
         logger.info(f"Deleted detail house with ID: {detail_id}")
         return True
@@ -214,49 +205,56 @@ class FloorPlanRepository:
     def __init__(self, session: Optional[AsyncSession] = None):
         self.session = session or get_db_session()
     
-    async def get_by_id(self, plan_id: int) -> Optional[FloorPlan]:
+    async def get_by_id(self, plan_id: int) -> Optional[DBFloorPlan]:
         """Get a floor plan by ID"""
         result = await self.session.execute(
-            select(FloorPlan).where(FloorPlan.id == plan_id)
+            select(DBFloorPlan).where(DBFloorPlan.id == plan_id)
         )
         return result.scalar_one_or_none()
     
-    async def get_by_house_id(self, house_id: int) -> List[FloorPlan]:
+    async def get_by_house_id(self, house_id: int) -> List[DBFloorPlan]:
         """Get all floor plans for a house"""
         result = await self.session.execute(
-            select(FloorPlan).where(FloorPlan.house_id == house_id)
+            select(DBFloorPlan).where(DBFloorPlan.house_id == house_id)
         )
         return result.scalars().all()
     
-    async def create(self, plan_data: Dict[str, Any]) -> FloorPlan:
+    async def create(self, plan: FloorPlan, house_id: int) -> DBFloorPlan:
         """Create a new floor plan"""
-        floor_plan = FloorPlan(**plan_data)
-        self.session.add(floor_plan)
+        db_plan = FloorPlanTransformer.pydantic_to_db(plan, house_id)
+        self.session.add(db_plan)
         await self.session.commit()
-        logger.info(f"Created floor plan for house ID: {floor_plan.house_id}")
-        return floor_plan
+        logger.info(f"Created floor plan for house ID: {house_id}")
+        return db_plan
     
-    async def update(self, plan_id: int, plan_data: Dict[str, Any]) -> Optional[FloorPlan]:
+    async def update(self, plan_id: int, plan: FloorPlan) -> Optional[DBFloorPlan]:
         """Update an existing floor plan"""
-        floor_plan = await self.get_by_id(plan_id)
-        if not floor_plan:
+        db_plan = await self.session.execute(
+            select(DBFloorPlan).where(DBFloorPlan.id == plan_id)
+        )
+        db_plan = db_plan.scalar_one_or_none()
+        if not db_plan:
             return None
         
-        for key, value in plan_data.items():
-            if hasattr(floor_plan, key):
-                setattr(floor_plan, key, value)
+        updated_db = FloorPlanTransformer.pydantic_to_db(plan, db_plan.house_id)
+        for key, value in updated_db.__dict__.items():
+            if not key.startswith('_'):
+                setattr(db_plan, key, value)
         
         await self.session.commit()
         logger.info(f"Updated floor plan with ID: {plan_id}")
-        return floor_plan
+        return db_plan
     
     async def delete(self, plan_id: int) -> bool:
         """Delete a floor plan"""
-        floor_plan = await self.get_by_id(plan_id)
-        if not floor_plan:
+        db_plan = await self.session.execute(
+            select(DBFloorPlan).where(DBFloorPlan.id == plan_id)
+        )
+        db_plan = db_plan.scalar_one_or_none()
+        if not db_plan:
             return False
         
-        await self.session.delete(floor_plan)
+        await self.session.delete(db_plan)
         await self.session.commit()
         logger.info(f"Deleted floor plan with ID: {plan_id}")
         return True 

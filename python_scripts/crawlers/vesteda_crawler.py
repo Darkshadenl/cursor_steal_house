@@ -13,6 +13,7 @@ from .vesteda_steps.llm_extraction_step import execute_llm_extraction
 from python_scripts.db_models.house_service import HouseService
 from python_scripts.crawlers.vesteda_models.house_models import DetailHouse, FetchedPage, GalleryHouse
 from python_scripts.services.llm_service import LLMProvider
+from python_scripts.db_models.models import GalleryHouse as DBGalleryHouse, DetailHouse as DBDetailHouse
 from typing import List
 
 # Configure logging
@@ -69,29 +70,34 @@ class VestedaCrawler():
                 
                 # Store gallery data only
                 logger.info(f"Storing {len(gallery_data)} gallery houses to database...")
-                self.house_service.store_crawler_results(gallery_data)
+                stored_houses: List[DBGalleryHouse] = await self.house_service.store_gallery_houses(gallery_data)
                 fetched_pages: List[FetchedPage] = await execute_detailed_property_extraction(crawler, gallery_data, self.session_id)
                 
                 # Extract structured data using LLM
                 logger.info("Extracting structured data using LLM...")
-                fetched_pages = await execute_llm_extraction(fetched_pages, provider=LLMProvider.GEMINI)
+                detail_houses: List[DetailHouse] = await execute_llm_extraction(fetched_pages, provider=LLMProvider.GEMINI)
                 
                 # Match detail houses with gallery houses based on address and city
-                for page in fetched_pages:
-                    if not page.success or not page.llm_output:
-                        continue
-                    for gallery_house in gallery_data:
-                        detail_house: DetailHouse = page.llm_output
-                        gHouse: GalleryHouse = gallery_house
-                        
-                        if detail_house.address == gHouse.address and detail_house.city == gHouse.city:
-                            page.llm_output.gallery_reference = gHouse
-                            break
+                for detail_house in detail_houses:
+                    matching_gallery_house = next(
+                        (house for house in stored_houses if house.address == detail_house.address and house.city == detail_house.city),
+                        None
+                    )
+                    
+                    if matching_gallery_house:
+                        detail_house.gallery_id = matching_gallery_house.id
+                    else:
+                        logger.warning(f"No matching gallery house found for {detail_house.address}, {detail_house.city}")
                 
                 # Store detail houses
-                logger.info(f"Storing {len(fetched_pages)} detail houses to database...")
-                await self.house_service.store_detail_houses(fetched_pages)
+                logger.info(f"Storing {len(detail_houses)} detail houses to database...")
+                stored_detail_houses: List[DBDetailHouse] = await self.house_service.store_detail_houses(detail_houses)
                 
+                return {
+                    'gallery_count': len(gallery_data),
+                    'detail_count': len(stored_detail_houses),
+                    'success': True
+                }
                 
         except Exception as e:
             logger.error(f"{RED}Error during crawl: {str(e)}{RESET}")
@@ -103,7 +109,7 @@ if __name__ == "__main__":
         result = asyncio.run(crawler.run_full_crawl())
         print(f"{GREEN}Crawl completed successfully!{RESET}")
         print(f"Processed {result['gallery_count']} properties")
-        print(f"Stored {len(result['gallery_ids'])} properties in database")
+        print(f"Stored {result['detail_count']} properties in database")
     except Exception as e:
         print(f"{RED}Error during crawl: {str(e)}{RESET}")
         raise e 
