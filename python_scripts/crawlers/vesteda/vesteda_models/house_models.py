@@ -37,8 +37,8 @@ class GalleryHouse(BaseModel):
 class IncomeRequirement(BaseModel):
     """Model for income requirements"""
 
-    min_income_single: str = Field(
-        ..., description="Minimum income requirement for single person"
+    min_income_single: Optional[str] = Field(
+        None, description="Minimum income requirement for single person"
     )
     min_income_joint: Optional[str] = Field(
         None, description="Minimum income requirement for joint application"
@@ -51,7 +51,7 @@ class IncomeRequirement(BaseModel):
 class FloorPlan(BaseModel):
     """Model for floor plans"""
 
-    image_url: str = Field(..., description="URL to the floor plan image")
+    image_url: Optional[str] = Field(None, description="URL to the floor plan image")
     description: Optional[str] = Field(
         None, description="Description of the floor plan"
     )
@@ -60,11 +60,17 @@ class FloorPlan(BaseModel):
 class ComplexInfo(BaseModel):
     """Model for complex information"""
 
-    name: str = Field(..., description="Name of the complex")
-    description: str = Field(..., description="Description of the complex")
-    year_of_construction: int = Field(..., description="Year the complex was built")
-    number_of_objects: str = Field(..., description="Number of objects in the complex")
-    number_of_floors: str = Field(..., description="Number of floors in the complex")
+    name: Optional[str] = Field(None, description="Name of the complex")
+    description: Optional[str] = Field(None, description="Description of the complex")
+    year_of_construction: Optional[int] = Field(
+        None, description="Year the complex was built"
+    )
+    number_of_objects: Optional[str] = Field(
+        None, description="Number of objects in the complex"
+    )
+    number_of_floors: Optional[str] = Field(
+        None, description="Number of floors in the complex"
+    )
     image_url: Optional[str] = Field(None, description="URL to image of the complex")
 
 
