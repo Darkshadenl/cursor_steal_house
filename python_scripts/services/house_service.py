@@ -14,7 +14,7 @@ from ..db_models.repositories import (
     FloorPlanRepository,
 )
 from ..db_models.db_connection import get_db_session
-from .models import (
+from ..db_models.models import (
     GalleryHouse as DBGalleryHouse,
     DetailHouse as DBDetailHouse,
     FloorPlan as DBFloorPlan,

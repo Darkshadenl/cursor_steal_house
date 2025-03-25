@@ -108,4 +108,4 @@ class FloorPlan(Base):
     image_url = Column(String, nullable=False)
     description = Column(String, nullable=True)
     
-    house = relationship("DetailHouse", back_populates="floor_plans") 
+    house = relationship("DetailHouse", back_populates="floor_plans")
