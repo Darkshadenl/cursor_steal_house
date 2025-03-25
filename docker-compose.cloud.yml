@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  crawler:
+    build: .
+    image: gcr.io/${PROJECT_ID}/steal-house-crawler:latest
+    environment:
+      # Database connection
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      # API Keys
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      # Credentials
+      - VESTEDA_EMAIL=${VESTEDA_EMAIL}
+      - VESTEDA_PASSWORD=${VESTEDA_PASSWORD}
+    volumes:
+      - browser_data:/app/browser_data
+
+volumes:
+  browser_data:
