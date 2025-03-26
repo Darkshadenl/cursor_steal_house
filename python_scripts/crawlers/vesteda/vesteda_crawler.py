@@ -13,7 +13,7 @@ from .vesteda_steps.property_extraction_step import execute_property_extraction
 from .vesteda_steps.cookie_acceptor import accept_cookies
 from .vesteda_steps.llm_extraction_step import execute_llm_extraction
 from python_scripts.services.house_service import HouseService
-from python_scripts.crawlers.vesteda.vesteda_models.house_models import (
+from python_scripts.crawlers.vesteda.models.house_models import (
     DetailHouse,
     FetchedPage,
     GalleryHouse,
@@ -45,7 +45,7 @@ class VestedaCrawler:
         load_dotenv()
         self.browser_config = BrowserConfig(
             user_data_dir="./browser_data/vesteda",  # Persistent profile directory
-            headless=True,  # Initially false for setup
+            headless=True,
             verbose=True,  # For debugging
             use_managed_browser=True,  # For persistent sessions
         )
@@ -139,10 +139,9 @@ class VestedaCrawler:
 if __name__ == "__main__":
     crawler = VestedaCrawler()
     try:
+        logger.info("Starting vesteda crawl...")
         result = asyncio.run(crawler.run_full_crawl())
-        print(f"{GREEN}Crawl completed successfully!{RESET}")
-        print(f"Processed {result['gallery_count']} properties")
-        print(f"Stored {result['detail_count']} properties in database")
+        logger.info(f"{GREEN}Crawl completed successfully!{RESET}")
     except Exception as e:
-        print(f"{RED}Error during crawl: {str(e)}{RESET}")
+        logger.error(f"{RED}Error during crawl: {str(e)}{RESET}")
         raise e

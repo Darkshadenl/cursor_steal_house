@@ -1,7 +1,7 @@
 import json
 import logging
 from typing import Any, Dict, List, Optional
-from python_scripts.crawlers.vesteda.vesteda_models.house_models import (
+from python_scripts.crawlers.vesteda.models.house_models import (
     DetailHouse,
     FetchedPage,
 )

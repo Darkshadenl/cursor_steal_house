@@ -1,6 +1,6 @@
 from typing import AsyncGenerator, Dict, Any, List, Optional, Union
 import logging
-from python_scripts.crawlers.vesteda.vesteda_models.house_models import (
+from python_scripts.crawlers.vesteda.models.house_models import (
     DetailHouse,
     FetchedPage,
     GalleryHouse,
