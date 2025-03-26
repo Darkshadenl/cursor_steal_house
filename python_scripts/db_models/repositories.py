@@ -8,7 +8,7 @@ from .models import (
     DetailHouse as DBDetailHouse,
     FloorPlan as DBFloorPlan,
 )
-from python_scripts.crawlers.vesteda.vesteda_models.house_models import (
+from python_scripts.crawlers.vesteda.models.house_models import (
     GalleryHouse,
     DetailHouse,
     FloorPlan,

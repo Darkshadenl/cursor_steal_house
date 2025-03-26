@@ -3,7 +3,7 @@ from flask_cors import CORS
 import os
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Keep for local development
 load_dotenv()
 
 app = Flask(__name__)
@@ -12,15 +12,14 @@ CORS(app)  # Enable CORS for all routes
 # Configure database connection from environment variables
 app.config["SQLALCHEMY_DATABASE_URI"] = (
     f"postgresql://{os.environ.get('POSTGRES_USER')}:"
-    f"{os.environ.get('POSTGRES_PASSWORD')}@"
-    f"{os.environ.get('POSTGRES_HOST')}:"
-    f"{os.environ.get('POSTGRES_PORT')}/"
-    f"{os.environ.get('POSTGRES_DB')}"
+    f"{os.getenv('POSTGRES_PASSWORD')}@"
+    f"{os.getenv('POSTGRES_HOST')}:"
+    f"{os.getenv('POSTGRES_PORT')}/"
+    f"{os.getenv('POSTGRES_DB')}"
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 
-# Example API routes
 @app.route("/api/health", methods=["GET"])
 def health_check():
     return jsonify({"status": "healthy", "message": "StealHouse API is running"})
@@ -28,8 +27,6 @@ def health_check():
 
 @app.route("/api/properties", methods=["GET"])
 def get_properties():
-    # This is a placeholder - you'll need to implement your actual data retrieval
-    # from your database models
     return jsonify(
         {
             "properties": [

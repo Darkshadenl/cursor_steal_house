@@ -20,8 +20,8 @@ DATABASE_URL = f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTG
 engine = create_async_engine(
     DATABASE_URL,
     pool_pre_ping=True,  # Enable the connection pool "pre-ping" feature
-    pool_recycle=3600,   # Recycle connections after 1 hour
-    echo=False  # Set to True for SQL query logging
+    pool_recycle=3600,  # Recycle connections after 1 hour
+    echo=False,  # Set to True for SQL query logging
 )
 
 # Create async session factory
@@ -30,11 +30,12 @@ AsyncSessionLocal = sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
     autocommit=False,
-    autoflush=False
+    autoflush=False,
 )
 
 # Base class for models
 Base = declarative_base()
+
 
 async def get_db():
     """
@@ -49,6 +50,7 @@ async def get_db():
         finally:
             await session.close()
 
+
 def get_db_session():
     """Get a database session instance"""
-    return AsyncSessionLocal() 
+    return AsyncSessionLocal()
