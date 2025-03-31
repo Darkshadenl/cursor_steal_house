@@ -9,7 +9,7 @@ from crawl4ai import (
 )
 
 # Import our models and transformer
-from ..models import GalleryHouse
+from ....models.house_models import GalleryHouse
 from crawler_job.helpers.transformers import GalleryHouseTransformer
 
 # Configure logging
