@@ -1,6 +1,6 @@
 from typing import AsyncGenerator, Dict, Any, List, Optional, Union
 import logging
-from python_scripts.crawlers.vesteda.models.house_models import (
+from crawler_job.crawlers.vesteda.models.house_models import (
     DetailHouse,
     FetchedPage,
     GalleryHouse,
@@ -14,7 +14,7 @@ from ..db_models.repositories import (
     FloorPlanRepository,
 )
 from ..db_models.db_connection import get_db_session
-from ..db_models.models import (
+from .models import (
     GalleryHouse as DBGalleryHouse,
     DetailHouse as DBDetailHouse,
     FloorPlan as DBFloorPlan,

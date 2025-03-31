@@ -16,7 +16,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: Dockerfile.backend.dev
+      dockerfile: backend/docker/Dockerfile.backend.dev
     ports:
       - "5001:5001" # Flask API port
     volumes:
@@ -31,10 +31,6 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_PORT=5432
       - POSTGRES_HOST=db
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - VESTEDA_EMAIL=${VESTEDA_EMAIL}
-      - VESTEDA_PASSWORD=${VESTEDA_PASSWORD}
     depends_on:
       - db
 

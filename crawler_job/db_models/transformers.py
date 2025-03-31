@@ -2,13 +2,13 @@ from typing import List, Optional, Dict, Any
 import logging
 
 # Import Pydantic models
-from python_scripts.crawlers.vesteda.models.house_models import (
+from crawler_job.crawlers.vesteda.models.house_models import (
     GalleryHouse as PydanticGalleryHouse,
 )
-from python_scripts.crawlers.vesteda.models.house_models import (
+from crawler_job.crawlers.vesteda.models.house_models import (
     DetailHouse as PydanticDetailHouse,
 )
-from python_scripts.crawlers.vesteda.models.house_models import (
+from crawler_job.crawlers.vesteda.models.house_models import (
     FloorPlan as PydanticFloorPlan,
 )
 from .models import (
