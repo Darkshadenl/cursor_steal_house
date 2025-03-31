@@ -44,10 +44,14 @@ class VestedaCrawler:
     def __init__(self):
         load_dotenv()
         self.browser_config = BrowserConfig(
-            user_data_dir="./browser_data/vesteda",  # Persistent profile directory
             headless=True,
-            verbose=True,  # For debugging
-            use_managed_browser=True,  # For persistent sessions
+            verbose=True,
+            use_managed_browser=False,
+            user_data_dir="./browser_data/vesteda",
+            extra_args=[
+                "--no-sandbox",
+                "--disable-gpu",
+            ],
         )
         self.base_url = "https://hurenbij.vesteda.com"
         self.email = os.getenv("VESTEDA_EMAIL")
