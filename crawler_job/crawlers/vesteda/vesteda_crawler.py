@@ -4,7 +4,7 @@ import logging
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 from dotenv import load_dotenv
 
-from python_scripts.crawlers.vesteda.vesteda_steps.detailed_property_extraction import (
+from crawler_job.crawlers.vesteda.vesteda_steps.detailed_property_extraction import (
     execute_detailed_property_extraction,
 )
 from .vesteda_steps.login_step import execute_login_step
@@ -12,14 +12,14 @@ from .vesteda_steps.search_navigation_step import execute_search_navigation
 from .vesteda_steps.property_extraction_step import execute_property_extraction
 from .vesteda_steps.cookie_acceptor import accept_cookies
 from .vesteda_steps.llm_extraction_step import execute_llm_extraction
-from python_scripts.services.house_service import HouseService
-from python_scripts.crawlers.vesteda.models.house_models import (
+from crawler_job.services.house_service import HouseService
+from crawler_job.crawlers.vesteda.models.house_models import (
     DetailHouse,
     FetchedPage,
     GalleryHouse,
 )
-from python_scripts.services.llm_service import LLMProvider
-from python_scripts.db_models.models import (
+from crawler_job.services.llm_service import LLMProvider
+from crawler_job.db_models.models import (
     GalleryHouse as DBGalleryHouse,
     DetailHouse as DBDetailHouse,
 )

@@ -21,7 +21,7 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-from python_scripts.db_models.models import Base
+from crawler_job.db_models.models import Base
 
 target_metadata = Base.metadata
 

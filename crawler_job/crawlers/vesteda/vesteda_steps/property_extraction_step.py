@@ -10,7 +10,7 @@ from crawl4ai import (
 
 # Import our models and transformer
 from ..models import GalleryHouse
-from python_scripts.db_models.transformers import GalleryHouseTransformer
+from crawler_job.db_models.transformers import GalleryHouseTransformer
 
 # Configure logging
 logger = logging.getLogger(__name__)
