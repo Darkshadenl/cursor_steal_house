@@ -11,7 +11,7 @@ from crawl4ai import (
     RateLimiter,
     SemaphoreDispatcher,
 )
-from crawler_job.crawlers.vesteda.models.house_models import (
+from crawler_job.models.house_models import (
     GalleryHouse,
     FetchedPage,
 )

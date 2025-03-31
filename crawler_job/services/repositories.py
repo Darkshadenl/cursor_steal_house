@@ -3,18 +3,18 @@ from sqlalchemy import select, delete
 from typing import List, Optional
 import logging
 
-from .models import (
+from ..models.db_models import (
     GalleryHouse as DBGalleryHouse,
     DetailHouse as DBDetailHouse,
     FloorPlan as DBFloorPlan,
 )
-from crawler_job.crawlers.vesteda.models.house_models import (
+from crawler_job.models.house_models import (
     GalleryHouse,
     DetailHouse,
     FloorPlan,
 )
-from ..db_models.db_connection import get_db_session
-from ..db_models.transformers import (
+from .db_connection import get_db_session
+from ..helpers.transformers import (
     GalleryHouseTransformer,
     DetailHouseTransformer,
     FloorPlanTransformer,

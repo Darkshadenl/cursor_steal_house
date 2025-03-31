@@ -1,6 +1,6 @@
 from typing import AsyncGenerator, Dict, Any, List, Optional, Union
 import logging
-from crawler_job.crawlers.vesteda.models.house_models import (
+from crawler_job.models.house_models import (
     DetailHouse,
     FetchedPage,
     GalleryHouse,
@@ -8,18 +8,18 @@ from crawler_job.crawlers.vesteda.models.house_models import (
 from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
 
-from ..db_models.repositories import (
+from .repositories import (
     GalleryHouseRepository,
     DetailHouseRepository,
     FloorPlanRepository,
 )
-from ..db_models.db_connection import get_db_session
-from ..db_models.models import (
+from .db_connection import get_db_session
+from ..models.db_models import (
     GalleryHouse as DBGalleryHouse,
     DetailHouse as DBDetailHouse,
     FloorPlan as DBFloorPlan,
 )
-from ..db_models.transformers import GalleryHouseTransformer, DetailHouseTransformer
+from ..helpers.transformers import GalleryHouseTransformer, DetailHouseTransformer
 
 logger = logging.getLogger(__name__)
 

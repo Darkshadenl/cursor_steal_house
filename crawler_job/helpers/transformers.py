@@ -2,16 +2,16 @@ from typing import List, Optional, Dict, Any
 import logging
 
 # Import Pydantic models
-from crawler_job.crawlers.vesteda.models.house_models import (
+from crawler_job.models.house_models import (
     GalleryHouse as PydanticGalleryHouse,
 )
-from crawler_job.crawlers.vesteda.models.house_models import (
+from crawler_job.models.house_models import (
     DetailHouse as PydanticDetailHouse,
 )
-from crawler_job.crawlers.vesteda.models.house_models import (
+from crawler_job.models.house_models import (
     FloorPlan as PydanticFloorPlan,
 )
-from .models import (
+from ..models.db_models import (
     GalleryHouse as DBGalleryHouse,
     DetailHouse as DBDetailHouse,
     FloorPlan as DBFloorPlan,

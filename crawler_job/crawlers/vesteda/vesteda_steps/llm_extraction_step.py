@@ -1,11 +1,11 @@
 import json
 import logging
 from typing import Any, Dict, List, Optional
-from crawler_job.crawlers.vesteda.models.house_models import (
+from crawler_job.models.house_models import (
     DetailHouse,
     FetchedPage,
 )
-from crawler_job.db_models.transformers import DetailHouseTransformer
+from crawler_job.helpers.transformers import DetailHouseTransformer
 from crawler_job.services.llm_service import LLMService, LLMProvider
 
 logger = logging.getLogger(__name__)
