@@ -45,14 +45,15 @@ async def execute_detailed_property_extraction(
         session_id=session_id,
         js_only=False,
         magic=False,
+        page_timeout=30000,  # Add explicit page timeout
     )
 
     dispatcher = SemaphoreDispatcher(
-        semaphore_count=3,
-        max_session_permit=3,
+        semaphore_count=2,  # Reduced from 3 to 2 to prevent overloading
+        max_session_permit=2,  # Also reduced to match semaphore_count
         monitor=CrawlerMonitor(max_visible_rows=10, display_mode=DisplayMode.DETAILED),
         rate_limiter=RateLimiter(
-            base_delay=(2.0, 4.0),
+            base_delay=(3.0, 5.0),  # Increased delay between requests
             max_delay=30.0,
             max_retries=3,
             rate_limit_codes=[429, 503],
@@ -66,24 +67,41 @@ async def execute_detailed_property_extraction(
 
     logger.info(f"Starting fetch for {len(urls)} properties...")
 
-    results = await crawler.arun_many(urls=urls, config=config, dispatcher=dispatcher)
+    # Add try/except block for error handling
+    try:
+        results = await crawler.arun_many(
+            urls=urls, config=config, dispatcher=dispatcher
+        )
 
-    fetched_pages = []
-    for result in results:
-        if result.success:
-            fetched_pages.append(
-                FetchedPage(
-                    url=result.url, markdown=result.markdown.raw_markdown, success=True
+        fetched_pages = []
+        for result in results:
+            if result.success:
+                fetched_pages.append(
+                    FetchedPage(
+                        url=result.url,
+                        markdown=result.markdown.raw_markdown,
+                        success=True,
+                    )
                 )
-            )
-        else:
-            logger.error(f"{RED}Error fetching property: {result.error_message}{RESET}")
-            fetched_pages.append(
-                FetchedPage(url=result.url, markdown="", success=False)
-            )
+            else:
+                error_msg = (
+                    result.error_message
+                    if hasattr(result, "error_message")
+                    else "Unknown error"
+                )
+                logger.error(f"{RED}Error fetching property: {error_msg}{RESET}")
+                fetched_pages.append(
+                    FetchedPage(url=result.url, markdown="", success=False)
+                )
 
-    logger.info(
-        f"{GREEN}Completed fetching property pages. Successfully fetched {sum(1 for page in fetched_pages if page.success)} out of {len(urls)} properties.{RESET}"
-    )
+        logger.info(
+            f"{GREEN}Completed fetching property pages. Successfully fetched {sum(1 for page in fetched_pages if page.success)} out of {len(urls)} properties.{RESET}"
+        )
 
-    return fetched_pages
+        return fetched_pages
+    except Exception as e:
+        logger.error(
+            f"{RED}Critical error during detailed property extraction: {str(e)}{RESET}"
+        )
+        # Return partial results if possible
+        return [FetchedPage(url=url, markdown="", success=False) for url in urls]
