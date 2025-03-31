@@ -71,7 +71,7 @@ class VestedaCrawler:
                 # Handle login if needed
                 if url == "https://hurenbij.vesteda.com/login/":
                     logger.info("Login required. Accepting cookies and logging in...")
-                    await accept_cookies(crawler, url, self.session_id)
+                    # await accept_cookies(crawler, url, self.session_id)
                     await execute_login_step(
                         crawler, self.email, self.password, self.session_id
                     )
