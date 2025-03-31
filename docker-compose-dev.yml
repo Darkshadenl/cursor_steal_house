@@ -2,7 +2,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile.frontend.dev
+      dockerfile: frontend/Dockerfile.frontend.dev
     ports:
       - "5173:5173" # Vite's default port
     volumes:
@@ -16,7 +16,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: backend/docker/Dockerfile.backend.dev
+      dockerfile: backend/Dockerfile.backend.dev
     ports:
       - "5001:5001" # Flask API port
     volumes:
