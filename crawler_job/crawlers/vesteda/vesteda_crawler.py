@@ -41,7 +41,7 @@ class VestedaCrawler:
         load_dotenv()
         self.browser_config = BrowserConfig(
             headless=True,
-            verbose=True,
+            verbose=False,
             use_managed_browser=True,
             user_data_dir="./browser_data/vesteda",
         )
@@ -51,7 +51,6 @@ class VestedaCrawler:
         self.session_id = "vesteda_session"
         self.deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
         self.google_api_key = os.getenv("GOOGLE_API_KEY")
-        self.house_service = HouseService()
 
     async def run_full_crawl(self) -> Dict[str, Any]:
         """Run a full crawl of Vesteda website and store results in database"""
@@ -74,30 +73,33 @@ class VestedaCrawler:
                     crawler, url, self.session_id
                 )
 
-                # Uitgestelde opslag tot na detail extractie
+                # Deferred storage until after detail extraction
                 detail_houses: List[DetailHouse] = []
                 fetched_pages: List[FetchedPage] = []
 
-                # Alleen nieuwe huizen verwerken
-                new_houses = await self.house_service.identify_new_houses(gallery_data)
+                async with HouseService() as house_service:
+                    # Only process new houses
+                    new_houses = await house_service.identify_new_houses(gallery_data)
 
-                if new_houses:
-                    logger.info(f"Fetching details for {len(new_houses)} new houses...")
-                    fetched_pages = await execute_detailed_property_extraction(
-                        crawler, new_houses, self.session_id
+                    if new_houses:
+                        logger.info(
+                            f"Fetching details for {len(new_houses)} new houses..."
+                        )
+                        fetched_pages = await execute_detailed_property_extraction(
+                            crawler, new_houses, self.session_id
+                        )
+
+                        # Extract structured data using LLM
+                        detail_houses = await execute_llm_extraction(
+                            fetched_pages, provider=LLMProvider.GEMINI
+                        )
+
+                    # Atomic transaction for all database operations
+                    result = await house_service.store_houses_atomic(
+                        gallery_houses=gallery_data,
+                        detail_houses=detail_houses,
+                        all_houses=gallery_data,  # Pass the original gallery data
                     )
-
-                    # Extract structured data using LLM
-                    detail_houses = await execute_llm_extraction(
-                        fetched_pages, provider=LLMProvider.GEMINI
-                    )
-
-                # Atomic transaction voor alle database-operaties
-                result = await self.house_service.store_houses_atomic(
-                    gallery_houses=gallery_data,
-                    detail_houses=detail_houses,
-                    all_houses=gallery_data,  # Pass de originele gallery data door
-                )
 
                 return {
                     "gallery_count": len(gallery_data),

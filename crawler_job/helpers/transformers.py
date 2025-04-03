@@ -16,21 +16,25 @@ from crawler_job.models.db_models import (
 logger = logging.getLogger(__name__)
 
 
-def db_gallery_houses_to_pydantic(
+async def db_gallery_houses_to_pydantic_async(
     db_houses: List[DbGalleryHouse],
 ) -> List[GalleryHouse]:
     """Convert a list of DbGalleryHouse SQLAlchemy models to GalleryHouse Pydantic models"""
-    return [GalleryHouse.from_db_model(house) for house in db_houses]
+    return [await GalleryHouse.from_db_model_async(house) for house in db_houses]
 
 
-def db_detail_houses_to_pydantic(db_houses: List[DbDetailHouse]) -> List[DetailHouse]:
+async def db_detail_houses_to_pydantic_async(
+    db_houses: List[DbDetailHouse],
+) -> List[DetailHouse]:
     """Convert a list of DbDetailHouse SQLAlchemy models to DetailHouse Pydantic models"""
-    return [DetailHouse.from_db_model(house) for house in db_houses]
+    return [await DetailHouse.from_db_model_async(house) for house in db_houses]
 
 
-def db_floor_plans_to_pydantic(db_plans: List[DbFloorPlan]) -> List[FloorPlan]:
+async def db_floor_plans_to_pydantic_async(
+    db_plans: List[DbFloorPlan],
+) -> List[FloorPlan]:
     """Convert a list of DbFloorPlan SQLAlchemy models to FloorPlan Pydantic models"""
-    return [FloorPlan.from_db_model(plan) for plan in db_plans]
+    return [await FloorPlan.from_db_model_async(plan) for plan in db_plans]
 
 
 def pydantic_gallery_houses_to_db(houses: List[GalleryHouse]) -> List[DbGalleryHouse]:

@@ -37,20 +37,26 @@ AsyncSessionLocal = sessionmaker(
 Base = declarative_base()
 
 
-async def get_db():
+def get_db_session() -> AsyncSession:
     """
-    Get a database session.
-    Usage:
-        async with get_db() as db:
-            # Use db for database operations
+    Get a new database session (non-async function for use in synchronous contexts).
+
+    Returns:
+        AsyncSession: A new async session that should be closed by the caller.
     """
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
-
-
-def get_db_session():
-    """Get a database session instance"""
     return AsyncSessionLocal()
+
+
+async def get_db_context():
+    """
+    Async context manager for database sessions.
+
+    Usage:
+        async with get_db_context() as session:
+            # Use session for database operations
+    """
+    session = AsyncSessionLocal()
+    try:
+        yield session
+    finally:
+        await session.close()
