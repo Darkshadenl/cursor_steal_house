@@ -19,6 +19,8 @@ async def execute_llm_extraction(
     schema = DetailHouse.model_json_schema()
     detail_houses: List[DetailHouse] = []
 
+    logger.info("Extracting structured data using LLM...")
+
     for page in fetched_pages:
         if not page.success:
             continue

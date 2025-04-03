@@ -15,9 +15,9 @@ from .repositories import (
 )
 from .db_connection import get_db_session
 from ..models.db_models import (
-    GalleryHouse as DBGalleryHouse,
-    DetailHouse as DBDetailHouse,
-    FloorPlan as DBFloorPlan,
+    DbGalleryHouse as DBGalleryHouse,
+    DbDetailHouse as DBDetailHouse,
+    DbFloorPlan as DBFloorPlan,
 )
 from ..helpers.transformers import GalleryHouseTransformer, DetailHouseTransformer
 

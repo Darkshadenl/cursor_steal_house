@@ -4,9 +4,9 @@ from typing import List, Optional
 import logging
 
 from ..models.db_models import (
-    GalleryHouse as DBGalleryHouse,
-    DetailHouse as DBDetailHouse,
-    FloorPlan as DBFloorPlan,
+    DbGalleryHouse as DBGalleryHouse,
+    DbDetailHouse as DBDetailHouse,
+    DbFloorPlan as DBFloorPlan,
 )
 from crawler_job.models.house_models import (
     GalleryHouse,

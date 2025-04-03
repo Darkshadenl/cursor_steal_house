@@ -26,6 +26,8 @@ async def execute_property_extraction(
     crawler: AsyncWebCrawler, url: str, session_id: str
 ) -> List[GalleryHouse]:
 
+    logger.info("Extracting property listings...")
+
     correct_urls = [
         "https://hurenbij.vesteda.com/zoekopdracht/",
         "https://hurenbij.vesteda.com/zoekopdracht/#tab-content-inloggen",
