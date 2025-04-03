@@ -42,20 +42,21 @@ async def execute_detailed_property_extraction(
     )
     config = CrawlerRunConfig(
         log_console=True,
-        markdown_generator=DefaultMarkdownGenerator(content_filter=prune_filter),
-        cache_mode=CacheMode.ENABLED,
+        markdown_generator=DefaultMarkdownGenerator(
+            content_filter=prune_filter,
+        ),
+        cache_mode=CacheMode.BYPASS,
         session_id=session_id,
         js_only=False,
         magic=False,
-        page_timeout=30000,  # Add explicit page timeout
     )
 
     dispatcher = SemaphoreDispatcher(
-        semaphore_count=2,  # Reduced from 3 to 2 to prevent overloading
-        max_session_permit=2,  # Also reduced to match semaphore_count
+        semaphore_count=1,
+        max_session_permit=1,
         monitor=CrawlerMonitor(max_visible_rows=10, display_mode=DisplayMode.DETAILED),
         rate_limiter=RateLimiter(
-            base_delay=(3.0, 5.0),  # Increased delay between requests
+            base_delay=(3.0, 5.0),
             max_delay=30.0,
             max_retries=3,
             rate_limit_codes=[429, 503],
@@ -72,7 +73,7 @@ async def execute_detailed_property_extraction(
     # Add try/except block for error handling
     try:
         results = await crawler.arun_many(
-            urls=urls, config=config, dispatcher=dispatcher
+            urls=urls[:10], config=config, dispatcher=dispatcher
         )
 
         fetched_pages = []
@@ -99,7 +100,6 @@ async def execute_detailed_property_extraction(
         logger.info(
             f"{GREEN}Completed fetching property pages. Successfully fetched {sum(1 for page in fetched_pages if page.success)} out of {len(urls)} properties.{RESET}"
         )
-
         return fetched_pages
     except Exception as e:
         logger.error(
