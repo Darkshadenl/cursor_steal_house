@@ -20,8 +20,8 @@ from crawler_job.models.house_models import (
 )
 from crawler_job.services.llm_service import LLMProvider
 from crawler_job.models.db_models import (
-    GalleryHouse as DBGalleryHouse,
-    DetailHouse as DBDetailHouse,
+    DbGalleryHouse as DBGalleryHouse,
+    DbDetailHouse as DBDetailHouse,
 )
 from typing import List
 
@@ -72,8 +72,7 @@ class VestedaCrawler:
                     )
                     url = await execute_search_navigation(crawler, self.session_id)
 
-                # Extract property listings
-                logger.info("Extracting property listings...")
+                # Extract property listing
                 gallery_data: List[GalleryHouse] = await execute_property_extraction(
                     crawler, url, self.session_id
                 )
@@ -84,12 +83,11 @@ class VestedaCrawler:
                 )
                 fetched_pages: List[FetchedPage] = (
                     await execute_detailed_property_extraction(
-                        crawler, gallery_data, self.session_id
+                        crawler, gallery_data, self.session_id, stored_houses
                     )
                 )
 
                 # Extract structured data using LLM
-                logger.info("Extracting structured data using LLM...")
                 detail_houses: List[DetailHouse] = await execute_llm_extraction(
                     fetched_pages, provider=LLMProvider.GEMINI
                 )

@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from crawler_job.models.db_models import GalleryHouse as DBGalleryHouse
+from crawler_job.models.db_models import DbGalleryHouse as DBGalleryHouse
 
 
 class GalleryHouse(BaseModel):
