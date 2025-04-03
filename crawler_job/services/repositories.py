@@ -4,9 +4,9 @@ from typing import List, Optional
 import logging
 
 from ..models.db_models import (
-    DbGalleryHouse as DBGalleryHouse,
-    DbDetailHouse as DBDetailHouse,
-    DbFloorPlan as DBFloorPlan,
+    DbGalleryHouse,
+    DbDetailHouse,
+    DbFloorPlan,
 )
 from crawler_job.models.house_models import (
     GalleryHouse,
@@ -14,11 +14,6 @@ from crawler_job.models.house_models import (
     FloorPlan,
 )
 from .db_connection import get_db_session
-from ..helpers.transformers import (
-    GalleryHouseTransformer,
-    DetailHouseTransformer,
-    FloorPlanTransformer,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -29,49 +24,46 @@ class GalleryHouseRepository:
     def __init__(self, session: Optional[AsyncSession] = None):
         self.session = session or get_db_session()
 
-    async def get_by_id(self, gallery_id: int) -> Optional[DBGalleryHouse]:
+    async def get_by_id(self, gallery_id: int) -> Optional[DbGalleryHouse]:
         """Get a gallery house by ID"""
         result = await self.session.execute(
-            select(DBGalleryHouse).where(DBGalleryHouse.id == gallery_id)
+            select(DbGalleryHouse).where(DbGalleryHouse.id == gallery_id)
         )
         return result.scalar_one_or_none()
 
-    async def get_by_address(self, address: str, city: str) -> Optional[DBGalleryHouse]:
+    async def get_by_address(self, address: str, city: str) -> Optional[DbGalleryHouse]:
         """Get a gallery house by address and city"""
         result = await self.session.execute(
-            select(DBGalleryHouse).where(
-                DBGalleryHouse.address == address, DBGalleryHouse.city == city
+            select(DbGalleryHouse).where(
+                DbGalleryHouse.address == address, DbGalleryHouse.city == city
             )
         )
         return result.scalar_one_or_none()
 
-    async def create(self, gallery_house: GalleryHouse) -> DBGalleryHouse:
+    async def create(self, gallery_house: GalleryHouse) -> DbGalleryHouse:
         """Create a new gallery house"""
-        self.high_demand_update(gallery_house)
-        db_house = GalleryHouseTransformer.pydantic_to_db(gallery_house)
+        db_house = gallery_house.to_db_model()
         self.session.add(db_house)
         await self.session.commit()
         logger.info(f"Created gallery house: {db_house.address}, {db_house.city}")
         return db_house
 
-    def high_demand_update(self, gallery_house: DBGalleryHouse):
-        if (
-            gallery_house.demand_message
-            == "This house has many viewing requests. Increase you chance by selecting a different property."
-        ):
-            gallery_house.high_demand = True
-
-    async def update(self, gallery_house: DBGalleryHouse) -> Optional[DBGalleryHouse]:
+    async def update(
+        self, db_gallery_house: DbGalleryHouse
+    ) -> Optional[DbGalleryHouse]:
         """Update an existing gallery house"""
         db_house = await self.session.execute(
-            select(DBGalleryHouse).where(DBGalleryHouse.id == gallery_house.id)
+            select(DbGalleryHouse).where(DbGalleryHouse.id == db_gallery_house.id)
         )
         db_house = db_house.scalar_one_or_none()
         if not db_house:
             return None
 
-        self.high_demand_update(gallery_house)
-        updated_db = GalleryHouseTransformer.pydantic_to_db(gallery_house)
+        # Convert to Pydantic and back to ensure proper transformation
+        gallery_house = GalleryHouse.from_db_model(db_gallery_house)
+
+        # Apply updates from the pydantic model
+        updated_db = gallery_house.to_db_model()
         for key, value in updated_db.__dict__.items():
             if not key.startswith("_"):
                 setattr(db_house, key, value)
@@ -80,7 +72,7 @@ class GalleryHouseRepository:
         logger.info(f"Updated gallery house: {db_house.address}, {db_house.city}")
         return db_house
 
-    async def get_or_create(self, gallery_house: GalleryHouse) -> DBGalleryHouse:
+    async def get_or_create(self, gallery_house: GalleryHouse) -> DbGalleryHouse:
         """Get an existing gallery house or create a new one"""
         if not gallery_house.address or not gallery_house.city:
             raise ValueError("Address and city are required for gallery house")
@@ -94,7 +86,7 @@ class GalleryHouseRepository:
     async def delete(self, gallery_id: int) -> bool:
         """Delete a gallery house"""
         db_house = await self.session.execute(
-            select(DBGalleryHouse).where(DBGalleryHouse.id == gallery_id)
+            select(DbGalleryHouse).where(DbGalleryHouse.id == gallery_id)
         )
         db_house = db_house.scalar_one_or_none()
         if not db_house:
@@ -112,43 +104,43 @@ class DetailHouseRepository:
     def __init__(self, session: Optional[AsyncSession] = None):
         self.session = session or get_db_session()
 
-    async def get_by_id(self, detail_id: int) -> Optional[DBDetailHouse]:
+    async def get_by_id(self, detail_id: int) -> Optional[DbDetailHouse]:
         """Get a detail house by ID"""
         result = await self.session.execute(
-            select(DBDetailHouse).where(DBDetailHouse.id == detail_id)
+            select(DbDetailHouse).where(DbDetailHouse.id == detail_id)
         )
         return result.scalar_one_or_none()
 
     async def get_by_address(
         self, address: str, postal_code: str, city: str
-    ) -> Optional[DBDetailHouse]:
+    ) -> Optional[DbDetailHouse]:
         """Get a detail house by address, postal code, and city"""
         result = await self.session.execute(
-            select(DBDetailHouse).where(
-                DBDetailHouse.address == address,
-                DBDetailHouse.postal_code == postal_code,
-                DBDetailHouse.city == city,
+            select(DbDetailHouse).where(
+                DbDetailHouse.address == address,
+                DbDetailHouse.postal_code == postal_code,
+                DbDetailHouse.city == city,
             )
         )
         return result.scalar_one_or_none()
 
-    async def get_by_gallery_id(self, gallery_id: int) -> Optional[DBDetailHouse]:
+    async def get_by_gallery_id(self, gallery_id: int) -> Optional[DbDetailHouse]:
         """Get a detail house by gallery ID"""
         result = await self.session.execute(
-            select(DBDetailHouse).where(DBDetailHouse.gallery_id == gallery_id)
+            select(DbDetailHouse).where(DbDetailHouse.gallery_id == gallery_id)
         )
         return result.scalar_one_or_none()
 
-    async def create(self, detail_house: DetailHouse) -> DBDetailHouse:
+    async def create(self, detail_house: DetailHouse) -> DbDetailHouse:
         """Create a new detail house"""
-        db_house = DetailHouseTransformer.pydantic_to_db(detail_house)
+        db_house = detail_house.to_db_model()
         self.session.add(db_house)
         await self.session.flush()  # Get ID without committing
 
         # Add floor plans if they exist
         if detail_house.floor_plans:
             for plan in detail_house.floor_plans:
-                db_plan = FloorPlanTransformer.pydantic_to_db(plan, db_house.id)
+                db_plan = plan.to_db_model(db_house.id)
                 self.session.add(db_plan)
 
         await self.session.commit()
@@ -157,17 +149,17 @@ class DetailHouseRepository:
 
     async def update(
         self, detail_id: int, detail_house: DetailHouse
-    ) -> Optional[DBDetailHouse]:
+    ) -> Optional[DbDetailHouse]:
         """Update an existing detail house"""
         db_house = await self.session.execute(
-            select(DBDetailHouse).where(DBDetailHouse.id == detail_id)
+            select(DbDetailHouse).where(DbDetailHouse.id == detail_id)
         )
         db_house = db_house.scalar_one_or_none()
         if not db_house:
             return None
 
-        # Update basic fields
-        updated_db = DetailHouseTransformer.pydantic_to_db(detail_house)
+        # Update basic fields using the to_db_model method
+        updated_db = detail_house.to_db_model()
         for key, value in updated_db.__dict__.items():
             if not key.startswith("_"):
                 setattr(db_house, key, value)
@@ -176,7 +168,7 @@ class DetailHouseRepository:
         logger.info(f"Updated detail house: {db_house.address}, {db_house.city}")
         return db_house
 
-    async def get_or_create(self, detail_house: DetailHouse) -> DBDetailHouse:
+    async def get_or_create(self, detail_house: DetailHouse) -> DbDetailHouse:
         """Get an existing detail house or create a new one"""
         if not all([detail_house.address, detail_house.postal_code, detail_house.city]):
             raise ValueError(
@@ -196,7 +188,7 @@ class DetailHouseRepository:
             )
 
         if existing:
-            if existing.has_changes(detail_house):
+            if existing.has_changes(detail_house.to_db_model()):
                 return await self.update(existing.id, detail_house)
             return existing
 
@@ -205,7 +197,7 @@ class DetailHouseRepository:
     async def delete(self, detail_id: int) -> bool:
         """Delete a detail house"""
         db_house = await self.session.execute(
-            select(DBDetailHouse).where(DBDetailHouse.id == detail_id)
+            select(DbDetailHouse).where(DbDetailHouse.id == detail_id)
         )
         db_house = db_house.scalar_one_or_none()
         if not db_house:
@@ -224,40 +216,43 @@ class FloorPlanRepository:
     def __init__(self, session: Optional[AsyncSession] = None):
         self.session = session or get_db_session()
 
-    async def get_by_id(self, plan_id: int) -> Optional[DBFloorPlan]:
+    async def get_by_id(self, plan_id: int) -> Optional[DbFloorPlan]:
         """Get a floor plan by ID"""
         result = await self.session.execute(
-            select(DBFloorPlan).where(DBFloorPlan.id == plan_id)
+            select(DbFloorPlan).where(DbFloorPlan.id == plan_id)
         )
         return result.scalar_one_or_none()
 
-    async def get_by_house_id(self, house_id: int) -> List[DBFloorPlan]:
+    async def get_by_house_id(self, house_id: int) -> List[DbFloorPlan]:
         """Get all floor plans for a house"""
         result = await self.session.execute(
-            select(DBFloorPlan).where(DBFloorPlan.house_id == house_id)
+            select(DbFloorPlan).where(DbFloorPlan.house_id == house_id)
         )
         return result.scalars().all()
 
-    async def create(self, plan: FloorPlan, house_id: int) -> DBFloorPlan:
+    async def create(self, plan: FloorPlan, house_id: int) -> DbFloorPlan:
         """Create a new floor plan"""
-        db_plan = FloorPlanTransformer.pydantic_to_db(plan, house_id)
+        db_plan = plan.to_db_model(house_id)
         self.session.add(db_plan)
         await self.session.commit()
         logger.info(f"Created floor plan for house ID: {house_id}")
         return db_plan
 
-    async def update(self, plan_id: int, plan: FloorPlan) -> Optional[DBFloorPlan]:
+    async def update(self, plan_id: int, plan: FloorPlan) -> Optional[DbFloorPlan]:
         """Update an existing floor plan"""
         db_plan = await self.session.execute(
-            select(DBFloorPlan).where(DBFloorPlan.id == plan_id)
+            select(DbFloorPlan).where(DbFloorPlan.id == plan_id)
         )
         db_plan = db_plan.scalar_one_or_none()
         if not db_plan:
             return None
 
-        updated_db = FloorPlanTransformer.pydantic_to_db(plan, db_plan.house_id)
-        for key, value in updated_db.__dict__.items():
-            if not key.startswith("_"):
+        # Create a new DB model from the Pydantic model
+        updated_plan = plan.to_db_model(db_plan.house_id)
+
+        # Update fields
+        for key, value in updated_plan.__dict__.items():
+            if not key.startswith("_") and key != "id" and key != "house_id":
                 setattr(db_plan, key, value)
 
         await self.session.commit()
@@ -267,7 +262,7 @@ class FloorPlanRepository:
     async def delete(self, plan_id: int) -> bool:
         """Delete a floor plan"""
         db_plan = await self.session.execute(
-            select(DBFloorPlan).where(DBFloorPlan.id == plan_id)
+            select(DbFloorPlan).where(DbFloorPlan.id == plan_id)
         )
         db_plan = db_plan.scalar_one_or_none()
         if not db_plan:

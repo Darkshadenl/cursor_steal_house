@@ -19,11 +19,7 @@ from crawler_job.models.house_models import (
     GalleryHouse,
 )
 from crawler_job.services.llm_service import LLMProvider
-from crawler_job.models.db_models import (
-    DbGalleryHouse as DBGalleryHouse,
-    DbDetailHouse as DBDetailHouse,
-)
-from typing import List
+from typing import List, Dict, Any
 
 # Configure logging
 logging.basicConfig(
@@ -57,7 +53,7 @@ class VestedaCrawler:
         self.google_api_key = os.getenv("GOOGLE_API_KEY")
         self.house_service = HouseService()
 
-    async def run_full_crawl(self):
+    async def run_full_crawl(self) -> Dict[str, Any]:
         """Run a full crawl of Vesteda website and store results in database"""
         try:
             async with AsyncWebCrawler(config=self.browser_config) as crawler:
@@ -77,53 +73,74 @@ class VestedaCrawler:
                     crawler, url, self.session_id
                 )
 
-                # Store gallery data only
-                stored_houses: List[DBGalleryHouse] = (
+                # Store gallery data - returns new and existing houses
+                new_houses, existing_houses = (
                     await self.house_service.store_gallery_houses(gallery_data)
                 )
-                fetched_pages: List[FetchedPage] = (
-                    await execute_detailed_property_extraction(
-                        crawler, gallery_data, self.session_id, stored_houses
-                    )
-                )
 
-                # Extract structured data using LLM
-                detail_houses: List[DetailHouse] = await execute_llm_extraction(
-                    fetched_pages, provider=LLMProvider.GEMINI
-                )
+                # Combine all houses for further processing
+                all_houses = new_houses + existing_houses
 
-                # Match detail houses with gallery houses based on address and city
-                for detail_house in detail_houses:
-                    matching_gallery_house = next(
-                        (
-                            house
-                            for house in stored_houses
-                            if house.address == detail_house.address
-                            and house.city == detail_house.city
-                        ),
-                        None,
+                # Extract detailed property information - only for new houses to save resources
+                if new_houses:
+                    logger.info(f"Fetching details for {len(new_houses)} new houses...")
+                    fetched_pages: List[FetchedPage] = (
+                        await execute_detailed_property_extraction(
+                            crawler, new_houses, self.session_id
+                        )
                     )
 
-                    if matching_gallery_house:
-                        detail_house.gallery_id = matching_gallery_house.id
-                    else:
-                        logger.warning(
-                            f"No matching gallery house found for {detail_house.address}, {detail_house.city}"
+                    # Extract structured data using LLM
+                    detail_houses: List[DetailHouse] = await execute_llm_extraction(
+                        fetched_pages, provider=LLMProvider.GEMINI
+                    )
+
+                    # Match detail houses with gallery houses based on address and city
+                    for detail_house in detail_houses:
+                        matching_gallery_house = next(
+                            (
+                                house
+                                for house in all_houses
+                                if house.address == detail_house.address
+                                and house.city == detail_house.city
+                            ),
+                            None,
                         )
 
-                # Store detail houses
-                logger.info(
-                    f"Storing {len(detail_houses)} detail houses to database..."
-                )
-                stored_detail_houses: List[DBDetailHouse] = (
-                    await self.house_service.store_detail_houses(detail_houses)
-                )
+                        if matching_gallery_house:
+                            # Use the gallery_id from the matching house if available
+                            detail_house.gallery_id = getattr(
+                                matching_gallery_house, "gallery_id", None
+                            )
+                        else:
+                            logger.warning(
+                                f"No matching gallery house found for {detail_house.address}, {detail_house.city}"
+                            )
 
-                return {
-                    "gallery_count": len(gallery_data),
-                    "detail_count": len(stored_detail_houses),
-                    "success": True,
-                }
+                    # Store detail houses
+                    logger.info(
+                        f"Storing {len(detail_houses)} detail houses to database..."
+                    )
+                    stored_detail_houses: List[DetailHouse] = (
+                        await self.house_service.store_detail_houses(detail_houses)
+                    )
+
+                    return {
+                        "gallery_count": len(gallery_data),
+                        "new_houses_count": len(new_houses),
+                        "existing_houses_count": len(existing_houses),
+                        "detail_count": len(stored_detail_houses),
+                        "success": True,
+                    }
+                else:
+                    logger.info("No new houses found, skipping detail extraction")
+                    return {
+                        "gallery_count": len(gallery_data),
+                        "new_houses_count": 0,
+                        "existing_houses_count": len(existing_houses),
+                        "detail_count": 0,
+                        "success": True,
+                    }
 
         except Exception as e:
             logger.error(f"{RED}Error during crawl: {str(e)}{RESET}")
