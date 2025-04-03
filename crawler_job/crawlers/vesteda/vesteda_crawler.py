@@ -46,12 +46,8 @@ class VestedaCrawler:
         self.browser_config = BrowserConfig(
             headless=True,
             verbose=True,
-            use_managed_browser=False,
+            use_persistent_context=True,
             user_data_dir="./browser_data/vesteda",
-            extra_args=[
-                "--no-sandbox",
-                "--disable-gpu",
-            ],
         )
         self.base_url = "https://hurenbij.vesteda.com"
         self.email = os.getenv("VESTEDA_EMAIL")
@@ -71,7 +67,6 @@ class VestedaCrawler:
                 # Handle login if needed
                 if url == "https://hurenbij.vesteda.com/login/":
                     logger.info("Login required. Accepting cookies and logging in...")
-                    # await accept_cookies(crawler, url, self.session_id)
                     await execute_login_step(
                         crawler, self.email, self.password, self.session_id
                     )
@@ -84,9 +79,6 @@ class VestedaCrawler:
                 )
 
                 # Store gallery data only
-                logger.info(
-                    f"Storing {len(gallery_data)} gallery houses to database..."
-                )
                 stored_houses: List[DBGalleryHouse] = (
                     await self.house_service.store_gallery_houses(gallery_data)
                 )

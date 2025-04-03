@@ -56,6 +56,8 @@ class HouseService:
         self, gallery_houses: List[GalleryHouse]
     ) -> List[DBGalleryHouse]:
         """Store a list of gallery houses and return them with their IDs"""
+        logger.info(f"Storing {len(gallery_houses)} gallery houses to database...")
+
         stored_houses = []
         skipped_count = 0
 
