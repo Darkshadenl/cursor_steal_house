@@ -39,7 +39,10 @@ async def execute_login_step(
         raise Exception(f"Login form submission failed: {result.error_message}")
 
     check_config = CrawlerRunConfig(
-        session_id=session_id, cache_mode=CacheMode.BYPASS, js_only=True
+        session_id=session_id,
+        cache_mode=CacheMode.BYPASS,
+        js_only=True,
+        user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
     )
 
     # Wait a moment for the redirect to complete

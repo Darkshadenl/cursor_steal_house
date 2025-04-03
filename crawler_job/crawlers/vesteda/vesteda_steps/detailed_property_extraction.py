@@ -42,6 +42,8 @@ async def execute_detailed_property_extraction(
     )
     config = CrawlerRunConfig(
         log_console=True,
+        exclude_domains=["deploy.mopinion.com", "app.cobrowser.com"],
+        mean_delay=1,
         markdown_generator=DefaultMarkdownGenerator(
             content_filter=prune_filter,
         ),
@@ -49,6 +51,7 @@ async def execute_detailed_property_extraction(
         session_id=session_id,
         js_only=False,
         magic=False,
+        user_agent_mode="random",
     )
 
     dispatcher = SemaphoreDispatcher(
@@ -73,7 +76,7 @@ async def execute_detailed_property_extraction(
     # Add try/except block for error handling
     try:
         results = await crawler.arun_many(
-            urls=urls[:10], config=config, dispatcher=dispatcher
+            urls=urls[:5], config=config, dispatcher=dispatcher
         )
 
         fetched_pages = []
