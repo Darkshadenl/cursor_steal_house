@@ -80,6 +80,8 @@ async def execute_property_extraction(
         extraction_strategy=JsonCssExtractionStrategy(schema),
         cache_mode=CacheMode.BYPASS,
         session_id=session_id,
+        magic=False,
+        user_agent_mode="random",
     )
 
     # Execute the gallery page crawl

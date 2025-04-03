@@ -15,6 +15,7 @@ async def accept_cookies(crawler: AsyncWebCrawler, current_url: str, session_id:
     cookie_config = CrawlerRunConfig(
         cache_mode=CacheMode.BYPASS,
         js_only=True,
+        magic=True,
         session_id=session_id,
         js_code=
         """
