@@ -24,19 +24,23 @@ async def execute_llm_extraction(
             continue
 
         try:
-            extracted_data: Optional[Dict[str, Any]] = await llm_service.extract(
+            extracted_data: Optional[Dict[str, Any] | None] = await llm_service.extract(
                 page.markdown, schema, provider
             )
 
-            if extracted_data:
-                json_data = json.loads(extracted_data)
-                detail_house: DetailHouse = DetailHouseTransformer.dict_to_pydantic(
-                    json_data
-                )
-                detail_houses.append(detail_house)
-                logger.info(f"Successfully extracted data for {page.url}")
-            else:
+            if extracted_data is None:
                 logger.warning(f"No data extracted for {page.url}")
+                continue
+
+            json_data = json.loads(extracted_data)
+            detail_house: DetailHouse = DetailHouseTransformer.dict_to_pydantic(
+                json_data
+            )
+            detail_houses.append(detail_house)
+            logger.info(f"Successfully extracted data for {page.url}")
+        except Exception as e:
+            logger.warning(f"No data extracted for {page.url}")
+            continue
 
         except Exception as e:
             logger.error(f"Error extracting data for {page.url}: {str(e)}")

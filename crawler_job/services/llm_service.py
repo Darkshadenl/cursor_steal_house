@@ -48,7 +48,7 @@ class LLMService:
                     Extract structured data from the given information.
                     The JSON you return must match the schema exactly.
                     {schema}
-                    If you can't find the data, return null.
+                    If you can't find the data, return a simple string 'null'.
                     **IMPORTANT**
                     DO NOT USE NEWLINE CHARACTERS (\\n) IN THE RETURNED JSON.
                     DO NOT USE MARKDOWN BLOCK SYNTAX (```json) IN THE RETURNED JSON.
@@ -62,9 +62,13 @@ class LLMService:
                 temperature=0.1,
                 response_format=schema,
             )
-            return self.remove_markdown_block_syntax(
-                response.choices[0].message.content
-            )
+
+            content = response.choices[0].message.content
+
+            if content == "null":
+                return None
+
+            return self.remove_markdown_block_syntax(content)
         except Exception as e:
             print(f"Error in {provider.value} extraction: {str(e)}")
             return None
