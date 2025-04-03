@@ -56,7 +56,7 @@ class GalleryHouse(BaseModel):
         )
 
     @classmethod
-    def from_db_model(cls, db_model):
+    async def from_db_model_async(cls, db_model):
         """Convert DbGalleryHouse SQLAlchemy model to GalleryHouse Pydantic model"""
         # Check if demand_message indicates high demand
         high_demand = db_model.high_demand
@@ -142,7 +142,7 @@ class FloorPlan(BaseModel):
         )
 
     @classmethod
-    def from_db_model(cls, db_model):
+    async def from_db_model_async(cls, db_model):
         """Convert DbFloorPlan SQLAlchemy model to FloorPlan Pydantic model"""
         return cls(
             image_url=db_model.image_url,
@@ -225,19 +225,19 @@ class DetailHouse(BaseModel):
     description: str = Field(..., description="General description of the house")
 
     # Media
-    floor_plans: Optional[List[FloorPlan]] = Field(
-        None, description="Floor plans of the house"
-    )
+    # floor_plans: Optional[List[FloorPlan]] = Field(
+    #     None, description="Floor plans of the house"
+    # )
 
     # Complex information
     complex_info: Optional[ComplexInfo] = Field(
         None, description="Information about the complex"
     )
 
-    # Location information
-    location_map_url: Optional[str] = Field(
-        None, description="URL to the map with the location"
-    )
+    # # Location information
+    # location_map_url: Optional[str] = Field(
+    #     None, description="URL to the map with the location"
+    # )
 
     # Action links
     request_viewing_url: Optional[str] = Field(
@@ -272,7 +272,7 @@ class DetailHouse(BaseModel):
             available_from=self.available_from,
             complex=self.complex,
             description=self.description,
-            location_map_url=self.location_map_url,
+            # location_map_url=self.location_map_url,
             request_viewing_url=self.request_viewing_url,
             options=self.options,
         )
@@ -295,15 +295,8 @@ class DetailHouse(BaseModel):
         return db_house
 
     @classmethod
-    def from_db_model(cls, db_model):
+    async def from_db_model_async(cls, db_model):
         """Convert DbDetailHouse SQLAlchemy model to DetailHouse Pydantic model"""
-        # Create floor plans list
-        floor_plans = []
-        if hasattr(db_model, "floor_plans"):
-            for plan in db_model.floor_plans:
-                floor_plans.append(FloorPlan.from_db_model(plan))
-
-        # Create income requirements if they exist
         income_requirements = None
         if any(
             [
@@ -358,7 +351,7 @@ class DetailHouse(BaseModel):
             options=db_model.options,
             income_requirements=income_requirements,
             complex_info=complex_info,
-            floor_plans=floor_plans if floor_plans else None,
+            # floor_plans=floor_plans if floor_plans else None,
             gallery_id=db_model.gallery_id,
         )
 
@@ -376,9 +369,9 @@ class DetailHouse(BaseModel):
         if "complex_info" in data and data["complex_info"]:
             complex_info = ComplexInfo.from_dict(data["complex_info"])
 
-        floor_plans = None
-        if "floor_plans" in data and data["floor_plans"]:
-            floor_plans = [FloorPlan.from_dict(plan) for plan in data["floor_plans"]]
+        # floor_plans = None
+        # if "floor_plans" in data and data["floor_plans"]:
+        #     floor_plans = [FloorPlan.from_dict(plan) for plan in data["floor_plans"]]
 
         return cls(
             address=data["address"],
@@ -395,7 +388,7 @@ class DetailHouse(BaseModel):
             available_from=data.get("available_from"),
             complex=data.get("complex"),
             description=data["description"],
-            floor_plans=floor_plans,
+            # floor_plans=floor_plans,
             complex_info=complex_info,
             location_map_url=data.get("location_map_url"),
             request_viewing_url=data.get("request_viewing_url"),

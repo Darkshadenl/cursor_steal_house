@@ -73,10 +73,9 @@ async def execute_detailed_property_extraction(
 
     logger.info(f"Starting fetch for {len(urls)} properties...")
 
-    # Add try/except block for error handling
     try:
         results = await crawler.arun_many(
-            urls=urls[:5], config=config, dispatcher=dispatcher
+            urls=urls, config=config, dispatcher=dispatcher
         )
 
         fetched_pages = []
