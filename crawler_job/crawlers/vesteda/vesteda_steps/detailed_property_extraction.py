@@ -41,7 +41,7 @@ async def execute_detailed_property_extraction(
         min_word_threshold=3,
     )
     config = CrawlerRunConfig(
-        log_console=True,
+        log_console=False,
         exclude_domains=["deploy.mopinion.com", "app.cobrowser.com"],
         mean_delay=1,
         markdown_generator=DefaultMarkdownGenerator(
