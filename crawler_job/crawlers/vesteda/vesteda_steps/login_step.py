@@ -2,6 +2,9 @@ from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
 from typing import Optional
 from playwright.async_api import Page, BrowserContext
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 async def execute_login_step(
@@ -27,6 +30,7 @@ async def execute_login_step(
         ],
     )
 
+    logger.info("Navigating to login page and logging in.")
     result = await crawler.arun(
         url="https://hurenbij.vesteda.com/login", config=run_config
     )
@@ -41,6 +45,7 @@ async def execute_login_step(
     # Wait a moment for the redirect to complete
     await asyncio.sleep(2)
 
+    logger.info("Verifying login.")
     check_result = await crawler.arun(
         url="https://hurenbij.vesteda.com/", config=check_config
     )
