@@ -28,9 +28,8 @@ RESET = "\033[0m"
 
 async def execute_detailed_property_extraction(
     crawler: AsyncWebCrawler,
-    data: List[GalleryHouse],
+    houses: List[GalleryHouse],
     session_id: str,
-    stored_houses: List[GalleryHouse],
 ) -> List[FetchedPage]:
     logger.info("Starting detailed property extraction (two-step process)...")
     main_url = "https://hurenbij.vesteda.com"
@@ -64,7 +63,7 @@ async def execute_detailed_property_extraction(
     )
 
     urls = []
-    for house in data:
+    for house in houses:
         url = main_url + house.detail_url
         urls.append(url)
 

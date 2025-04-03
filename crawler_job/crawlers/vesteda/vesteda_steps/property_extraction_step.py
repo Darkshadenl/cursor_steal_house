@@ -8,9 +8,7 @@ from crawl4ai import (
     JsonCssExtractionStrategy,
 )
 
-# Import our models and transformer
 from ....models.house_models import GalleryHouse
-from crawler_job.helpers.transformers import GalleryHouseTransformer
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -89,9 +87,8 @@ async def execute_property_extraction(
 
     if result.success:
         raw_data = json.loads(result.extracted_content)
-        transformed_data = [
-            GalleryHouseTransformer.dict_to_pydantic(house) for house in raw_data
-        ]
+        transformed_data = [GalleryHouse.from_dict(house) for house in raw_data]
+
         logger.info(
             f"{GREEN}Successfully extracted and transformed {len(transformed_data)} properties{RESET}"
         )

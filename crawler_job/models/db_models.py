@@ -32,7 +32,7 @@ class DbGalleryHouse(Base):
 
     # Relationship
     detail_house = relationship(
-        "DetailHouse", back_populates="gallery_reference", uselist=False
+        "DbDetailHouse", back_populates="gallery_reference", uselist=False
     )
 
 
@@ -48,7 +48,7 @@ class DbDetailHouse(Base):
     gallery_id = Column(
         Integer, ForeignKey("steal_house.gallery_houses.id"), nullable=True
     )
-    gallery_reference = relationship("GalleryHouse", back_populates="detail_house")
+    gallery_reference = relationship("DbGalleryHouse", back_populates="detail_house")
 
     # Basic information
     address = Column(String, nullable=False)
@@ -94,7 +94,7 @@ class DbDetailHouse(Base):
     options = Column(Text, nullable=True)
 
     # Floor plans are stored in a related table
-    floor_plans = relationship("FloorPlan", back_populates="house")
+    floor_plans = relationship("DbFloorPlan", back_populates="house")
 
     def has_changes(self, other: "DbDetailHouse") -> bool:
         """Compare this instance with another DetailHouse instance to check for changes"""
@@ -118,4 +118,4 @@ class DbFloorPlan(Base):
     image_url = Column(String, nullable=False)
     description = Column(String, nullable=True)
 
-    house = relationship("DetailHouse", back_populates="floor_plans")
+    house = relationship("DbDetailHouse", back_populates="floor_plans")
