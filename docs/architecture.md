@@ -1,7 +1,7 @@
 # StealHouse Project Documentation
 
-**Version:** 1.0
-**Date:** 2024-10-27
+**Version:** 1.1
+**Date:** 2024-10-28
 
 ## Table of Contents
 
@@ -20,6 +20,7 @@
     - [Backend \& Database Setup (Local Development)](#backend--database-setup-local-development)
     - [Frontend Setup (Local Development)](#frontend-setup-local-development)
     - [Running with Docker Compose (Development)](#running-with-docker-compose-development)
+    - [Running the Crawler with Docker](#running-the-crawler-with-docker)
   - [4. Usage](#4-usage)
     - [Running the Scraper](#running-the-scraper)
     - [Accessing the Frontend](#accessing-the-frontend)
@@ -35,6 +36,8 @@
     - [Overview](#overview-1)
     - [Core Logic Flow](#core-logic-flow)
     - [Key Components](#key-components)
+    - [Crawler Docker Configuration](#crawler-docker-configuration)
+    - [Google Cloud Run Deployment](#google-cloud-run-deployment)
   - [7. Backend API Reference (Initial)](#7-backend-api-reference-initial)
     - [Overview](#overview-2)
     - [Endpoints](#endpoints)
@@ -229,7 +232,7 @@ This method runs the *entire stack* (Frontend, Backend, DB) in Docker containers
 
 3.  **Build and start all services:**
     ```bash
-    docker-compose -f docker-compose-dev.yml up --build -d
+    docker compose -f docker-compose-dev.yml up --build -d
     ```
     *   `--build`: Forces Docker to rebuild images if Dockerfiles have changed.
     *   `-d`: Runs containers in detached mode (in the background).
@@ -242,13 +245,47 @@ This method runs the *entire stack* (Frontend, Backend, DB) in Docker containers
 5.  **Apply Migrations (if needed after initial up):**
     If you started the stack via Docker Compose and need to apply migrations:
     ```bash
-    docker-compose -f docker-compose-dev.yml exec backend alembic upgrade head
+    docker compose -f docker-compose-dev.yml exec backend alembic upgrade head
     ```
 
 6.  **Stopping the services:**
     ```bash
-    docker-compose -f docker-compose-dev.yml down
+    docker compose -f docker-compose-dev.yml down
     ```
+
+### Running the Crawler with Docker
+
+The project includes a specialized Docker configuration for running the crawler in a containerized environment, leveraging the `crawl4ai` library's features.
+
+1.  **Build the crawler Docker image:**
+    ```bash
+    docker build -t stealhouse-crawler -f dockerfile .
+    ```
+
+2.  **Run the crawler as a standalone container:**
+    ```bash
+    docker run -e POSTGRES_USER=admin \
+               -e POSTGRES_PASSWORD=welkom123 \
+               -e POSTGRES_DB=mydb \
+               -e POSTGRES_HOST=host.docker.internal \
+               -e POSTGRES_PORT=5432 \
+               -e VESTEDA_EMAIL=your_email@example.com \
+               -e VESTEDA_PASSWORD=your_password \
+               -e CRAWLER_VERBOSE=True \
+               stealhouse-crawler
+    ```
+    
+    Replace the environment variables with your actual values.
+
+3.  **Run crawler as part of docker-compose:**
+    
+    The crawler service is already included in the `docker-compose-dev.yml` file and can be run alongside the other services:
+    
+    ```bash
+    docker compose -f docker-compose-dev.yml up crawler
+    ```
+    
+    This will automatically connect to the PostgreSQL database service using the internal Docker network.
 
 ---
 
@@ -367,61 +404,61 @@ erDiagram
 
 Stores summarized information about a property, typically extracted from search result or gallery pages.
 
-| Column           | Type    | Constraints | Description                                      |
-| :--------------- | :------ | :---------- | :----------------------------------------------- |
-| `id`             | Integer | PK          | Unique identifier for the gallery entry.         |
-| `address`        | String  | Not Null    | Street address of the property.                  |
-| `city`           | String  | Not Null    | City where the property is located.              |
-| `status`         | String  | Not Null    | Rental status (e.g., 'For Rent', 'Rented').      |
-| `image_url`      | String  | Nullable    | URL of the primary image shown in the gallery.   |
-| `high_demand`    | Boolean | Default: F  | Flag indicating high interest or viewing requests. |
-| `demand_message` | String  | Nullable    | Text message related to demand (if any).         |
+| Column           | Type    | Constraints | Description                                           |
+| :--------------- | :------ | :---------- | :---------------------------------------------------- |
+| `id`             | Integer | PK          | Unique identifier for the gallery entry.              |
+| `address`        | String  | Not Null    | Street address of the property.                       |
+| `city`           | String  | Not Null    | City where the property is located.                   |
+| `status`         | String  | Not Null    | Rental status (e.g., 'For Rent', 'Rented').           |
+| `image_url`      | String  | Nullable    | URL of the primary image shown in the gallery.        |
+| `high_demand`    | Boolean | Default: F  | Flag indicating high interest or viewing requests.    |
+| `demand_message` | String  | Nullable    | Text message related to demand (if any).              |
 | `detail_url`     | String  | Nullable    | Relative or absolute URL to the property detail page. |
 
 #### `detail_houses`
 
 Stores comprehensive information about a specific property, usually scraped from its detail page.
 
-| Column                 | Type    | Constraints | Description                                         |
-| :--------------------- | :------ | :---------- | :-------------------------------------------------- |
-| `id`                   | Integer | PK          | Unique identifier for the detailed property entry.  |
+| Column                 | Type    | Constraints | Description                                                            |
+| :--------------------- | :------ | :---------- | :--------------------------------------------------------------------- |
+| `id`                   | Integer | PK          | Unique identifier for the detailed property entry.                     |
 | `gallery_id`           | Integer | FK          | Foreign key linking to `gallery_houses.id` (Nullable, Cascade Delete). |
-| `address`              | String  | Not Null    | Full street address.                              |
-| `postal_code`          | String  | Not Null    | Postal code.                                      |
-| `city`                 | String  | Not Null    | City.                                             |
-| `neighborhood`         | String  | Nullable    | Neighborhood name.                                |
-| `rental_price`         | String  | Not Null    | Monthly rental price (as string, e.g., "€1,200"). |
-| `service_costs`        | String  | Nullable    | Additional service costs (as string).             |
-| `min_income_single`    | String  | Nullable    | Minimum income requirement for a single applicant.  |
-| `min_income_joint`     | String  | Nullable    | Minimum income requirement for joint applicants.    |
-| `read_more_url`        | String  | Nullable    | URL for more income requirement details.            |
-| `square_meters`        | Integer | Not Null    | Living area in square meters.                     |
-| `bedrooms`             | Integer | Not Null    | Number of bedrooms.                               |
-| `energy_label`         | String  | Nullable    | Energy efficiency label (e.g., 'A', 'B').         |
-| `status`               | String  | Not Null    | Current rental status.                            |
-| `available_from`       | String  | Nullable    | Date or description of availability.              |
-| `complex`              | String  | Nullable    | Name or identifier of the building complex.       |
-| `complex_name`         | String  | Nullable    | Display name of the complex.                      |
-| `complex_description`  | Text    | Nullable    | Description of the complex.                       |
-| `year_of_construction` | Integer | Nullable    | Year the complex was built.                       |
-| `number_of_objects`    | String  | Nullable    | Number of units/objects in the complex.           |
-| `number_of_floors`     | String  | Nullable    | Number of floors in the complex.                  |
-| `complex_image_url`    | String  | Nullable    | URL for an image of the complex.                  |
-| `description`          | Text    | Not Null    | Detailed description of the property.             |
-| `location_map_url`     | String  | Nullable    | URL to a map showing the property location.       |
-| `request_viewing_url`  | String  | Nullable    | URL to request a property viewing.                |
-| `options`              | Text    | Nullable    | Additional options or features (as text/JSON).    |
+| `address`              | String  | Not Null    | Full street address.                                                   |
+| `postal_code`          | String  | Not Null    | Postal code.                                                           |
+| `city`                 | String  | Not Null    | City.                                                                  |
+| `neighborhood`         | String  | Nullable    | Neighborhood name.                                                     |
+| `rental_price`         | String  | Not Null    | Monthly rental price (as string, e.g., "€1,200").                      |
+| `service_costs`        | String  | Nullable    | Additional service costs (as string).                                  |
+| `min_income_single`    | String  | Nullable    | Minimum income requirement for a single applicant.                     |
+| `min_income_joint`     | String  | Nullable    | Minimum income requirement for joint applicants.                       |
+| `read_more_url`        | String  | Nullable    | URL for more income requirement details.                               |
+| `square_meters`        | Integer | Not Null    | Living area in square meters.                                          |
+| `bedrooms`             | Integer | Not Null    | Number of bedrooms.                                                    |
+| `energy_label`         | String  | Nullable    | Energy efficiency label (e.g., 'A', 'B').                              |
+| `status`               | String  | Not Null    | Current rental status.                                                 |
+| `available_from`       | String  | Nullable    | Date or description of availability.                                   |
+| `complex`              | String  | Nullable    | Name or identifier of the building complex.                            |
+| `complex_name`         | String  | Nullable    | Display name of the complex.                                           |
+| `complex_description`  | Text    | Nullable    | Description of the complex.                                            |
+| `year_of_construction` | Integer | Nullable    | Year the complex was built.                                            |
+| `number_of_objects`    | String  | Nullable    | Number of units/objects in the complex.                                |
+| `number_of_floors`     | String  | Nullable    | Number of floors in the complex.                                       |
+| `complex_image_url`    | String  | Nullable    | URL for an image of the complex.                                       |
+| `description`          | Text    | Not Null    | Detailed description of the property.                                  |
+| `location_map_url`     | String  | Nullable    | URL to a map showing the property location.                            |
+| `request_viewing_url`  | String  | Nullable    | URL to request a property viewing.                                     |
+| `options`              | Text    | Nullable    | Additional options or features (as text/JSON).                         |
 
 #### `floor_plans`
 
 Stores URLs and descriptions for property floor plans.
 
-| Column      | Type    | Constraints | Description                                        |
-| :---------- | :------ | :---------- | :------------------------------------------------- |
-| `id`        | Integer | PK          | Unique identifier for the floor plan entry.        |
-| `house_id`  | Integer | FK          | Foreign key linking to `detail_houses.id` (Cascade Delete). |
-| `image_url` | String  | Not Null    | URL of the floor plan image.                       |
-| `description` | String  | Nullable    | Optional description of the floor plan.            |
+| Column        | Type    | Constraints | Description                                                 |
+| :------------ | :------ | :---------- | :---------------------------------------------------------- |
+| `id`          | Integer | PK          | Unique identifier for the floor plan entry.                 |
+| `house_id`    | Integer | FK          | Foreign key linking to `detail_houses.id` (Cascade Delete). |
+| `image_url`   | String  | Not Null    | URL of the floor plan image.                                |
+| `description` | String  | Nullable    | Optional description of the floor plan.                     |
 
 ---
 
@@ -504,6 +541,163 @@ sequenceDiagram
 *   **`services/llm_service.py`:** Provides an interface to LLM providers (via `LiteLLM`) for structured data extraction based on a Pydantic schema.
 *   **`models/`:** Contains Pydantic models (`house_models.py`) representing the data structure and SQLAlchemy models (`db_models.py`) for the database tables.
 *   **`helpers/transformers.py`:** Utility functions to convert between Pydantic and SQLAlchemy models.
+
+### Crawler Docker Configuration
+
+The crawler is containerized using a custom Dockerfile that leverages the `crawl4ai-base-arm64` image:
+
+```dockerfile
+FROM crawl4ai-base-arm64:latest
+
+# Set working directory
+WORKDIR /app
+
+# Install PostgreSQL development packages and Cloud SQL Proxy dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    postgresql-client \
+    wget \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Cloud SQL Proxy
+RUN wget https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.9.0/cloud-sql-proxy.linux.amd64 -O /usr/local/bin/cloud-sql-proxy \
+    && chmod +x /usr/local/bin/cloud-sql-proxy
+
+# Copy requirements.txt first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Playwright browser
+RUN playwright install chromium && playwright install-deps
+
+# Copy crawler code
+COPY crawler_job /app/crawler_job
+
+# Set environment variables
+ENV PYTHONPATH=/app
+# Environment variable for verbose mode (can be overridden at runtime)
+ENV CRAWLER_VERBOSE=False
+
+# Create a directory for logs
+RUN mkdir -p /app/logs
+# Create directory for browser data
+RUN mkdir -p /app/browser_data/vesteda
+
+# Create start script to launch Cloud SQL Proxy, Chrome browser, and crawler
+RUN echo '#!/bin/bash\n\
+\n\
+# Start Cloud SQL Proxy if CLOUD_SQL_INSTANCE is set\n\
+if [ -n "$CLOUD_SQL_INSTANCE" ]; then\n\
+  echo "Starting Cloud SQL Proxy for instance: $CLOUD_SQL_INSTANCE..."\n\
+  # Start Cloud SQL Proxy in background\n\
+  /usr/local/bin/cloud-sql-proxy --port=5432 "$CLOUD_SQL_INSTANCE" &\n\
+  PROXY_PID=$!\n\
+  \n\
+  # Wait for proxy to start up\n\
+  echo "Waiting for Cloud SQL Proxy to start..."\n\
+  sleep 5\n\
+  \n\
+  # Override database host to use local proxy\n\
+  export POSTGRES_HOST=127.0.0.1\n\
+fi\n\
+\n\
+# Launch chrome in background with remote debugging\n\
+echo "Starting Chrome with remote debugging..."\n\
+\n\
+# Get path to the Chromium executable\n\
+CHROMIUM_PATH=$(find /root/.cache/ms-playwright -name chrome -type f | head -n 1)\n\
+\n\
+# Launch Chromium with remote debugging\n\
+$CHROMIUM_PATH --headless --disable-gpu --remote-debugging-address=0.0.0.0 --remote-debugging-port=9222 --no-sandbox &\n\
+\n\
+# Wait for Chrome to start\n\
+echo "Waiting for Chrome to start..."\n\
+sleep 5\n\
+\n\
+# Run the crawler\n\
+echo "Starting crawler..."\n\
+python -m crawler_job.crawlers.vesteda.vesteda_crawler\n\
+\n\
+# If proxy was started, clean up\n\
+if [ -n "$PROXY_PID" ]; then\n\
+  echo "Stopping Cloud SQL Proxy..."\n\
+  kill $PROXY_PID\n\
+fi\n\
+' > /app/start.sh && chmod +x /app/start.sh
+
+# Default command to run the start script
+CMD ["/app/start.sh"]
+```
+
+**Key Features:**
+
+1. **Base Image:** Uses the `crawl4ai-base-arm64` image which includes the Crawl4AI library and Playwright.
+2. **PostgreSQL Support:** Installs the necessary PostgreSQL development packages to support database connections.
+3. **Cloud SQL Proxy:** Integrates Google Cloud SQL Proxy for secure connections to Google Cloud SQL instances.
+4. **Browser Configuration:** Sets up Chromium with remote debugging to support the `use_managed_browser=True` configuration used by the crawler.
+5. **Environment Variables:** Configurable via Docker environment variables, including a `CRAWLER_VERBOSE` option.
+6. **Start Script:** Includes a custom start script that:
+   - Starts the Cloud SQL Proxy if `CLOUD_SQL_INSTANCE` is provided
+   - Launches a headless Chrome browser with remote debugging
+   - Runs the crawler with the proper configurations
+   - Cleans up processes on completion
+
+This Docker configuration enables the crawler to run in any environment with Docker support, without requiring local Python installation or browser configuration.
+
+### Google Cloud Run Deployment
+
+The Dockerfile is optimized for running in Google Cloud Run as a job. To deploy:
+
+1. **Build and push the Docker image:**
+   ```bash
+   # Build the image
+   docker build -t gcr.io/[YOUR-PROJECT-ID]/stealhouse-crawler .
+   
+   # Push to Google Container Registry
+   docker push gcr.io/[YOUR-PROJECT-ID]/stealhouse-crawler
+   ```
+
+2. **Deploy as a Cloud Run job:**
+   ```bash
+   gcloud run jobs create stealhouse-crawler \
+     --image gcr.io/[YOUR-PROJECT-ID]/stealhouse-crawler \
+     --set-env-vars="CLOUD_SQL_INSTANCE=[YOUR-INSTANCE-CONNECTION-NAME]" \
+     --set-env-vars="POSTGRES_USER=[DB-USER]" \
+     --set-env-vars="POSTGRES_PASSWORD=[DB-PASSWORD]" \
+     --set-env-vars="POSTGRES_DB=[DB-NAME]" \
+     --set-env-vars="VESTEDA_EMAIL=[YOUR-EMAIL]" \
+     --set-env-vars="VESTEDA_PASSWORD=[YOUR-PASSWORD]" \
+     --set-env-vars="CRAWLER_VERBOSE=True"
+   ```
+
+3. **Set up a schedule (optional):**
+   ```bash
+   gcloud scheduler jobs create http stealhouse-crawler-scheduler \
+     --schedule="0 */6 * * *" \
+     --uri="https://[REGION]-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/[PROJECT-ID]/jobs/stealhouse-crawler:run" \
+     --http-method=POST \
+     --oauth-service-account-email=[SERVICE-ACCOUNT]@[PROJECT-ID].iam.gserviceaccount.com
+   ```
+
+**Key Cloud Run Configuration Notes:**
+
+1. **Service Account:** Ensure the service account used by Cloud Run has:
+   - `cloudsql.client` role for Cloud SQL access
+   - Appropriate roles for any other Google Cloud services used (e.g., Secret Manager for credentials)
+
+2. **Connection Name:** The `CLOUD_SQL_INSTANCE` should be in the format `project:region:instance`, e.g., `myproject:us-central1:myinstance`
+
+3. **Security:** For production, consider using Secret Manager for sensitive values like passwords:
+   ```bash
+   gcloud run jobs update stealhouse-crawler \
+     --set-secrets="POSTGRES_PASSWORD=db-password:latest" \
+     --set-secrets="VESTEDA_PASSWORD=vesteda-password:latest"
+   ```
+
+This configuration provides a secure, scalable solution for running the crawler as a scheduled job in Google Cloud, with proper connectivity to a private Cloud SQL database instance.
 
 ---
 
