@@ -39,9 +39,13 @@ RESET = "\033[0m"
 class VestedaCrawler:
     def __init__(self):
         load_dotenv()
+        # Get verbose setting from environment variable, default to False
+        verbose = os.getenv("CRAWLER_VERBOSE", "False").lower() == "true"
+        logger.info(f"Browser verbose mode: {verbose}")
+
         self.browser_config = BrowserConfig(
             headless=True,
-            verbose=False,
+            verbose=verbose,
             use_managed_browser=True,
             user_data_dir="./browser_data/vesteda",
         )
