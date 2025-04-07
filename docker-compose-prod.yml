@@ -1,0 +1,48 @@
+services:
+  cloud-sql-proxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.9.0
+    command: --port=5432 ${CLOUD_SQL_INSTANCE}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT}:5432"  # Bind alleen aan localhost voor veiligheid
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/credentials/credentials.json
+    volumes:
+      - ./credentials:/credentials:ro  # Read-only toegang tot credentials
+    restart: always
+    healthcheck:  # Healthcheck toevoegen
+      test: ["CMD", "nc", "-z", "localhost", "5432"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  crawler:
+    build:
+      context: .
+      dockerfile: dockerfile
+    depends_on:
+      cloud-sql-proxy:
+        condition: service_healthy  # Wacht tot de proxy echt klaar is
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_PORT: 5432
+      POSTGRES_HOST: cloud-sql-proxy
+      VESTEDA_EMAIL: ${VESTEDA_EMAIL}
+      VESTEDA_PASSWORD: ${VESTEDA_PASSWORD}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      CRAWLER_VERBOSE: ${CRAWLER_VERBOSE:-False}
+      CLOUD_SQL_INSTANCE: ${CLOUD_SQL_INSTANCE}
+    restart: on-failure
+    logging:  # Logging configuratie toevoegen
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Resource limieten toevoegen
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
