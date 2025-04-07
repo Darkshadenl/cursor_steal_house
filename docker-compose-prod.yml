@@ -1,15 +1,17 @@
+# will probably not be used.
+
 services:
   cloud-sql-proxy:
     image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.9.0
     command: --port=5432 ${CLOUD_SQL_INSTANCE}
     ports:
-      - "127.0.0.1:${POSTGRES_PORT}:5432"  # Bind alleen aan localhost voor veiligheid
+      - "127.0.0.1:${POSTGRES_PORT}:5432" # Bind alleen aan localhost voor veiligheid
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/credentials/credentials.json
     volumes:
-      - ./credentials:/credentials:ro  # Read-only toegang tot credentials
+      - ./credentials:/credentials:ro # Read-only toegang tot credentials
     restart: always
-    healthcheck:  # Healthcheck toevoegen
+    healthcheck: # Healthcheck toevoegen
       test: ["CMD", "nc", "-z", "localhost", "5432"]
       interval: 30s
       timeout: 10s
@@ -21,7 +23,7 @@ services:
       dockerfile: dockerfile
     depends_on:
       cloud-sql-proxy:
-        condition: service_healthy  # Wacht tot de proxy echt klaar is
+        condition: service_healthy # Wacht tot de proxy echt klaar is
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -35,7 +37,7 @@ services:
       CRAWLER_VERBOSE: ${CRAWLER_VERBOSE:-False}
       CLOUD_SQL_INSTANCE: ${CLOUD_SQL_INSTANCE}
     restart: on-failure
-    logging:  # Logging configuratie toevoegen
+    logging: # Logging configuratie toevoegen
       driver: "json-file"
       options:
         max-size: "10m"
@@ -44,5 +46,5 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
+          cpus: "1.0"
           memory: 1G
