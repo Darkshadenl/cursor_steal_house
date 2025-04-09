@@ -109,7 +109,7 @@ class HouseService:
 
         async def _execute_transaction():
             async with get_repositories(self.session) as repos:
-                new_houses, existing_houses = (
+                new_houses, existing_houses, updated_houses = (
                     await self._store_gallery_houses_with_repos(gallery_houses, repos)
                 )
 
@@ -118,25 +118,44 @@ class HouseService:
                 )
                 await self._store_detail_houses_with_repos(matched_details, repos)
 
-                # Send notifications for new houses if notification service is available
-                if self.notification_service and new_houses:
-                    logger.info(
-                        f"Sending notifications for {len(new_houses)} new houses"
-                    )
-                    for house in new_houses:
-                        try:
-                            await self.notification_service.send_new_house_notification(
-                                house
-                            )
-                        except Exception as e:
-                            logger.error(
-                                f"Failed to send notification for {house.address}: {e}",
-                                exc_info=True,
-                            )
+                # Send notifications if notification service is available
+                if self.notification_service:
+                    # Send notifications for new houses
+                    if new_houses:
+                        logger.info(
+                            f"Sending notifications for {len(new_houses)} new houses"
+                        )
+                        for house in new_houses:
+                            try:
+                                await self.notification_service.send_new_house_notification(
+                                    house
+                                )
+                            except Exception as e:
+                                logger.error(
+                                    f"Failed to send notification for {house.address}: {e}",
+                                    exc_info=True,
+                                )
+
+                    # Send notifications for updated houses
+                    if updated_houses:
+                        logger.info(
+                            f"Sending notifications for {len(updated_houses)} updated houses"
+                        )
+                        for house, old_status in updated_houses:
+                            try:
+                                await self.notification_service.send_updated_house_notification(
+                                    house, old_status
+                                )
+                            except Exception as e:
+                                logger.error(
+                                    f"Failed to send update notification for {house.address}: {e}",
+                                    exc_info=True,
+                                )
 
                 return {
                     "new_count": len(new_houses),
                     "existing_count": len(existing_houses),
+                    "updated_count": len(updated_houses),
                 }
 
         if has_active_transaction:
@@ -147,10 +166,11 @@ class HouseService:
 
     async def _store_gallery_houses_with_repos(
         self, gallery_houses: List[GalleryHouse], repos: Dict[str, Any]
-    ) -> Tuple[List[GalleryHouse], List[GalleryHouse]]:
+    ) -> Tuple[List[GalleryHouse], List[GalleryHouse], List[Tuple[GalleryHouse, str]]]:
         """Interne methode voor gallery house opslag met gegeven repositories"""
         new_db_houses: List[DbGalleryHouse] = []
         existing_db_houses: List[DbGalleryHouse] = []
+        updated_houses: List[Tuple[GalleryHouse, str]] = []
 
         for house in gallery_houses:
             existing_house = await repos["gallery"].get_by_address(
@@ -158,17 +178,25 @@ class HouseService:
             )
             if existing_house:
                 if existing_house.status != house.status:
+                    old_status = existing_house.status
                     existing_house.status = house.status
                     await repos["gallery"].update(existing_house)
+                    # Store house and its old status for notification
+                    house_obj = await db_gallery_houses_to_pydantic_async(
+                        [existing_house]
+                    )
+                    if house_obj:
+                        updated_houses.append((house_obj[0], old_status))
                 existing_db_houses.append(existing_house)
             else:
                 stored_db_house = await repos["gallery"].create(house)
                 new_db_houses.append(stored_db_house)
 
-        return (
-            await db_gallery_houses_to_pydantic_async(new_db_houses),
-            await db_gallery_houses_to_pydantic_async(existing_db_houses),
-        )
+        new_houses = await db_gallery_houses_to_pydantic_async(new_db_houses)
+        existing_houses = await db_gallery_houses_to_pydantic_async(existing_db_houses)
+
+        # Store the updated houses for notification in the _execute_transaction method
+        return (new_houses, existing_houses, updated_houses)
 
     async def _match_details_with_gallery(
         self, detail_houses: List[DetailHouse], all_houses: List[GalleryHouse]
@@ -211,7 +239,7 @@ class HouseService:
 
     async def _store_gallery_houses(
         self, gallery_houses: List[GalleryHouse]
-    ) -> Tuple[List[GalleryHouse], List[GalleryHouse]]:
+    ) -> Tuple[List[GalleryHouse], List[GalleryHouse], List[Tuple[GalleryHouse, str]]]:
         """Interne methode voor gallery house opslag"""
         async with get_repositories(self.session) as repos:
             return await self._store_gallery_houses_with_repos(gallery_houses, repos)

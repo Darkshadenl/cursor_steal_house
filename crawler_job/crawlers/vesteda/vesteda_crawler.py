@@ -36,11 +36,11 @@ RED = "\033[91m"
 YELLOW = "\033[93m"
 RESET = "\033[0m"
 
+load_dotenv()
+
 
 class VestedaCrawler:
     def __init__(self):
-        load_dotenv()
-
         # Get verbose setting from environment variable, default to False
         verbose = os.getenv("CRAWLER_VERBOSE", "False").lower() == "true"
         logger.info(f"Browser verbose mode: {verbose}")
@@ -125,12 +125,50 @@ class VestedaCrawler:
             logger.error(f"{RED}Error during crawl: {str(e)}{RESET}")
             raise e
 
+    async def test_notifications_only(self) -> Dict[str, Any]:
+        """Run only the test notification functionality without crawling"""
+        try:
+            logger.info(
+                f"{YELLOW}Sending test notification to all active channels...{RESET}"
+            )
+            successful_channels = (
+                await self.notification_service.send_test_notification()
+            )
+
+            if successful_channels:
+                logger.info(
+                    f"{GREEN}Test notifications sent successfully to: {', '.join(successful_channels)}{RESET}"
+                )
+            else:
+                logger.warning(
+                    f"{YELLOW}No test notifications were sent successfully. Please check your configuration.{RESET}"
+                )
+
+            return {
+                "success": len(successful_channels) > 0,
+                "successful_channels": successful_channels,
+            }
+
+        except Exception as e:
+            logger.error(f"{RED}Error sending test notifications: {str(e)}{RESET}")
+            return {"success": False, "error": str(e)}
+
 
 if __name__ == "__main__":
     crawler = VestedaCrawler()
     try:
+        print(os.getenv("NOTIFICATION_CHANNELS_ACTIVE"))
+        
+        
         logger.info("Starting vesteda crawl...")
-        result = asyncio.run(crawler.run_full_crawl())
+
+        # If TEST_NOTIFICATIONS_ONLY is set, only run test notifications
+        if os.getenv("TEST_NOTIFICATIONS_ONLY", "false").lower() == "true":
+            logger.info(f"{YELLOW}Running in test notifications only mode{RESET}")
+            result = asyncio.run(crawler.test_notifications_only())
+        else:
+            result = asyncio.run(crawler.run_full_crawl())
+
         logger.info(f"{GREEN}Crawl completed successfully!{RESET}")
     except Exception as e:
         logger.error(f"{RED}Error during crawl: {str(e)}{RESET}")

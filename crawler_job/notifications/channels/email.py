@@ -4,7 +4,7 @@ import logging
 import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import Optional
+from typing import List
 
 from .base import AbstractNotificationChannel
 
@@ -14,18 +14,25 @@ logger = logging.getLogger(__name__)
 class EmailNotificationChannel(AbstractNotificationChannel):
     """Notification channel for sending emails."""
 
-    def __init__(self, recipient_email: str):
+    def __init__(self, recipients_file_path: str):
         """Initialize the email notification channel.
 
         Args:
-            recipient_email: The email address to send notifications to
+            recipients_file_path: Path to a text file containing recipient email addresses (one per line)
         """
         # Get settings from environment variables
         self.smtp_server = os.getenv("SMTP_SERVER")
-        self.smtp_port = int(os.getenv("SMTP_PORT"))
+        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
         self.email_user = os.getenv("EMAIL_USER")
         self.email_password = os.getenv("EMAIL_PASSWORD")
-        self.recipient_email = recipient_email
+
+        # Read recipient emails from file
+        self.recipient_emails = self._read_recipients_from_file(recipients_file_path)
+
+        if not self.recipient_emails:
+            raise ValueError(
+                f"No recipient emails found in file: {recipients_file_path}"
+            )
 
         # Validate required settings
         if not all([self.smtp_server, self.email_user, self.email_password]):
@@ -33,17 +40,43 @@ class EmailNotificationChannel(AbstractNotificationChannel):
                 "Missing required email configuration in environment variables"
             )
 
-        logger.info(f"Email notification channel initialized for {recipient_email}")
+        logger.info(
+            f"Email notification channel initialized with {len(self.recipient_emails)} recipients"
+        )
+
+    def _read_recipients_from_file(self, file_path: str) -> List[str]:
+        """Read recipient email addresses from a text file.
+
+        Args:
+            file_path: Path to the text file with email addresses (one per line)
+
+        Returns:
+            List of email addresses
+        """
+        if not os.path.exists(file_path):
+            logger.error(f"Recipients file not found: {file_path}")
+            return []
+
+        try:
+            with open(file_path, "r") as f:
+                # Read lines, strip whitespace, and filter out empty lines
+                emails = [line.strip() for line in f.readlines() if line.strip()]
+
+            logger.info(f"Found {len(emails)} email recipients in {file_path}")
+            return emails
+        except Exception as e:
+            logger.error(f"Error reading recipients file: {str(e)}")
+            return []
 
     async def send_notification(self, subject: str, message: str) -> bool:
-        """Send an email notification.
+        """Send an email notification to all recipients.
 
         Args:
             subject: The email subject
             message: The email body
 
         Returns:
-            bool: True if the email was sent successfully, False otherwise
+            bool: True if the email was sent successfully to all recipients, False otherwise
         """
         return await asyncio.to_thread(self._send_email_sync, subject, message)
 
@@ -55,27 +88,42 @@ class EmailNotificationChannel(AbstractNotificationChannel):
             message: The email body
 
         Returns:
-            bool: True if the email was sent successfully, False otherwise
+            bool: True if the email was sent successfully to all recipients, False otherwise
         """
+        if not self.recipient_emails:
+            logger.warning(
+                "No recipient emails configured, skipping email notification"
+            )
+            return False
+
+        success = True
+
         try:
-            # Create a multipart message
-            email_message = MIMEMultipart()
-            email_message["From"] = self.email_user
-            email_message["To"] = self.recipient_email
-            email_message["Subject"] = subject
-
-            # Add the message body
-            email_message.attach(MIMEText(message, "plain"))
-
             # Connect to the SMTP server
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 server.starttls()  # Secure the connection
                 server.login(self.email_user, self.email_password)
-                server.send_message(email_message)
 
-            logger.info(f"Email notification sent to {self.recipient_email}")
-            return True
+                # Send to each recipient
+                for recipient in self.recipient_emails:
+                    try:
+                        # Create a multipart message
+                        email_message = MIMEMultipart()
+                        email_message["From"] = self.email_user
+                        email_message["To"] = recipient
+                        email_message["Subject"] = subject
+
+                        # Add the message body
+                        email_message.attach(MIMEText(message, "plain"))
+
+                        server.send_message(email_message)
+                        logger.info(f"Email notification sent to {recipient}")
+                    except Exception as e:
+                        logger.error(f"Failed to send email to {recipient}: {str(e)}")
+                        success = False
+
+            return success
 
         except Exception as e:
-            logger.error(f"Failed to send email notification: {str(e)}")
+            logger.error(f"Failed to establish email connection: {str(e)}")
             return False
