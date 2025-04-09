@@ -92,6 +92,21 @@ npm install
 npm run dev
 ```
 
+## Testing Notifications
+
+You can test if the notification system is working properly by using the following environment variables:
+
+- `TEST_NOTIFICATIONS_ONLY=true` - Only send test notifications without starting the crawler
+
+These can be added to your `.env` file or set directly when running the container:
+
+```bash
+# To only run the notification test without crawling
+docker run -e TEST_NOTIFICATIONS_ONLY=true <container_name>
+```
+
+This is especially useful when testing the notification setup in Docker environments or on deployment.
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

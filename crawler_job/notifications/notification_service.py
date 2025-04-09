@@ -21,7 +21,7 @@ class NotificationService:
 
         # Get notification configuration from environment variables
         notification_channels_active = os.getenv("NOTIFICATION_CHANNELS_ACTIVE", "")
-        notification_recipient_email = os.getenv("NOTIFICATION_RECIPIENT_EMAIL")
+        email_recipients_file = os.getenv("EMAIL_RECIPIENTS_FILE")
 
         # Parse the active channels string and initialize each channel
         if notification_channels_active:
@@ -32,9 +32,7 @@ class NotificationService:
             logger.info(
                 f"Initializing notification channels: {', '.join(active_channel_names)}"
             )
-            self._initialize_channels(
-                active_channel_names, notification_recipient_email
-            )
+            self._initialize_channels(active_channel_names, email_recipients_file)
         else:
             logger.info(
                 "No notification channels configured in NOTIFICATION_CHANNELS_ACTIVE"
@@ -50,28 +48,28 @@ class NotificationService:
             )
 
     def _initialize_channels(
-        self, channel_names: List[str], notification_recipient_email: Optional[str]
+        self, channel_names: List[str], email_recipients_file: Optional[str]
     ) -> None:
         """Initialize notification channels based on the provided names.
 
         Args:
             channel_names: List of channel names to initialize
-            notification_recipient_email: Email address to send notifications to
+            email_recipients_file: Path to file containing email recipients (one per line)
         """
         for channel_name in channel_names:
             try:
                 if channel_name == "email":
-                    if not notification_recipient_email:
+                    if not email_recipients_file:
                         logger.warning(
-                            "Email channel is enabled but NOTIFICATION_RECIPIENT_EMAIL is not set"
+                            "Email channel is enabled but EMAIL_RECIPIENTS_FILE is not set"
                         )
                         continue
 
                     self.active_channels.append(
-                        EmailNotificationChannel(notification_recipient_email)
+                        EmailNotificationChannel(email_recipients_file)
                     )
                     logger.info(
-                        f"Email notification channel initialized for {notification_recipient_email}"
+                        f"Email notification channel initialized with recipients from {email_recipients_file}"
                     )
 
                 elif channel_name == "pushover":
@@ -133,3 +131,86 @@ class NotificationService:
                     f"Error sending notification via {channel.__class__.__name__}: {str(e)}",
                     exc_info=True,
                 )
+
+    async def send_updated_house_notification(
+        self, house: GalleryHouse, old_status: str
+    ) -> None:
+        """Send a notification about an updated house to all active channels.
+
+        Args:
+            house: The updated house to send a notification about
+            old_status: The previous status of the house
+        """
+        if not self.active_channels:
+            logger.info("No active notification channels, skipping notification")
+            return
+
+        subject = f"House Status Updated: {house.address}, {house.city}"
+
+        # Format the message with details about the house
+        message = (
+            f"The status of a property at {house.address}, {house.city} has changed.\n\n"
+            f"Previous status: {old_status}\n"
+            f"New status: {house.status}\n"
+            f"Type: {house.house_type if hasattr(house, 'house_type') else 'Not specified'}\n"
+            f"Price: {house.price if hasattr(house, 'price') else 'Not specified'}\n\n"
+            f"View details: {house.detail_url}"
+        )
+
+        # Send the notification to each active channel
+        for channel in self.active_channels:
+            try:
+                success = await channel.send_notification(subject, message)
+                if success:
+                    logger.info(
+                        f"Update notification for {house.address} sent successfully via {channel.__class__.__name__}"
+                    )
+                else:
+                    logger.warning(
+                        f"Failed to send update notification for {house.address} via {channel.__class__.__name__}"
+                    )
+            except Exception as e:
+                logger.error(
+                    f"Error sending update notification via {channel.__class__.__name__}: {str(e)}",
+                    exc_info=True,
+                )
+
+    async def send_test_notification(self) -> List[str]:
+        """Send a test notification to all active channels.
+
+        Returns:
+            List of channel names that were successfully notified
+        """
+        if not self.active_channels:
+            logger.info("No active notification channels, skipping test notification")
+            return []
+
+        subject = "StealHouse Notification Test"
+        message = (
+            "This is a test notification from StealHouse.\n\n"
+            "If you're receiving this, your notification channel is properly configured."
+        )
+
+        successful_channels = []
+
+        # Send the notification to each active channel
+        for channel in self.active_channels:
+            channel_name = channel.__class__.__name__.replace("NotificationChannel", "")
+            try:
+                success = await channel.send_notification(subject, message)
+                if success:
+                    logger.info(
+                        f"Test notification sent successfully via {channel_name}"
+                    )
+                    successful_channels.append(channel_name)
+                else:
+                    logger.warning(
+                        f"Failed to send test notification via {channel_name}"
+                    )
+            except Exception as e:
+                logger.error(
+                    f"Error sending test notification via {channel_name}: {str(e)}",
+                    exc_info=True,
+                )
+
+        return successful_channels

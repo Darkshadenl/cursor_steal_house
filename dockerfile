@@ -27,14 +27,16 @@ RUN playwright install chromium && playwright install-deps
 # Copy crawler code
 COPY crawler_job /app/crawler_job
 
+# Copy recipients file to the container
+COPY recipients.txt /app/recipients.txt
+
 # Set environment variables
 ENV PYTHONPATH=/app
 # Environment variable for verbose mode (can be overridden at runtime)
 ENV CRAWLER_VERBOSE=False
 
-# Create a directory for logs
+# Create directories for data and logs
 RUN mkdir -p /app/logs
-# Create directory for browser data
 RUN mkdir -p /app/browser_data/vesteda
 
 # Create start script to launch Cloud SQL Proxy, Chrome browser, and crawler
@@ -53,6 +55,15 @@ RUN echo '#!/bin/bash\n\
     \n\
     # Override database host to use local proxy\n\
     export POSTGRES_HOST=127.0.0.1\n\
+    fi\n\
+    \n\
+    # Check if we should only run test notifications\n\
+    if [ "$TEST_NOTIFICATIONS_ONLY" = "true" ]; then\n\
+    echo "Running in test notifications only mode. Skipping Chrome startup..."\n\
+    # Run the crawler with test notifications only\n\
+    python -m crawler_job.crawlers.vesteda.vesteda_crawler\n\
+    # Exit after testing notifications\n\
+    exit 0\n\
     fi\n\
     \n\
     # Launch chrome in background with remote debugging\n\

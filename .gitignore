@@ -66,3 +66,12 @@ credentials/*.json
 .env.prod
 credentials/
 credentials/*.json
+recipients.txt
+
+build-run-only-test.sh
+build-and-push-google.sh
+create-new-job-google.sh
+ter test/run-notification-test-local.sh
+ter test/run-notification-test.sh
+ter test/build-push-test-job-google.sh
+full-deployment.sh
