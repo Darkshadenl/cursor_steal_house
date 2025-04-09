@@ -49,10 +49,15 @@ async def get_repositories(
 class HouseService:
     """Service for handling house data storage"""
 
-    def __init__(self):
-        """Initialize with a new database session"""
+    def __init__(self, notification_service=None):
+        """Initialize with a new database session and optional notification service
+
+        Args:
+            notification_service: Optional notification service for sending alerts
+        """
         self.session = get_db_session()
         self._closed = False
+        self.notification_service = notification_service
 
     async def __aenter__(self):
         """Enter the context manager"""
@@ -112,6 +117,22 @@ class HouseService:
                     detail_houses, all_houses
                 )
                 await self._store_detail_houses_with_repos(matched_details, repos)
+
+                # Send notifications for new houses if notification service is available
+                if self.notification_service and new_houses:
+                    logger.info(
+                        f"Sending notifications for {len(new_houses)} new houses"
+                    )
+                    for house in new_houses:
+                        try:
+                            await self.notification_service.send_new_house_notification(
+                                house
+                            )
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to send notification for {house.address}: {e}",
+                                exc_info=True,
+                            )
 
                 return {
                     "new_count": len(new_houses),

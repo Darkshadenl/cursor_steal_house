@@ -19,6 +19,7 @@ from crawler_job.models.house_models import (
     GalleryHouse,
 )
 from crawler_job.services.llm_service import LLMProvider
+from crawler_job.notifications.notification_service import NotificationService
 from typing import List, Dict, Any
 
 # Configure logging
@@ -39,6 +40,7 @@ RESET = "\033[0m"
 class VestedaCrawler:
     def __init__(self):
         load_dotenv()
+
         # Get verbose setting from environment variable, default to False
         verbose = os.getenv("CRAWLER_VERBOSE", "False").lower() == "true"
         logger.info(f"Browser verbose mode: {verbose}")
@@ -55,6 +57,9 @@ class VestedaCrawler:
         self.session_id = "vesteda_session"
         self.deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
         self.google_api_key = os.getenv("GOOGLE_API_KEY")
+
+        # Initialize notification service after loading environment variables
+        self.notification_service = NotificationService()
 
     async def run_full_crawl(self) -> Dict[str, Any]:
         """Run a full crawl of Vesteda website and store results in database"""
@@ -81,7 +86,10 @@ class VestedaCrawler:
                 detail_houses: List[DetailHouse] = []
                 fetched_pages: List[FetchedPage] = []
 
-                async with HouseService() as house_service:
+                # Initialize HouseService with notification service
+                async with HouseService(
+                    notification_service=self.notification_service
+                ) as house_service:
                     # Only process new houses
                     new_houses = await house_service.identify_new_houses(gallery_data)
 
