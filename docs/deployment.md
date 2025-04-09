@@ -7,7 +7,8 @@ This document outlines the deployment procedures for the StealHouse application,
 2. [Local Development Setup](#local-development-setup)
 3. [Google Cloud Run Deployment](#google-cloud-run-deployment)
 4. [Environment Variables](#environment-variables)
-5. [Troubleshooting](#troubleshooting)
+5. [Deployment Scripts](#deployment-scripts)
+6. [Troubleshooting](#troubleshooting)
 
 ## Docker Setup
 
@@ -157,13 +158,17 @@ The crawler is designed to run as a scheduled job on Google Cloud Run, with secu
 
 ### Building and Pushing the Docker Image
 
+When building for deployment to Google Cloud Run, it's important to build for the correct architecture. If you're building on an ARM-based machine (like a Mac with M1/M2 chip), you need to explicitly build for the `linux/amd64` platform:
+
 ```bash
-# Build the image
-docker build -t gcr.io/[YOUR-PROJECT-ID]/stealhouse-crawler .
+# Build the image for linux/amd64 platform
+docker buildx build --platform=linux/amd64 -t gcr.io/[YOUR-PROJECT-ID]/stealhouse-crawler .
 
 # Push to Google Container Registry
 docker push gcr.io/[YOUR-PROJECT-ID]/stealhouse-crawler
 ```
+
+Alternatively, you can use the provided deployment scripts (see [Deployment Scripts](#deployment-scripts) section).
 
 ### Deploying as a Cloud Run Job
 
@@ -221,6 +226,49 @@ The crawler supports the following environment variables:
 | `CRAWLER_VERBOSE`    | Enable verbose logging                                               | No                 | False   |
 | `CLOUD_SQL_INSTANCE` | Cloud SQL instance connection name (format: project:region:instance) | Only for Cloud SQL | -       |
 
+## Deployment Scripts
+
+The project includes several deployment scripts to streamline the process:
+
+### build-and-push.sh
+
+This script builds the Docker image for the `linux/amd64` platform (required for Cloud Run) and pushes it to Google Container Registry:
+
+```bash
+#!/bin/bash
+chmod +x build-and-push.sh
+./build-and-push.sh
+```
+
+Key features:
+- Automatically builds for `linux/amd64` platform using `docker buildx`
+- Tags the image with your Google Cloud project ID
+- Pushes the image to Google Container Registry
+
+### create-new-job.sh
+
+This script deploys the crawler as a Cloud Run job:
+
+```bash
+chmod +x create-new-job.sh
+./create-new-job.sh
+```
+
+Key features:
+- Creates a new Cloud Run job or updates an existing one
+- Configures job settings (memory, CPU, timeout, retries)
+- Sets environment variables by reading from a `.env.prod` file
+- Provides instructions for manual execution and scheduling
+
+### Deployment Workflow
+
+The recommended deployment workflow is:
+
+1. Update your crawler code as needed
+2. Run `./build-and-push.sh` to build and push the Docker image
+3. Run `./create-new-job.sh` to deploy or update the Cloud Run job
+4. Optionally, set up a schedule using Cloud Scheduler
+
 ## Troubleshooting
 
 ### Common Docker Issues
@@ -255,4 +303,17 @@ The crawler supports the following environment variables:
 3. **Timeout Issues**: If the crawler exceeds the default timeout:
    ```bash
    gcloud run jobs update stealhouse-crawler --timeout 30m
-   ``` 
+   ```
+
+### Architecture Issues
+
+If you encounter errors related to architecture incompatibility when deploying to Cloud Run from an ARM-based machine (like Mac M1/M2), ensure you:
+
+1. Use the `--platform=linux/amd64` flag with Docker build commands
+2. Use `docker buildx` instead of standard `docker build`
+3. Use the provided `build-and-push.sh` script which handles this automatically
+
+Example error message indicating an architecture issue:
+```
+The user-provided container failed to start and listen on the port defined by the PORT environment variable.
+``` 
