@@ -75,3 +75,6 @@ ter test/run-notification-test-local.sh
 ter test/run-notification-test.sh
 ter test/build-push-test-job-google.sh
 full-deployment.sh
+
+prompts/
+implementation_plans/
