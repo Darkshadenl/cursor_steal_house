@@ -133,7 +133,7 @@ docker build -t stealhouse-crawler .
 For local development with a local PostgreSQL database:
 
 ```bash
-docker compose -f docker-compose-dev.yml up -d crawler
+docker compose -f scripts/docker/docker-compose-dev.yml up -d crawler
 ```
 
 Note: Always use `docker compose` (without hyphen) as the modern replacement for `docker-compose`.
@@ -230,14 +230,14 @@ The crawler supports the following environment variables:
 
 The project includes several deployment scripts to streamline the process:
 
-### build-and-push.sh
+### scripts/shell/build-and-push-google.sh
 
 This script builds the Docker image for the `linux/amd64` platform (required for Cloud Run) and pushes it to Google Container Registry:
 
 ```bash
 #!/bin/bash
-chmod +x build-and-push.sh
-./build-and-push.sh
+chmod +x scripts/shell/build-and-push-google.sh
+./scripts/shell/build-and-push-google.sh
 ```
 
 Key features:
@@ -245,13 +245,13 @@ Key features:
 - Tags the image with your Google Cloud project ID
 - Pushes the image to Google Container Registry
 
-### create-new-job.sh
+### scripts/shell/create-new-job-google.sh
 
 This script deploys the crawler as a Cloud Run job:
 
 ```bash
-chmod +x create-new-job.sh
-./create-new-job.sh
+chmod +x scripts/shell/create-new-job-google.sh
+./scripts/shell/create-new-job-google.sh
 ```
 
 Key features:
@@ -265,8 +265,8 @@ Key features:
 The recommended deployment workflow is:
 
 1. Update your crawler code as needed
-2. Run `./build-and-push.sh` to build and push the Docker image
-3. Run `./create-new-job.sh` to deploy or update the Cloud Run job
+2. Run `./scripts/shell/build-and-push-google.sh` to build and push the Docker image
+3. Run `./scripts/shell/create-new-job-google.sh` to deploy or update the Cloud Run job
 4. Optionally, set up a schedule using Cloud Scheduler
 
 ## Troubleshooting
@@ -311,7 +311,7 @@ If you encounter errors related to architecture incompatibility when deploying t
 
 1. Use the `--platform=linux/amd64` flag with Docker build commands
 2. Use `docker buildx` instead of standard `docker build`
-3. Use the provided `build-and-push.sh` script which handles this automatically
+3. Use the provided `build-and-push-google.sh` script which handles this automatically
 
 Example error message indicating an architecture issue:
 ```

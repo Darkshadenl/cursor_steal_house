@@ -13,7 +13,7 @@ services:
   crawler:
     build:
       context: .
-      dockerfile: dockerfile
+      dockerfile: scripts/docker/Dockerfile
     depends_on:
       - db
     environment:

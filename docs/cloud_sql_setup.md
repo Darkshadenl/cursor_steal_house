@@ -130,7 +130,7 @@ Edit `.env.prod` with your actual configuration:
 Use the production Docker Compose file:
 
 ```bash
-docker compose -f docker-compose-prod.yml --env-file .env.prod up -d
+docker compose -f scripts/docker/docker-compose-prod.yml --env-file .env.prod up -d
 ```
 
 ## 8. Running Cloud SQL Proxy Locally
@@ -227,7 +227,7 @@ psql -h localhost -p 5432 -U admin -d mydb
 
 ```bash
 # Make sure the proxy is running
-docker compose -f docker-compose-prod.yml --env-file .env.prod up -d cloud-sql-proxy
+docker compose -f scripts/docker/docker-compose-prod.yml --env-file .env.prod up -d cloud-sql-proxy
 
 # Run migrations
 alembic upgrade head
@@ -259,5 +259,5 @@ alembic upgrade head
 - Verify that your service account has the correct permissions
 - Check the Cloud SQL Proxy logs for any errors:
   ```bash
-  docker compose -f docker-compose-prod.yml logs cloud-sql-proxy
+  docker compose -f scripts/docker/docker-compose-prod.yml logs cloud-sql-proxy
   ```
