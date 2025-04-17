@@ -1,30 +1,31 @@
-# Step 2: Database Model Refactoring
+# Step 3: Crawler Logic Refactoring
 
 ## Objective
-Combine `GalleryHouse` and `DetailHouse` into a single unified `House` model while removing unused fields and the `FloorPlan` model.
+Update the crawler logic to work with the unified `House` model, eliminating the two-step collection process and removing extraction of unused fields.
 
 ## Tasks
 
-*   **Define Unified Models:**
-    *   In `crawler_job/models/pydantic_models.py`:
-        *   Create a new Pydantic model `House`.
-        *   Combine fields from the current `GalleryHouse` (excluding `image_url`) and `DetailHouse` (excluding `complex_image_url`, `read_more_url`) into the `House` model. Exclude any fields related to `FloorPlan`.
-        *   Add `to_db_model()` method to `House` for converting to `DbHouse`.
-        *   Add `@classmethod from_db_model()` to `House` for converting from `DbHouse`.
-        *   Ensure all fields have type hints and the model has a docstring.
-    *   In `crawler_job/models/db_models.py`:
-        *   Create a new SQLAlchemy model `DbHouse` inheriting from `Base`.
-        *   Mirror the structure and fields of the Pydantic `House` model.
-        *   Ensure it uses appropriate SQLAlchemy column types.
-*   **Remove Old Models:**
-    *   Delete `GalleryHouse`, `DetailHouse`, and `FloorPlan` from `crawler_job/models/pydantic_models.py`.
-    *   Delete `DbGalleryHouse`, `DbDetailHouse`, and `DbFloorPlan` from `crawler_job/models/db_models.py`.
-*   **Verify Alembic Configuration:**
-    *   Check `database_migrations/env.py` and confirm that `target_metadata` is correctly set to `crawler_job.models.db_models.Base.metadata`.
+*   **Update Vesteda Steps (`crawler_job/crawlers/vesteda/vesteda_steps.py`):**
+    *   Modify `execute_property_extraction`:
+        *   Aim to extract all required fields for the new `House` model from the gallery page results.
+        *   Remove logic for extracting `image_url`.
+    *   Modify `execute_detailed_property_extraction`:
+        *   If still needed for data not on the gallery page, update it to fetch remaining `House` fields.
+        *   Remove logic for extracting `complex_image_url`, `read_more_url`, and any floor plan data.
+        *   Consider merging this step's logic into `execute_property_extraction` if feasible.
+    *   Modify `execute_llm_extraction`:
+        *   Ensure it populates the unified `House` model, excluding the removed fields.
+        *   Adjust prompts/parsing as needed for the new model structure.
+*   **Update Main Crawler (`crawler_job/crawlers/vesteda/vesteda_crawler.py`):**
+    *   In `VestedaCrawler.run_full_crawl`:
+        *   Change the flow to process each property into a single `House` Pydantic object.
+        *   Remove intermediate lists like `gallery_data: List[GalleryHouse]` and `detail_houses: List[DetailHouse]`.
+        *   Use a single list `houses: List[House]` if needed.
+        *   Update the call to `house_service.identify_new_houses` to accept and return `List[House]`.
+        *   Update the call to `house_service.store_houses_atomic` to accept `List[House]` and operate on the `houses` table. Adjust parameters accordingly.
 
 ## Expected Outcomes
-- A single, unified `House` Pydantic model replacing the separate `GalleryHouse` and `DetailHouse` models
-- A single, unified `DbHouse` SQLAlchemy model replacing the separate database model classes
-- Removal of the `FloorPlan` model and related code
-- Removal of unused fields (`image_url`, `complex_image_url`, and `read_more_url`)
-- Maintained conversion methods between Pydantic and SQLAlchemy models 
+- Streamlined crawling process that directly populates `House` objects
+- Elimination of the two-step (gallery then detail) crawling process
+- Removal of code extracting unused fields
+- Updated extraction logic that fits the new unified data model 

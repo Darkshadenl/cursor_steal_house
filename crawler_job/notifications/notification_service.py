@@ -3,7 +3,7 @@ import logging
 from typing import List, Optional
 from dotenv import load_dotenv
 
-from crawler_job.models.house_models import GalleryHouse
+from crawler_job.models.house_models import House
 from .channels.base import AbstractNotificationChannel
 from .channels.email import EmailNotificationChannel
 from .channels.pushover import PushoverNotificationChannel
@@ -93,7 +93,7 @@ class NotificationService:
                     exc_info=True,
                 )
 
-    async def send_new_house_notification(self, house: GalleryHouse) -> None:
+    async def send_new_house_notification(self, house: House) -> None:
         """Send a notification about a new house to all active channels.
 
         Args:
@@ -133,7 +133,7 @@ class NotificationService:
                 )
 
     async def send_updated_house_notification(
-        self, house: GalleryHouse, old_status: str
+        self, house: House, old_status: str
     ) -> None:
         """Send a notification about an updated house to all active channels.
 

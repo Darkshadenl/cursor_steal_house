@@ -8,7 +8,7 @@ from crawl4ai import (
     JsonCssExtractionStrategy,
 )
 
-from ....models.house_models import GalleryHouse
+from ....models.house_models import House
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -22,8 +22,18 @@ RESET = "\033[0m"
 
 async def execute_property_extraction(
     crawler: AsyncWebCrawler, url: str, session_id: str
-) -> List[GalleryHouse]:
+) -> List[House]:
+    """
+    Extract property listings from the Vesteda search page and return them as House objects.
 
+    Args:
+        crawler: The web crawler instance
+        url: The URL to crawl
+        session_id: The session ID for the crawler
+
+    Returns:
+        List[House]: List of extracted House objects
+    """
     logger.info("Extracting property listings...")
 
     correct_urls = [
@@ -56,12 +66,6 @@ async def execute_property_extraction(
             {"name": "area", "selector": "div.object-area span.value", "type": "text"},
             {"name": "status", "selector": "div.card-image-label span", "type": "text"},
             {
-                "name": "image_url",
-                "selector": "img.card-img-top",
-                "type": "attribute",
-                "attribute": "src",
-            },
-            {
                 "name": "demand_message",
                 "selector": "div.card-body.pt-0 p.text-muted",
                 "type": "text",
@@ -75,7 +79,7 @@ async def execute_property_extraction(
         ],
     }
 
-    # Step 1: Crawl the gallery page to extract house listings
+    # Crawl the gallery page to extract house listings
     gallery_config = CrawlerRunConfig(
         extraction_strategy=JsonCssExtractionStrategy(schema),
         cache_mode=CacheMode.BYPASS,
@@ -89,12 +93,57 @@ async def execute_property_extraction(
 
     if result.success:
         raw_data = json.loads(result.extracted_content)
-        transformed_data = [GalleryHouse.from_dict(house) for house in raw_data]
+        houses = []
+
+        for house_data in raw_data:
+            # Pre-process the data before passing to from_dict
+            processed_data = house_data.copy()
+
+            # Process bedrooms field
+            try:
+                if "bedrooms" in house_data and house_data["bedrooms"]:
+                    processed_data["bedrooms"] = int(house_data["bedrooms"])
+            except ValueError:
+                logger.warning(
+                    f"Could not convert bedrooms to int: {house_data.get('bedrooms')}"
+                )
+                processed_data["bedrooms"] = None
+
+            # Process area field to square_meters
+            try:
+                if "area" in house_data and house_data["area"]:
+                    # Strip "m²" and convert to int
+                    area_str = house_data.get("area", "").replace("m2", "").strip()
+                    if area_str:
+                        processed_data["square_meters"] = int(area_str)
+            except ValueError:
+                logger.warning(
+                    f"Could not convert area to int: {house_data.get('area')}"
+                )
+                processed_data["square_meters"] = None
+
+            # Rename price to rental_price
+            if "price" in processed_data:
+                processed_data["rental_price"] = processed_data.pop("price")
+
+            # Check if demand message indicates high demand
+            demand_message = processed_data.get("demand_message")
+            high_demand = False
+            if demand_message and any(
+                keyword in demand_message.lower()
+                for keyword in ["hoge interesse", "veel interesse", "popular"]
+            ):
+                high_demand = True
+            processed_data["high_demand"] = high_demand
+
+            # Create House object using from_dict
+            house = House.from_dict(processed_data)
+            houses.append(house)
 
         logger.info(
-            f"{GREEN}Successfully extracted and transformed {len(transformed_data)} properties{RESET}"
+            f"{GREEN}Successfully extracted and transformed {len(houses)} properties{RESET}"
         )
-        return transformed_data
+        return houses
     else:
         logger.error(f"{RED}Error extracting properties: {result.error_message}{RESET}")
         raise Exception("Error extracting properties", result.error_message)

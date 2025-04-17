@@ -202,13 +202,8 @@ class FetchedPage(BaseModel):
     """Model for a fetched page of data"""
 
     url: str = Field(..., description="The URL of the fetched page")
-    html: str = Field(..., description="The HTML content of the fetched page")
-    status_code: int = Field(..., description="The HTTP status code of the response")
-    timestamp: str = Field(..., description="The timestamp when the page was fetched")
-    crawl_id: str = Field(..., description="The ID of the crawl operation")
-    page_type: str = Field(
-        ..., description="The type of page (e.g., 'gallery', 'detail')"
-    )
+    markdown: str = Field(..., description="The markdown content of the fetched page")
+    success: bool = Field(..., description="Whether the fetch was successful")
 
 
 __all__ = [
