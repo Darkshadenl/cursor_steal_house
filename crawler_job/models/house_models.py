@@ -4,11 +4,10 @@ from typing import Optional, List, Dict, Any
 
 class House(BaseModel):
     """
-    Unified model for house information, combining both gallery and detail data.
-    This model replaces the previous separate GalleryHouse and DetailHouse models.
+    Unified model for house information representing all property data in a single schema.
     """
 
-    # Basic information (from both models)
+    # Basic information
     address: str = Field(..., description="The complete address of the house")
     city: str = Field(..., description="The city where the house is located")
     postal_code: Optional[str] = Field(None, description="The postal code of the house")
@@ -16,7 +15,7 @@ class House(BaseModel):
         None, description="The neighborhood where the house is located"
     )
 
-    # Status information (from GalleryHouse)
+    # Status information
     status: str = Field(..., description="The status of the house, e.g. 'For rent'")
     high_demand: bool = Field(
         False, description="Indicates if the house has many viewing requests"
@@ -25,18 +24,18 @@ class House(BaseModel):
         None, description="Message about the popularity of the house"
     )
 
-    # Detailed link (from GalleryHouse)
+    # Detailed link
     detail_url: Optional[str] = Field(
         None, description="URL to the detail page of the house"
     )
 
-    # Financial information (from DetailHouse)
+    # Financial information
     rental_price: Optional[str] = Field(
         None, description="The monthly rental price in euros"
     )
     service_costs: Optional[str] = Field(None, description="Service costs in euros")
 
-    # Income requirements (from DetailHouse's nested IncomeRequirement)
+    # Income requirements
     min_income_single: Optional[str] = Field(
         None, description="Minimum income requirement for single person"
     )
@@ -47,7 +46,7 @@ class House(BaseModel):
         None, description="Link to more information about income requirements"
     )
 
-    # Features and details (from DetailHouse)
+    # Features and details
     square_meters: Optional[int] = Field(
         None, description="The living area in square meters"
     )
@@ -62,12 +61,12 @@ class House(BaseModel):
         None, description="Name of the complex the house belongs to"
     )
 
-    # Descriptions (from DetailHouse)
+    # Descriptions
     description: Optional[str] = Field(
         None, description="General description of the house"
     )
 
-    # Complex information (from DetailHouse's nested ComplexInfo)
+    # Complex information
     complex_name: Optional[str] = Field(None, description="Name of the complex")
     complex_description: Optional[str] = Field(
         None, description="Description of the complex"
@@ -82,17 +81,17 @@ class House(BaseModel):
         None, description="Number of floors in the complex"
     )
 
-    # Location information (from DetailHouse)
+    # Location information
     location_map_url: Optional[str] = Field(
         None, description="URL to the map with the location"
     )
 
-    # Action links (from DetailHouse)
+    # Action links
     request_viewing_url: Optional[str] = Field(
         None, description="URL to request a viewing of the property"
     )
 
-    # Extra options (from DetailHouse)
+    # Extra options
     options: Optional[str] = Field(
         None, description="Extra options or possibilities for the house"
     )

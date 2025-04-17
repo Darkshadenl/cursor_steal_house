@@ -7,8 +7,7 @@ Base = declarative_base()
 
 class DbHouse(Base):
     """
-    SQLAlchemy model for house information. This is a unified model that combines
-    both DbGalleryHouse and DbDetailHouse, replacing them.
+    SQLAlchemy model for house information with a unified schema to store all property data.
     """
 
     __tablename__ = "houses"
@@ -16,71 +15,77 @@ class DbHouse(Base):
 
     id = Column(Integer, primary_key=True)
 
-    # Basic information (from both models)
+    # Basic information
     address = Column(String, nullable=False)
     city = Column(String, nullable=False)
     postal_code = Column(String, nullable=True)
     neighborhood = Column(String, nullable=True)
 
-    # Status information (from DbGalleryHouse)
+    # Status information
     status = Column(String, nullable=False)
     high_demand = Column(Boolean, default=False)
     demand_message = Column(String, nullable=True)
 
-    # Detailed link (from DbGalleryHouse)
+    # Detailed link
     detail_url = Column(String, nullable=True)
 
-    # Financial information (from DbDetailHouse)
+    # Financial information
     rental_price = Column(String, nullable=True)
     service_costs = Column(String, nullable=True)
 
-    # Income requirements (from DbDetailHouse)
+    # Income requirements
     min_income_single = Column(String, nullable=True)
     min_income_joint = Column(String, nullable=True)
     read_more_url = Column(String, nullable=True)
 
-    # Features and details (from DbDetailHouse)
+    # Features and details
     square_meters = Column(Integer, nullable=True)
     bedrooms = Column(Integer, nullable=True)
     energy_label = Column(String, nullable=True)
     available_from = Column(String, nullable=True)
     complex = Column(String, nullable=True)
 
-    # Complex information (from DbDetailHouse)
+    # Complex information
     complex_name = Column(String, nullable=True)
     complex_description = Column(Text, nullable=True)
     year_of_construction = Column(Integer, nullable=True)
     number_of_objects = Column(String, nullable=True)
     number_of_floors = Column(String, nullable=True)
 
-    # Descriptions (from DbDetailHouse)
+    # Description
     description = Column(Text, nullable=True)
 
-    # Location information (from DbDetailHouse)
+    # Location information
     location_map_url = Column(String, nullable=True)
 
-    # Action links (from DbDetailHouse)
+    # Action links
     request_viewing_url = Column(String, nullable=True)
 
-    # Extra options (from DbDetailHouse)
+    # Extra options
     options = Column(Text, nullable=True)
 
-    def has_changes(self, other_db_house):
+    def has_changes(self, other):
         """
-        Check if this house has differences compared to another house.
-        Used to determine if an update is needed.
+        Check if another DbHouse instance has different values.
+        Used to determine if an update is necessary.
 
         Args:
-            other_db_house: Another DbHouse instance to compare against
+            other: Another DbHouse instance to compare with
 
         Returns:
             bool: True if there are differences, False otherwise
         """
-        # Compare all fields excluding the ID and relationship fields
-        for key, value in self.__dict__.items():
-            if not key.startswith("_") and key != "id":
-                if getattr(other_db_house, key, None) != value:
-                    return True
+        # Check all columns except id (primary key)
+        for column in self.__table__.columns:
+            if column.name == "id":
+                continue
+
+            self_value = getattr(self, column.name)
+            other_value = getattr(other, column.name, None)
+
+            if self_value != other_value:
+                return True
+
         return False
 
 
