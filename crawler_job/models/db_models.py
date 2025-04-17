@@ -69,6 +69,12 @@ class DbHouse(Base):
         """
         Check if this house has differences compared to another house.
         Used to determine if an update is needed.
+
+        Args:
+            other_db_house: Another DbHouse instance to compare against
+
+        Returns:
+            bool: True if there are differences, False otherwise
         """
         # Compare all fields excluding the ID and relationship fields
         for key, value in self.__dict__.items():

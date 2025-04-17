@@ -17,37 +17,76 @@ class HouseRepository:
     """Repository for House operations"""
 
     def __init__(self, session: AsyncSession):
+        """Initialize the repository with a database session
+
+        Args:
+            session: SQLAlchemy async session
+        """
         self.session = session
 
     async def get_by_id(self, house_id: int) -> Optional[DbHouse]:
-        """Get a house by ID"""
+        """Get a house by ID
+
+        Args:
+            house_id: ID of the house to retrieve
+
+        Returns:
+            Optional[DbHouse]: The house if found, None otherwise
+        """
         result = await self.session.execute(
             select(DbHouse).where(DbHouse.id == house_id)
         )
         return result.scalar_one_or_none()
 
     async def get_by_address(self, address: str, city: str) -> Optional[DbHouse]:
-        """Get a house by address and city"""
+        """Get a house by address and city
+
+        Args:
+            address: Address of the house
+            city: City where the house is located
+
+        Returns:
+            Optional[DbHouse]: The house if found, None otherwise
+        """
         result = await self.session.execute(
             select(DbHouse).where(DbHouse.address == address, DbHouse.city == city)
         )
         return result.scalar_one_or_none()
 
     async def get_all(self) -> List[DbHouse]:
-        """Get all houses"""
+        """Get all houses
+
+        Returns:
+            List[DbHouse]: All houses in the database
+        """
         result = await self.session.execute(select(DbHouse))
         return result.scalars().all()
 
     async def create(self, house: House) -> DbHouse:
-        """Create a new house"""
+        """Create a new house
+
+        Args:
+            house: House model to create
+
+        Returns:
+            DbHouse: The created house model
+        """
         db_house = house.to_db_model()
         self.session.add(db_house)
-        await self.session.commit()
+        await self.session.flush()
         logger.info(f"Created house: {db_house.address}, {db_house.city}")
         return db_house
 
     async def update(self, house_id: int, house: House) -> Optional[DbHouse]:
-        """Update an existing house"""
+        """Update an existing house
+
+        Args:
+            house_id: ID of the house to update
+            house: House model with updated information
+
+        Returns:
+            Optional[DbHouse]: The updated house if found, None otherwise
+        """
         db_house = await self.session.execute(
             select(DbHouse).where(DbHouse.id == house_id)
         )
@@ -61,12 +100,22 @@ class HouseRepository:
             if not key.startswith("_") and key != "id":
                 setattr(db_house, key, value)
 
-        await self.session.commit()
+        await self.session.flush()
         logger.info(f"Updated house: {db_house.address}, {db_house.city}")
         return db_house
 
     async def get_or_create(self, house: House) -> DbHouse:
-        """Get an existing house or create a new one"""
+        """Get an existing house or create a new one
+
+        Args:
+            house: House model to get or create
+
+        Returns:
+            DbHouse: The existing or newly created house
+
+        Raises:
+            ValueError: If address or city is missing
+        """
         if not all([house.address, house.city]):
             raise ValueError("Address and city are required for house")
 
@@ -79,7 +128,14 @@ class HouseRepository:
         return await self.create(house)
 
     async def delete(self, house_id: int) -> bool:
-        """Delete a house"""
+        """Delete a house
+
+        Args:
+            house_id: ID of the house to delete
+
+        Returns:
+            bool: True if the house was deleted, False if it wasn't found
+        """
         db_house = await self.session.execute(
             select(DbHouse).where(DbHouse.id == house_id)
         )
@@ -88,6 +144,6 @@ class HouseRepository:
             return False
 
         await self.session.delete(db_house)
-        await self.session.commit()
+        await self.session.flush()
         logger.info(f"Deleted house with ID: {house_id}")
         return True

@@ -91,7 +91,7 @@ class VestedaCrawler:
                     notification_service=self.notification_service
                 ) as house_service:
                     # Only process new houses
-                    new_houses = await house_service.identify_new_houses(houses)
+                    new_houses = await house_service.identify_new_houses_async(houses)
 
                     if new_houses:
                         logger.info(
@@ -132,7 +132,7 @@ class VestedaCrawler:
                                         break
 
                     # Atomic transaction for all database operations
-                    result = await house_service.store_houses_atomic(
+                    result = await house_service.store_houses_atomic_async(
                         houses=houses,
                         all_houses=houses,
                     )
