@@ -1,5 +1,3 @@
-Ok, hier is de aangepaste versie van de documentatie:
-
 # StealHouse Project
 
 StealHouse is a Python-based web crawler system designed to collect rental property listings from various housing websites using modern LLMs (Large Language Models) and the crawl4ai library to intelligently extract and structure housing data.
@@ -57,7 +55,17 @@ The system consists of:
 
 5. **Run database migrations**:
    ```bash
+   # Apply all migrations
    alembic upgrade head
+   
+   # Check current migration status
+   alembic current
+   
+   # View migration history
+   alembic history
+   
+   # Create a new migration (after model changes)
+   alembic revision --autogenerate -m "description_of_changes"
    ```
 
 ### Running the Crawler Locally
@@ -123,6 +131,24 @@ bash scripts/shell/full-deployment.sh
 ## Database Schema
 
 The database uses a unified `houses` table that stores all property information in a single table. This simplifies the data model and improves query performance.
+
+### Database Migrations
+
+The project uses Alembic for database migrations. The migration files are stored in the `database_migrations/versions/` directory. Key migration commands:
+
+```bash
+# View available migration commands
+alembic --help
+
+# Apply all migrations
+alembic upgrade head
+
+# Downgrade to a previous version
+alembic downgrade <revision>
+
+# Create a new migration after model changes
+alembic revision --autogenerate -m "description_of_changes"
+```
 
 ## License
 

@@ -24,17 +24,24 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Install Playwright browser
 RUN playwright install chromium && playwright install-deps
 
-# Copy crawler code
+# Copy application code and data files
 COPY crawler_job /app/crawler_job
+COPY database_migrations /app/database_migrations
+COPY alembic.ini /app/alembic.ini
+COPY recipients.txt /app/recipients.txt
 
 # Set environment variables
 ENV PYTHONPATH=/app
 # Environment variable for verbose mode (can be overridden at runtime)
 ENV CRAWLER_VERBOSE=False
+# Default to Vesteda (can be overridden at runtime)
+ENV CRAWLER_WEBSITE=Vesteda
 
-# Create a directory for logs
+# Copy scripts for database migration and configuration
+COPY scripts/shell/insert_vesteda_config.py /app/scripts/insert_vesteda_config.py
+
+# Create directories for logs and browser data
 RUN mkdir -p /app/logs
-# Create directory for browser data
 RUN mkdir -p /app/browser_data/vesteda
 
 # Create start script for production with Cloud SQL Proxy and Chrome
@@ -97,9 +104,35 @@ RUN echo '#!/bin/bash\n\
     exit 1\n\
     fi\n\
     \n\
-    # Run the crawler\n\
-    echo "Starting crawler..."\n\
-    python -m crawler_job.crawlers.vesteda.vesteda_crawler\n\
+    # Run database migrations\n\
+    echo "Running database migrations..."\n\
+    cd /app && alembic upgrade head\n\
+    MIGRATION_EXIT_CODE=$?\n\
+    if [ $MIGRATION_EXIT_CODE -ne 0 ]; then\n\
+    echo "Database migration failed with exit code $MIGRATION_EXIT_CODE"\n\
+    # Cleanup and exit\n\
+    if [ -n "$CHROME_PID" ]; then kill $CHROME_PID; fi\n\
+    if [ -n "$PROXY_PID" ]; then kill $PROXY_PID; fi\n\
+    exit $MIGRATION_EXIT_CODE\n\
+    fi\n\
+    echo "Database migrations completed successfully."\n\
+    \n\
+    # Insert Vesteda configuration if needed\n\
+    echo "Ensuring Vesteda configuration exists..."\n\
+    python /app/scripts/insert_vesteda_config.py\n\
+    CONFIG_EXIT_CODE=$?\n\
+    if [ $CONFIG_EXIT_CODE -ne 0 ]; then\n\
+    echo "Configuration setup failed with exit code $CONFIG_EXIT_CODE"\n\
+    # Cleanup and exit\n\
+    if [ -n "$CHROME_PID" ]; then kill $CHROME_PID; fi\n\
+    if [ -n "$PROXY_PID" ]; then kill $PROXY_PID; fi\n\
+    exit $CONFIG_EXIT_CODE\n\
+    fi\n\
+    echo "Configuration setup completed successfully."\n\
+    \n\
+    # Run the crawler using the new main.py script\n\
+    echo "Starting crawler for website: $CRAWLER_WEBSITE..."\n\
+    python -m crawler_job.main --website="$CRAWLER_WEBSITE"\n\
     CRAWLER_EXIT_CODE=$?\n\
     echo "Crawler finished with exit code $CRAWLER_EXIT_CODE"\n\
     \n\
