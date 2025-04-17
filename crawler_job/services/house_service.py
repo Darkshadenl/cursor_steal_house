@@ -71,7 +71,15 @@ class HouseService:
             # We can't use await in __del__, so we just make a warning
 
     async def identify_new_houses(self, houses: List[House]) -> List[House]:
-        """Identificeer nieuwe huizen zonder database write"""
+        """
+        Identify houses that don't exist in the database
+
+        Args:
+            houses: List of House objects to check
+
+        Returns:
+            List[House]: List of houses that are not in the database
+        """
         new_houses = []
         async with get_repository(self.session) as repo:
             for house in houses:
@@ -85,7 +93,16 @@ class HouseService:
         houses: List[House],
         all_houses: List[House],
     ) -> Dict[str, int]:
-        """Atomic transaction voor alle huisdata"""
+        """
+        Store houses in an atomic transaction
+
+        Args:
+            houses: List of House objects to store
+            all_houses: List of all House objects (including ones not being stored)
+
+        Returns:
+            Dict[str, int]: Dictionary with counts of new, existing, and updated houses
+        """
         has_active_transaction = self.session.in_transaction()
 
         async def _execute_transaction():
@@ -93,11 +110,6 @@ class HouseService:
                 new_houses, existing_houses, updated_houses = (
                     await self._store_houses_with_repo(houses, repo)
                 )
-
-                matched_details = await self._match_details_with_houses(
-                    houses, all_houses
-                )
-                await self._store_houses_with_repo(matched_details, repo)
 
                 # Send notifications if notification service is available
                 if self.notification_service:
@@ -148,7 +160,17 @@ class HouseService:
     async def _store_houses_with_repo(
         self, houses: List[House], repo: HouseRepository
     ) -> Tuple[List[House], List[House], List[Tuple[House, str]]]:
-        """Interne methode voor house opslag met gegeven repository"""
+        """
+        Internal method to store houses with the given repository
+
+        Args:
+            houses: List of House objects to store
+            repo: Repository to use for storage
+
+        Returns:
+            Tuple[List[House], List[House], List[Tuple[House, str]]]:
+            Lists of new, existing, and updated houses (with old status)
+        """
         new_db_houses: List[DbHouse] = []
         existing_db_houses: List[DbHouse] = []
         updated_houses: List[Tuple[House, str]] = []
@@ -175,28 +197,18 @@ class HouseService:
         # Store the updated houses for notification in the _execute_transaction method
         return (new_houses, existing_houses, updated_houses)
 
-    async def _match_details_with_houses(
-        self, houses: List[House], all_houses: List[House]
-    ) -> List[House]:
-        """Match detail houses met gallery houses"""
-        matched_details = []
-        for house in houses:
-            matching_house = next(
-                (
-                    h
-                    for h in all_houses
-                    if h.address == house.address and h.city == house.city
-                ),
-                None,
-            )
-            if matching_house:
-                house.gallery_id = getattr(matching_house, "gallery_id", None)
-                matched_details.append(house)
-        return matched_details
-
     async def _store_houses(
         self, houses: List[House]
     ) -> Tuple[List[House], List[House], List[Tuple[House, str]]]:
-        """Interne methode voor house opslag"""
+        """
+        Internal method for house storage
+
+        Args:
+            houses: List of House objects to store
+
+        Returns:
+            Tuple[List[House], List[House], List[Tuple[House, str]]]:
+            Lists of new, existing, and updated houses (with old status)
+        """
         async with get_repository(self.session) as repo:
             return await self._store_houses_with_repo(houses, repo)

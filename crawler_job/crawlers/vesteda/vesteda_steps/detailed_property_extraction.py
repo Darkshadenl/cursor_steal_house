@@ -12,7 +12,7 @@ from crawl4ai import (
     SemaphoreDispatcher,
 )
 from crawler_job.models.house_models import (
-    GalleryHouse,
+    House,
     FetchedPage,
 )
 
@@ -28,10 +28,21 @@ RESET = "\033[0m"
 
 async def execute_detailed_property_extraction(
     crawler: AsyncWebCrawler,
-    houses: List[GalleryHouse],
+    houses: List[House],
     session_id: str,
 ) -> List[FetchedPage]:
-    logger.info("Starting detailed property extraction (two-step process)...")
+    """
+    Extract detailed property information for the given houses
+
+    Args:
+        crawler: The web crawler instance
+        houses: List of House objects with basic info
+        session_id: The session ID for the crawler
+
+    Returns:
+        List[FetchedPage]: List of fetched detail pages
+    """
+    logger.info("Starting detailed property extraction...")
     main_url = "https://hurenbij.vesteda.com"
 
     prune_filter = PruningContentFilter(
@@ -68,8 +79,9 @@ async def execute_detailed_property_extraction(
 
     urls = []
     for house in houses:
-        url = main_url + house.detail_url
-        urls.append(url)
+        if house.detail_url:
+            url = main_url + house.detail_url
+            urls.append(url)
 
     logger.info(f"Starting fetch for {len(urls)} properties...")
 
