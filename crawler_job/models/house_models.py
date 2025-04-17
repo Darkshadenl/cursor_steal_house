@@ -98,7 +98,11 @@ class House(BaseModel):
     )
 
     def to_db_model(self):
-        """Convert House Pydantic model to DbHouse SQLAlchemy model"""
+        """Convert House Pydantic model to DbHouse SQLAlchemy model
+
+        Returns:
+            DbHouse: Converted DbHouse SQLAlchemy model
+        """
         from crawler_job.models.db_models import DbHouse
 
         return DbHouse(
@@ -133,7 +137,14 @@ class House(BaseModel):
 
     @classmethod
     async def from_db_model_async(cls, db_model):
-        """Convert DbHouse SQLAlchemy model to House Pydantic model"""
+        """Convert DbHouse SQLAlchemy model to House Pydantic model
+
+        Args:
+            db_model: DbHouse SQLAlchemy model to convert
+
+        Returns:
+            House: Converted House Pydantic model
+        """
         return cls(
             address=db_model.address,
             city=db_model.city,
@@ -166,7 +177,14 @@ class House(BaseModel):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]):
-        """Create a House instance from a dictionary"""
+        """Create a House instance from a dictionary
+
+        Args:
+            data: Dictionary containing house data
+
+        Returns:
+            House: New House Pydantic model created from the dictionary
+        """
         return cls(
             address=data.get("address"),
             city=data.get("city"),

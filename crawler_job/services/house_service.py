@@ -25,7 +25,14 @@ logger = logging.getLogger(__name__)
 async def get_repository(
     session: AsyncSession,
 ) -> AsyncGenerator[HouseRepository, None]:
-    """Context manager to get the house repository with a session"""
+    """Context manager to get the house repository with a session
+
+    Args:
+        session: SQLAlchemy async session
+
+    Returns:
+        HouseRepository instance with the provided session
+    """
     try:
         yield HouseRepository(session)
     finally:
@@ -33,7 +40,7 @@ async def get_repository(
 
 
 class HouseService:
-    """Service for handling house data storage"""
+    """Service for handling house data storage and retrieval"""
 
     def __init__(self, notification_service=None):
         """Initialize with a new database session and optional notification service
@@ -70,7 +77,7 @@ class HouseService:
             )
             # We can't use await in __del__, so we just make a warning
 
-    async def identify_new_houses(self, houses: List[House]) -> List[House]:
+    async def identify_new_houses_async(self, houses: List[House]) -> List[House]:
         """
         Identify houses that don't exist in the database
 
@@ -88,7 +95,20 @@ class HouseService:
                     new_houses.append(house)
         return new_houses
 
-    async def store_houses_atomic(
+    # Legacy method name for backward compatibility
+    async def identify_new_houses(self, houses: List[House]) -> List[House]:
+        """
+        Legacy method for identifying new houses
+
+        Args:
+            houses: List of House objects to check
+
+        Returns:
+            List[House]: List of houses that are not in the database
+        """
+        return await self.identify_new_houses_async(houses)
+
+    async def store_houses_atomic_async(
         self,
         houses: List[House],
         all_houses: List[House],
@@ -157,6 +177,24 @@ class HouseService:
             async with self.session.begin():
                 return await _execute_transaction()
 
+    # Legacy method name for backward compatibility
+    async def store_houses_atomic(
+        self,
+        houses: List[House],
+        all_houses: List[House],
+    ) -> Dict[str, int]:
+        """
+        Legacy method for storing houses atomically
+
+        Args:
+            houses: List of House objects to store
+            all_houses: List of all House objects (including ones not being stored)
+
+        Returns:
+            Dict[str, int]: Dictionary with counts of new, existing, and updated houses
+        """
+        return await self.store_houses_atomic_async(houses, all_houses)
+
     async def _store_houses_with_repo(
         self, houses: List[House], repo: HouseRepository
     ) -> Tuple[List[House], List[House], List[Tuple[House, str]]]:
@@ -194,10 +232,9 @@ class HouseService:
         new_houses = await db_houses_to_pydantic_async(new_db_houses)
         existing_houses = await db_houses_to_pydantic_async(existing_db_houses)
 
-        # Store the updated houses for notification in the _execute_transaction method
         return (new_houses, existing_houses, updated_houses)
 
-    async def _store_houses(
+    async def _store_houses_async(
         self, houses: List[House]
     ) -> Tuple[List[House], List[House], List[Tuple[House, str]]]:
         """
@@ -212,3 +249,30 @@ class HouseService:
         """
         async with get_repository(self.session) as repo:
             return await self._store_houses_with_repo(houses, repo)
+
+    # Legacy method name for backward compatibility
+    async def _store_houses(
+        self, houses: List[House]
+    ) -> Tuple[List[House], List[House], List[Tuple[House, str]]]:
+        """
+        Legacy method for internal house storage
+
+        Args:
+            houses: List of House objects to store
+
+        Returns:
+            Tuple[List[House], List[House], List[Tuple[House, str]]]:
+            Lists of new, existing, and updated houses (with old status)
+        """
+        return await self._store_houses_async(houses)
+
+    async def get_all_houses_async(self) -> List[House]:
+        """
+        Get all houses from the database
+
+        Returns:
+            List[House]: All houses in the database
+        """
+        async with get_repository(self.session) as repo:
+            db_houses = await repo.get_all()
+            return await db_houses_to_pydantic_async(db_houses)
