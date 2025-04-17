@@ -169,7 +169,7 @@ These steps set up the Python environment, database, and scraper components for 
 
 4.  **Set up environment variables:**
     *   Create a `.env` file in the project root directory.
-    *   Copy necessary variables from `docker-compose-local-dev.yml` and `alembic.ini`. Essential variables include:
+    *   Copy necessary variables from `scripts/docker/docker-compose-local-dev.yml` and `alembic.ini`. Essential variables include:
         ```dotenv
         POSTGRES_USER=admin
         POSTGRES_PASSWORD=welkom123
@@ -192,7 +192,7 @@ These steps set up the Python environment, database, and scraper components for 
 
 5.  **Start the PostgreSQL database using Docker:**
     ```bash
-    docker-compose -f docker-compose-local-dev.yml up -d db
+    docker-compose -f scripts/docker/docker-compose-local-dev.yml up -d db
     ```
     This command specifically starts *only* the `db` service defined in the local development compose file.
 
@@ -228,11 +228,11 @@ This method runs the *entire stack* (Frontend, Backend, DB) in Docker containers
 1.  **Ensure Docker and Docker Compose are running.**
 
 2.  **Set up environment variables:**
-    *   Create a `.env` file in the project root as described in the Backend Setup section. The `docker-compose-dev.yml` file will use these variables.
+    *   Create a `.env` file in the project root as described in the Backend Setup section. The `scripts/docker/docker-compose-dev.yml` file will use these variables.
 
 3.  **Build and start all services:**
     ```bash
-    docker compose -f docker-compose-dev.yml up --build -d
+    docker compose -f scripts/docker/docker-compose-dev.yml up --build -d
     ```
     *   `--build`: Forces Docker to rebuild images if Dockerfiles have changed.
     *   `-d`: Runs containers in detached mode (in the background).
@@ -245,12 +245,12 @@ This method runs the *entire stack* (Frontend, Backend, DB) in Docker containers
 5.  **Apply Migrations (if needed after initial up):**
     If you started the stack via Docker Compose and need to apply migrations:
     ```bash
-    docker compose -f docker-compose-dev.yml exec backend alembic upgrade head
+    docker compose -f scripts/docker/docker-compose-dev.yml exec backend alembic upgrade head
     ```
 
 6.  **Stopping the services:**
     ```bash
-    docker compose -f docker-compose-dev.yml down
+    docker compose -f scripts/docker/docker-compose-dev.yml down
     ```
 
 ### Running the Crawler with Docker
@@ -279,13 +279,15 @@ The project includes a specialized Docker configuration for running the crawler 
 
 3.  **Run crawler as part of docker-compose:**
     
-    The crawler service is already included in the `docker-compose-dev.yml` file and can be run alongside the other services:
+    The crawler service is already included in the `scripts/docker/docker-compose-dev.yml` file and can be run alongside the other services:
     
     ```bash
-    docker compose -f docker-compose-dev.yml up crawler
+    docker compose -f scripts/docker/docker-compose-dev.yml up crawler
     ```
     
     This will automatically connect to the PostgreSQL database service using the internal Docker network.
+
+**Note:** The scraper is designed to run independently. In the Docker setup (`scripts/docker/docker-compose-dev.yml`), there is commented-out configuration for running the crawler via `cron` inside the `backend` container. This could be enabled for periodic scraping.
 
 ---
 
@@ -307,12 +309,12 @@ The scraper currently implemented targets the Vesteda website.
     *   It performs login (if necessary), navigates the search results, extracts gallery and detail information, potentially uses LLMs for detailed data, and stores the results in the database configured in `db_connection.py` (which reads from `.env`).
     *   Logs will be printed to the console and saved to `vesteda_crawler.log`.
 
-**Note:** The scraper is designed to run independently. In the Docker setup (`docker-compose-dev.yml`), there is commented-out configuration for running the crawler via `cron` inside the `backend` container. This could be enabled for periodic scraping.
+**Note:** The scraper is designed to run independently. In the Docker setup (`scripts/docker/docker-compose-dev.yml`), there is commented-out configuration for running the crawler via `cron` inside the `backend` container. This could be enabled for periodic scraping.
 
 ### Accessing the Frontend
 
 *   **Local Development:** After running `npm run dev` in the `frontend` directory, access the application at `http://localhost:5173`.
-*   **Docker Development:** After running `docker-compose -f docker-compose-dev.yml up`, access the application at `http://localhost:5173`.
+*   **Docker Development:** After running `docker compose -f scripts/docker/docker-compose-dev.yml up`, access the application at `http://localhost:5173`.
 
 The frontend currently displays placeholder property data fetched from the backend API.
 
@@ -327,7 +329,7 @@ The backend Flask API runs on port 5001 (either locally or within Docker).
     export FLASK_ENV=development
     flask run --host=0.0.0.0 --port=5001
     ```
-*   **Docker Development:** The API starts automatically when running `docker-compose -f docker-compose-dev.yml up`.
+*   **Docker Development:** The API starts automatically when running `docker compose -f scripts/docker/docker-compose-dev.yml up`.
 
 You can access the endpoints using tools like `curl`, Postman, or directly from a browser:
 
@@ -651,51 +653,51 @@ This Docker configuration enables the crawler to run in any environment with Doc
 
 The Dockerfile is optimized for running in Google Cloud Run as a job. To deploy:
 
-1. **Build and push the Docker image:**
-   ```bash
-   # Build the image
-   docker build -t gcr.io/[YOUR-PROJECT-ID]/stealhouse-crawler .
-   
-   # Push to Google Container Registry
-   docker push gcr.io/[YOUR-PROJECT-ID]/stealhouse-crawler
-   ```
+1.  **Build and push the Docker image:**
+    ```bash
+    # Build the image
+    docker build -t gcr.io/[YOUR-PROJECT-ID]/stealhouse-crawler .
+    
+    # Push to Google Container Registry
+    docker push gcr.io/[YOUR-PROJECT-ID]/stealhouse-crawler
+    ```
 
-2. **Deploy as a Cloud Run job:**
-   ```bash
-   gcloud run jobs create stealhouse-crawler \
-     --image gcr.io/[YOUR-PROJECT-ID]/stealhouse-crawler \
-     --set-env-vars="CLOUD_SQL_INSTANCE=[YOUR-INSTANCE-CONNECTION-NAME]" \
-     --set-env-vars="POSTGRES_USER=[DB-USER]" \
-     --set-env-vars="POSTGRES_PASSWORD=[DB-PASSWORD]" \
-     --set-env-vars="POSTGRES_DB=[DB-NAME]" \
-     --set-env-vars="VESTEDA_EMAIL=[YOUR-EMAIL]" \
-     --set-env-vars="VESTEDA_PASSWORD=[YOUR-PASSWORD]" \
-     --set-env-vars="CRAWLER_VERBOSE=True"
-   ```
+2.  **Deploy as a Cloud Run job:**
+    ```bash
+    gcloud run jobs create stealhouse-crawler \
+      --image gcr.io/[YOUR-PROJECT-ID]/stealhouse-crawler \
+      --set-env-vars="CLOUD_SQL_INSTANCE=[YOUR-INSTANCE-CONNECTION-NAME]" \
+      --set-env-vars="POSTGRES_USER=[DB-USER]" \
+      --set-env-vars="POSTGRES_PASSWORD=[DB-PASSWORD]" \
+      --set-env-vars="POSTGRES_DB=[DB-NAME]" \
+      --set-env-vars="VESTEDA_EMAIL=[YOUR-EMAIL]" \
+      --set-env-vars="VESTEDA_PASSWORD=[YOUR-PASSWORD]" \
+      --set-env-vars="CRAWLER_VERBOSE=True"
+    ```
 
-3. **Set up a schedule (optional):**
-   ```bash
-   gcloud scheduler jobs create http stealhouse-crawler-scheduler \
-     --schedule="0 */6 * * *" \
-     --uri="https://[REGION]-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/[PROJECT-ID]/jobs/stealhouse-crawler:run" \
-     --http-method=POST \
-     --oauth-service-account-email=[SERVICE-ACCOUNT]@[PROJECT-ID].iam.gserviceaccount.com
-   ```
+3.  **Set up a schedule (optional):**
+    ```bash
+    gcloud scheduler jobs create http stealhouse-crawler-scheduler \
+      --schedule="0 */6 * * *" \
+      --uri="https://[REGION]-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/[PROJECT-ID]/jobs/stealhouse-crawler:run" \
+      --http-method=POST \
+      --oauth-service-account-email=[SERVICE-ACCOUNT]@[PROJECT-ID].iam.gserviceaccount.com
+    ```
 
 **Key Cloud Run Configuration Notes:**
 
-1. **Service Account:** Ensure the service account used by Cloud Run has:
-   - `cloudsql.client` role for Cloud SQL access
-   - Appropriate roles for any other Google Cloud services used (e.g., Secret Manager for credentials)
+1.  **Service Account:** Ensure the service account used by Cloud Run has:
+    - `cloudsql.client` role for Cloud SQL access
+    - Appropriate roles for any other Google Cloud services used (e.g., Secret Manager for credentials)
 
-2. **Connection Name:** The `CLOUD_SQL_INSTANCE` should be in the format `project:region:instance`, e.g., `myproject:us-central1:myinstance`
+2.  **Connection Name:** The `CLOUD_SQL_INSTANCE` should be in the format `project:region:instance`, e.g., `myproject:us-central1:myinstance`
 
-3. **Security:** For production, consider using Secret Manager for sensitive values like passwords:
-   ```bash
-   gcloud run jobs update stealhouse-crawler \
-     --set-secrets="POSTGRES_PASSWORD=db-password:latest" \
-     --set-secrets="VESTEDA_PASSWORD=vesteda-password:latest"
-   ```
+3.  **Security:** For production, consider using Secret Manager for sensitive values like passwords:
+    ```bash
+    gcloud run jobs update stealhouse-crawler \
+      --set-secrets="POSTGRES_PASSWORD=db-password:latest" \
+      --set-secrets="VESTEDA_PASSWORD=vesteda-password:latest"
+    ```
 
 This configuration provides a secure, scalable solution for running the crawler as a scheduled job in Google Cloud, with proper connectivity to a private Cloud SQL database instance.
 

@@ -1,47 +1,33 @@
 from typing import AsyncGenerator, Dict, Any, List, Optional, Union, Tuple
 import logging
 from crawler_job.models.house_models import (
-    DetailHouse,
-    GalleryHouse,
+    House,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
 import warnings
 
 from .repositories import (
-    GalleryHouseRepository,
-    DetailHouseRepository,
-    FloorPlanRepository,
+    HouseRepository,
 )
 from .db_connection import get_db_session
 from ..models.db_models import (
-    DbGalleryHouse,
-    DbDetailHouse,
+    DbHouse,
 )
 from ..helpers.transformers import (
-    db_gallery_houses_to_pydantic_async,
-    db_detail_houses_to_pydantic_async,
+    db_houses_to_pydantic_async,
 )
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def get_repositories(
+async def get_repository(
     session: AsyncSession,
-) -> AsyncGenerator[
-    Dict[
-        str, Union[GalleryHouseRepository, DetailHouseRepository, FloorPlanRepository]
-    ],
-    None,
-]:
-    """Context manager to get all repositories with a shared session"""
+) -> AsyncGenerator[HouseRepository, None]:
+    """Context manager to get the house repository with a session"""
     try:
-        yield {
-            "gallery": GalleryHouseRepository(session),
-            "detail": DetailHouseRepository(session),
-            "floor_plan": FloorPlanRepository(session),
-        }
+        yield HouseRepository(session)
     finally:
         pass
 
@@ -84,39 +70,34 @@ class HouseService:
             )
             # We can't use await in __del__, so we just make a warning
 
-    async def identify_new_houses(
-        self, gallery_houses: List[GalleryHouse]
-    ) -> List[GalleryHouse]:
+    async def identify_new_houses(self, houses: List[House]) -> List[House]:
         """Identificeer nieuwe huizen zonder database write"""
         new_houses = []
-        async with get_repositories(self.session) as repos:
-            for house in gallery_houses:
-                existing_house = await repos["gallery"].get_by_address(
-                    house.address, house.city
-                )
+        async with get_repository(self.session) as repo:
+            for house in houses:
+                existing_house = await repo.get_by_address(house.address, house.city)
                 if not existing_house:
                     new_houses.append(house)
         return new_houses
 
     async def store_houses_atomic(
         self,
-        gallery_houses: List[GalleryHouse],
-        detail_houses: List[DetailHouse],
-        all_houses: List[GalleryHouse],
+        houses: List[House],
+        all_houses: List[House],
     ) -> Dict[str, int]:
         """Atomic transaction voor alle huisdata"""
         has_active_transaction = self.session.in_transaction()
 
         async def _execute_transaction():
-            async with get_repositories(self.session) as repos:
+            async with get_repository(self.session) as repo:
                 new_houses, existing_houses, updated_houses = (
-                    await self._store_gallery_houses_with_repos(gallery_houses, repos)
+                    await self._store_houses_with_repo(houses, repo)
                 )
 
-                matched_details = await self._match_details_with_gallery(
-                    detail_houses, all_houses
+                matched_details = await self._match_details_with_houses(
+                    houses, all_houses
                 )
-                await self._store_detail_houses_with_repos(matched_details, repos)
+                await self._store_houses_with_repo(matched_details, repo)
 
                 # Send notifications if notification service is available
                 if self.notification_service:
@@ -164,89 +145,58 @@ class HouseService:
             async with self.session.begin():
                 return await _execute_transaction()
 
-    async def _store_gallery_houses_with_repos(
-        self, gallery_houses: List[GalleryHouse], repos: Dict[str, Any]
-    ) -> Tuple[List[GalleryHouse], List[GalleryHouse], List[Tuple[GalleryHouse, str]]]:
-        """Interne methode voor gallery house opslag met gegeven repositories"""
-        new_db_houses: List[DbGalleryHouse] = []
-        existing_db_houses: List[DbGalleryHouse] = []
-        updated_houses: List[Tuple[GalleryHouse, str]] = []
+    async def _store_houses_with_repo(
+        self, houses: List[House], repo: HouseRepository
+    ) -> Tuple[List[House], List[House], List[Tuple[House, str]]]:
+        """Interne methode voor house opslag met gegeven repository"""
+        new_db_houses: List[DbHouse] = []
+        existing_db_houses: List[DbHouse] = []
+        updated_houses: List[Tuple[House, str]] = []
 
-        for house in gallery_houses:
-            existing_house = await repos["gallery"].get_by_address(
-                house.address, house.city
-            )
+        for house in houses:
+            existing_house = await repo.get_by_address(house.address, house.city)
             if existing_house:
                 if existing_house.status != house.status:
                     old_status = existing_house.status
                     existing_house.status = house.status
-                    await repos["gallery"].update(existing_house)
+                    await repo.update(existing_house.id, house)
                     # Store house and its old status for notification
-                    house_obj = await db_gallery_houses_to_pydantic_async(
-                        [existing_house]
-                    )
+                    house_obj = await db_houses_to_pydantic_async([existing_house])
                     if house_obj:
                         updated_houses.append((house_obj[0], old_status))
                 existing_db_houses.append(existing_house)
             else:
-                stored_db_house = await repos["gallery"].create(house)
+                stored_db_house = await repo.create(house)
                 new_db_houses.append(stored_db_house)
 
-        new_houses = await db_gallery_houses_to_pydantic_async(new_db_houses)
-        existing_houses = await db_gallery_houses_to_pydantic_async(existing_db_houses)
+        new_houses = await db_houses_to_pydantic_async(new_db_houses)
+        existing_houses = await db_houses_to_pydantic_async(existing_db_houses)
 
         # Store the updated houses for notification in the _execute_transaction method
         return (new_houses, existing_houses, updated_houses)
 
-    async def _match_details_with_gallery(
-        self, detail_houses: List[DetailHouse], all_houses: List[GalleryHouse]
-    ) -> List[DetailHouse]:
+    async def _match_details_with_houses(
+        self, houses: List[House], all_houses: List[House]
+    ) -> List[House]:
         """Match detail houses met gallery houses"""
         matched_details = []
-        for detail_house in detail_houses:
-            matching_gallery = next(
+        for house in houses:
+            matching_house = next(
                 (
                     h
                     for h in all_houses
-                    if h.address == detail_house.address and h.city == detail_house.city
+                    if h.address == house.address and h.city == house.city
                 ),
                 None,
             )
-            if matching_gallery:
-                detail_house.gallery_id = getattr(matching_gallery, "gallery_id", None)
-                matched_details.append(detail_house)
+            if matching_house:
+                house.gallery_id = getattr(matching_house, "gallery_id", None)
+                matched_details.append(house)
         return matched_details
 
-    async def _store_detail_houses_with_repos(
-        self, detail_houses: List[DetailHouse], repos: Dict[str, Any]
-    ) -> List[DetailHouse]:
-        """Interne methode voor detail house opslag met gegeven repositories"""
-        stored_db_houses: List[DbDetailHouse] = []
-
-        for detail_house in detail_houses:
-            existing_house = await repos["detail"].get_by_address(
-                detail_house.address, detail_house.postal_code, detail_house.city
-            )
-            if existing_house:
-                db_detail_house = detail_house.to_db_model()
-                if existing_house.has_changes(db_detail_house):
-                    await repos["detail"].update(existing_house.id, detail_house)
-            else:
-                detail_house_obj = await repos["detail"].create(detail_house)
-                stored_db_houses.append(detail_house_obj)
-
-        return await db_detail_houses_to_pydantic_async(stored_db_houses)
-
-    async def _store_gallery_houses(
-        self, gallery_houses: List[GalleryHouse]
-    ) -> Tuple[List[GalleryHouse], List[GalleryHouse], List[Tuple[GalleryHouse, str]]]:
-        """Interne methode voor gallery house opslag"""
-        async with get_repositories(self.session) as repos:
-            return await self._store_gallery_houses_with_repos(gallery_houses, repos)
-
-    async def _store_detail_houses(
-        self, detail_houses: List[DetailHouse]
-    ) -> List[DetailHouse]:
-        """Interne methode voor detail house opslag"""
-        async with get_repositories(self.session) as repos:
-            return await self._store_detail_houses_with_repos(detail_houses, repos)
+    async def _store_houses(
+        self, houses: List[House]
+    ) -> Tuple[List[House], List[House], List[Tuple[House, str]]]:
+        """Interne methode voor house opslag"""
+        async with get_repository(self.session) as repo:
+            return await self._store_houses_with_repo(houses, repo)

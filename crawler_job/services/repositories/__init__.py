@@ -1,9 +1,5 @@
-from .galleryHouseRepository import GalleryHouseRepository
-from .floorPlanRepository import FloorPlanRepository
-from .detailHouseRepository import DetailHouseRepository
+from .houseRepository import HouseRepository
 
 __all__ = [
-    "GalleryHouseRepository",
-    "FloorPlanRepository",
-    "DetailHouseRepository",
+    "HouseRepository",
 ]

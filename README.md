@@ -17,12 +17,12 @@ The system consists of:
 
 ````
 ├── docs/               # Documentation
-├── python_scripts/     # Backend Python code
-│   ├── crawlers/       # Web crawlers for different sites
-│   ├── db_models/      # Database models and repositories
-│   └── services/       # Shared services (LLM, etc.)
-├── src/                # React frontend
-└── docker-compose.yml  # Local Docker configuration
+├── scripts/            # Scripts and configuration files
+│   ├── shell/          # Shell scripts for deployment and maintenance
+│   └── docker/         # Docker configuration files
+├── crawler_job/        # Backend Python code for crawler
+├── tests/              # Test files
+└── requirements.txt    # Python dependencies
 ````
 
 ## Local Development Setup
@@ -52,7 +52,7 @@ The system consists of:
 
 4. **Start the database**:
    ```bash
-   docker-compose -f docker-compose-local-dev.yml up -d
+   docker-compose -f scripts/docker/docker-compose-local-dev.yml up -d
    ```
 
 5. **Run database migrations**:
@@ -106,6 +106,19 @@ docker run -e TEST_NOTIFICATIONS_ONLY=true <container_name>
 ```
 
 This is especially useful when testing the notification setup in Docker environments or on deployment.
+
+You can also use the provided scripts in the `scripts` directory:
+
+```bash
+# Build and push the Docker image to Google Container Registry
+bash scripts/shell/build-and-push-google.sh
+
+# Create or update a Cloud Run job
+bash scripts/shell/create-new-job-google.sh
+
+# Run both of the above scripts in sequence
+bash scripts/shell/full-deployment.sh
+```
 
 ## License
 
