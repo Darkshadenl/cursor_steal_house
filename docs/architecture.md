@@ -29,9 +29,7 @@
     - [Overview](#overview)
     - [Entity Relationship Diagram](#entity-relationship-diagram)
     - [Table Descriptions](#table-descriptions)
-      - [`gallery_houses`](#gallery_houses)
-      - [`detail_houses`](#detail_houses)
-      - [`floor_plans`](#floor_plans)
+      - [`houses`](#houses)
   - [6. Crawler Details (Vesteda)](#6-crawler-details-vesteda)
     - [Overview](#overview-1)
     - [Core Logic Flow](#core-logic-flow)
@@ -119,7 +117,7 @@ graph LR
 **Explanation:**
 
 1.  The **Python Scraper** accesses **Rental Websites**.
-2.  The Scraper extracts data and stores it in the **PostgreSQL Database**.
+2.  The Scraper extracts property data and stores it directly in the **PostgreSQL Database** in a unified house table.
 3.  The **User** interacts with the **React Frontend**.
 4.  The Frontend sends requests to the **Backend API**.
 5.  The Backend API queries the **PostgreSQL Database** and returns data to the Frontend.
@@ -342,33 +340,22 @@ You can access the endpoints using tools like `curl`, Postman, or directly from 
 
 ### Overview
 
-The PostgreSQL database schema (`steal_house`) is designed to store information about rental properties scraped from various sources. It distinguishes between high-level gallery information and detailed property information.
+The PostgreSQL database schema (`steal_house`) is designed to store information about rental properties scraped from various sources. It uses a unified houses table that combines information previously split across multiple tables.
 
 ### Entity Relationship Diagram
 
 ```mermaid
 erDiagram
-    GALLERY_HOUSES ||--o{ DETAIL_HOUSES : contains
-    DETAIL_HOUSES ||--o{ FLOOR_PLANS : has
-
-    GALLERY_HOUSES {
+    HOUSES {
         Integer id PK
         String address
         String city
+        String postal_code
+        String neighborhood
         String status
-        String image_url
         Boolean high_demand
         String demand_message
         String detail_url
-    }
-
-    DETAIL_HOUSES {
-        Integer id PK
-        Integer gallery_id FK
-        String address
-        String postal_code
-        String city
-        String neighborhood
         String rental_price
         String service_costs
         String min_income_single
@@ -377,7 +364,6 @@ erDiagram
         Integer square_meters
         Integer bedrooms
         String energy_label
-        String status
         String available_from
         String complex
         String complex_name
@@ -385,82 +371,49 @@ erDiagram
         Integer year_of_construction
         String number_of_objects
         String number_of_floors
-        String complex_image_url
         Text description
         String location_map_url
         String request_viewing_url
         Text options
     }
-
-    FLOOR_PLANS {
-        Integer id PK
-        Integer house_id FK
-        String image_url
-        String description
-    }
 ```
 
 ### Table Descriptions
 
-#### `gallery_houses`
+#### `houses`
 
-Stores summarized information about a property, typically extracted from search result or gallery pages.
+Stores comprehensive information about a property, combining what was previously separated into gallery and detail tables.
 
-| Column           | Type    | Constraints | Description                                           |
-| :--------------- | :------ | :---------- | :---------------------------------------------------- |
-| `id`             | Integer | PK          | Unique identifier for the gallery entry.              |
-| `address`        | String  | Not Null    | Street address of the property.                       |
-| `city`           | String  | Not Null    | City where the property is located.                   |
-| `status`         | String  | Not Null    | Rental status (e.g., 'For Rent', 'Rented').           |
-| `image_url`      | String  | Nullable    | URL of the primary image shown in the gallery.        |
-| `high_demand`    | Boolean | Default: F  | Flag indicating high interest or viewing requests.    |
-| `demand_message` | String  | Nullable    | Text message related to demand (if any).              |
-| `detail_url`     | String  | Nullable    | Relative or absolute URL to the property detail page. |
-
-#### `detail_houses`
-
-Stores comprehensive information about a specific property, usually scraped from its detail page.
-
-| Column                 | Type    | Constraints | Description                                                            |
-| :--------------------- | :------ | :---------- | :--------------------------------------------------------------------- |
-| `id`                   | Integer | PK          | Unique identifier for the detailed property entry.                     |
-| `gallery_id`           | Integer | FK          | Foreign key linking to `gallery_houses.id` (Nullable, Cascade Delete). |
-| `address`              | String  | Not Null    | Full street address.                                                   |
-| `postal_code`          | String  | Not Null    | Postal code.                                                           |
-| `city`                 | String  | Not Null    | City.                                                                  |
-| `neighborhood`         | String  | Nullable    | Neighborhood name.                                                     |
-| `rental_price`         | String  | Not Null    | Monthly rental price (as string, e.g., "€1,200").                      |
-| `service_costs`        | String  | Nullable    | Additional service costs (as string).                                  |
-| `min_income_single`    | String  | Nullable    | Minimum income requirement for a single applicant.                     |
-| `min_income_joint`     | String  | Nullable    | Minimum income requirement for joint applicants.                       |
-| `read_more_url`        | String  | Nullable    | URL for more income requirement details.                               |
-| `square_meters`        | Integer | Not Null    | Living area in square meters.                                          |
-| `bedrooms`             | Integer | Not Null    | Number of bedrooms.                                                    |
-| `energy_label`         | String  | Nullable    | Energy efficiency label (e.g., 'A', 'B').                              |
-| `status`               | String  | Not Null    | Current rental status.                                                 |
-| `available_from`       | String  | Nullable    | Date or description of availability.                                   |
-| `complex`              | String  | Nullable    | Name or identifier of the building complex.                            |
-| `complex_name`         | String  | Nullable    | Display name of the complex.                                           |
-| `complex_description`  | Text    | Nullable    | Description of the complex.                                            |
-| `year_of_construction` | Integer | Nullable    | Year the complex was built.                                            |
-| `number_of_objects`    | String  | Nullable    | Number of units/objects in the complex.                                |
-| `number_of_floors`     | String  | Nullable    | Number of floors in the complex.                                       |
-| `complex_image_url`    | String  | Nullable    | URL for an image of the complex.                                       |
-| `description`          | Text    | Not Null    | Detailed description of the property.                                  |
-| `location_map_url`     | String  | Nullable    | URL to a map showing the property location.                            |
-| `request_viewing_url`  | String  | Nullable    | URL to request a property viewing.                                     |
-| `options`              | Text    | Nullable    | Additional options or features (as text/JSON).                         |
-
-#### `floor_plans`
-
-Stores URLs and descriptions for property floor plans.
-
-| Column        | Type    | Constraints | Description                                                 |
-| :------------ | :------ | :---------- | :---------------------------------------------------------- |
-| `id`          | Integer | PK          | Unique identifier for the floor plan entry.                 |
-| `house_id`    | Integer | FK          | Foreign key linking to `detail_houses.id` (Cascade Delete). |
-| `image_url`   | String  | Not Null    | URL of the floor plan image.                                |
-| `description` | String  | Nullable    | Optional description of the floor plan.                     |
+| Column                 | Type    | Constraints | Description                                           |
+| :--------------------- | :------ | :---------- | :---------------------------------------------------- |
+| `id`                   | Integer | PK          | Unique identifier for the property entry.             |
+| `address`              | String  | Not Null    | Full street address.                                  |
+| `city`                 | String  | Not Null    | City where the property is located.                   |
+| `postal_code`          | String  | Nullable    | Postal code.                                          |
+| `neighborhood`         | String  | Nullable    | Neighborhood name.                                    |
+| `status`               | String  | Not Null    | Rental status (e.g., 'For Rent', 'Rented').           |
+| `high_demand`          | Boolean | Default: F  | Flag indicating high interest or viewing requests.    |
+| `demand_message`       | String  | Nullable    | Text message related to demand (if any).              |
+| `detail_url`           | String  | Nullable    | Relative or absolute URL to the property detail page. |
+| `rental_price`         | String  | Nullable    | Monthly rental price (as string, e.g., "€1,200").     |
+| `service_costs`        | String  | Nullable    | Additional service costs (as string).                 |
+| `min_income_single`    | String  | Nullable    | Minimum income requirement for a single applicant.    |
+| `min_income_joint`     | String  | Nullable    | Minimum income requirement for joint applicants.      |
+| `read_more_url`        | String  | Nullable    | URL for more income requirement details.              |
+| `square_meters`        | Integer | Nullable    | Living area in square meters.                         |
+| `bedrooms`             | Integer | Nullable    | Number of bedrooms.                                   |
+| `energy_label`         | String  | Nullable    | Energy efficiency label (e.g., 'A', 'B').             |
+| `available_from`       | String  | Nullable    | Date or description of availability.                  |
+| `complex`              | String  | Nullable    | Name or identifier of the building complex.           |
+| `complex_name`         | String  | Nullable    | Display name of the complex.                          |
+| `complex_description`  | Text    | Nullable    | Description of the complex.                           |
+| `year_of_construction` | Integer | Nullable    | Year the complex was built.                           |
+| `number_of_objects`    | String  | Nullable    | Number of units/objects in the complex.               |
+| `number_of_floors`     | String  | Nullable    | Number of floors in the complex.                      |
+| `description`          | Text    | Nullable    | Detailed description of the property.                 |
+| `location_map_url`     | String  | Nullable    | URL to a map showing the property location.           |
+| `request_viewing_url`  | String  | Nullable    | URL to request a property viewing.                    |
+| `options`              | Text    | Nullable    | Additional options or features (as text/JSON).        |
 
 ---
 
@@ -506,11 +459,11 @@ sequenceDiagram
 
     Main->>Steps: execute_property_extraction()
     Steps->>Crawler: arun(search_url, extraction_strategy)
-    Crawler-->>Steps: Gallery JSON Data
-    Steps-->>Main: List[GalleryHouse]
+    Crawler-->>Steps: Property List Data
+    Steps-->>Main: List[House] (Basic Info)
 
-    Main->>DBService: identify_new_houses(gallery_houses)
-    DBService-->>Main: List[GalleryHouse] (New Houses Only)
+    Main->>DBService: identify_new_houses(houses)
+    DBService-->>Main: List[House] (New Houses Only)
 
     opt New Houses Found
         Main->>Steps: execute_detailed_property_extraction(new_houses)
@@ -519,10 +472,10 @@ sequenceDiagram
         Steps-->>Main: List[FetchedPage]
 
         Main->>LLMService: execute_llm_extraction(fetched_pages)
-        LLMService-->>Main: List[DetailHouse] (Structured Data)
+        LLMService-->>Main: List[House] (With Detailed Data)
     end
 
-    Main->>DBService: store_houses_atomic(gallery_data, detail_data, all_gallery_data)
+    Main->>DBService: store_houses(houses)
     DBService->>DBService: Perform DB Operations (Create/Update)
     DBService-->>Main: Storage Result (Counts)
 
@@ -536,12 +489,12 @@ sequenceDiagram
     *   `cookie_acceptor.py`: Handles accepting cookies on the site.
     *   `login_step.py`: Performs login using provided credentials.
     *   `search_navigation_step.py`: Navigates to the property search results page.
-    *   `property_extraction_step.py`: Extracts summary data (gallery view) using `JsonCssExtractionStrategy`.
+    *   `property_extraction_step.py`: Extracts property data using `JsonCssExtractionStrategy`.
     *   `detailed_property_extraction.py`: Fetches the full HTML/Markdown content of individual property detail pages using `arun_many` for efficiency.
-    *   `llm_extraction_step.py`: Uses `LLMService` (interfacing with `LiteLLM`) to extract structured `DetailHouse` data from the fetched markdown/HTML.
-*   **`services/house_service.py`:** Handles interaction with the database repositories for storing `GalleryHouse` and `DetailHouse` data. Uses an atomic transaction for saving all data.
+    *   `llm_extraction_step.py`: Uses `LLMService` (interfacing with `LiteLLM`) to extract additional structured `House` data from the fetched markdown/HTML.
+*   **`services/house_service.py`:** Handles interaction with the database repositories for storing `House` data.
 *   **`services/llm_service.py`:** Provides an interface to LLM providers (via `LiteLLM`) for structured data extraction based on a Pydantic schema.
-*   **`models/`:** Contains Pydantic models (`house_models.py`) representing the data structure and SQLAlchemy models (`db_models.py`) for the database tables.
+*   **`models/`:** Contains Pydantic models (`house_models.py`) representing the unified `House` structure and SQLAlchemy models (`db_models.py`) for the database tables.
 *   **`helpers/transformers.py`:** Utility functions to convert between Pydantic and SQLAlchemy models.
 
 ### Crawler Docker Configuration

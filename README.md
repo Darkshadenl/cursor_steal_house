@@ -8,7 +8,7 @@ StealHouse is a Python-based web crawler system designed to collect rental prope
 
 The system consists of:
 - Python crawler for housing websites (currently supports Vesteda)
-- PostgreSQL database for data storage
+- PostgreSQL database for data storage with unified houses schema
 - LLM integration for intelligent data extraction
 - Notification system (Email, Pushover, Telegram)
 - React frontend (in development) for data visualization
@@ -63,8 +63,8 @@ The system consists of:
 ### Running the Crawler Locally
 
 ```bash
-cd python_scripts/crawlers/vesteda
-python vesteda_crawler.py
+# Run the Vesteda crawler directly
+python -m crawler_job.crawlers.vesteda.vesteda_crawler
 ```
 
 ### Notification System
@@ -119,6 +119,10 @@ bash scripts/shell/create-new-job-google.sh
 # Run both of the above scripts in sequence
 bash scripts/shell/full-deployment.sh
 ```
+
+## Database Schema
+
+The database uses a unified `houses` table that stores all property information in a single table. This simplifies the data model and improves query performance.
 
 ## License
 
