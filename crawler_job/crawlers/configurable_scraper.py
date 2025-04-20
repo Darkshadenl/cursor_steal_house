@@ -131,40 +131,62 @@ class ConfigurableWebsiteScraper(AbstractWebsiteScraper):
         login_result = await self.crawler.arun(url=login_url, config=run_config)
 
         if not login_result.success:
-            self.logger.error(f"Login failed: {login_result.error_message}")
+            self.logger.error(
+                f"Login failed during initial submission: {login_result.error_message}"
+            )
             return False
 
-        # Verify login success if a success indicator is provided
-        if self.config.login_config.success_indicator_selector:
-            # Wait a moment for the redirect to complete
-            await asyncio.sleep(2)
+        # --- Login Verification ---
+        await asyncio.sleep(2)  # Wait a moment for potential redirects
 
-            check_config = CrawlerRunConfig(
-                session_id=self.session_id,
-                cache_mode=CacheMode.BYPASS,
-                js_only=True,
+        login_verified = False
+        current_url = await self.crawler.aeval("window.location.href")
+        self.logger.info(f"URL after login attempt: {current_url}")
+
+        # Option 1: Verify using expected success URL
+        if self.config.login_config.success_check_url:
+            expected_url = urljoin(base_url, self.config.login_config.success_check_url)
+            if current_url == expected_url:
+                self.logger.info("Login verified via success URL.")
+                login_verified = True
+            else:
+                self.logger.error(
+                    f"Login verification failed: URL mismatch. Expected '{expected_url}', got '{current_url}'"
+                )
+
+        # Option 2: Verify using success indicator selector (if URL check not used or failed)
+        elif self.config.login_config.success_indicator_selector:
+            self.logger.info(
+                "Attempting login verification via success indicator selector."
+            )
+            # Check for success indicator
+            success_indicator_js = f"!!document.querySelector('{self.config.login_config.success_indicator_selector}')"
+            try:
+                indicator_found = await self.crawler.aeval(success_indicator_js)
+                if indicator_found:
+                    self.logger.info("Login verified via success indicator selector.")
+                    login_verified = True
+                else:
+                    self.logger.error(
+                        "Login verification failed: Success indicator selector not found."
+                    )
+            except Exception as e:
+                self.logger.error(f"Error checking success indicator selector: {e}")
+
+        # Option 3: No specific verification configured (assume success if submission worked)
+        elif (
+            not self.config.login_config.success_check_url
+            and not self.config.login_config.success_indicator_selector
+        ):
+            self.logger.warning(
+                "No specific login verification (URL or selector) configured. Assuming success."
+            )
+            login_verified = (
+                True  # Assume success if submit worked and no verification is set
             )
 
-            check_result = await self.crawler.arun(url=base_url, config=check_config)
-
-            if not check_result.success:
-                self.logger.error(
-                    f"Login verification failed: {check_result.error_message}"
-                )
-                return False
-
-            # Check for success indicator
-            success_indicator_js = f"""
-                !!document.querySelector('{self.config.login_config.success_indicator_selector}')
-            """
-
-            success_result = await self.crawler.aeval(success_indicator_js)
-
-            if not success_result:
-                self.logger.error(
-                    "Login verification failed: Success indicator not found"
-                )
-                return False
+        if not login_verified:
+            return False
 
         self.logger.info("Login successful")
         return True

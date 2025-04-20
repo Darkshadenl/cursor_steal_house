@@ -85,53 +85,69 @@ class VestedaCrawler:
                 houses: List[House] = await execute_property_extraction(
                     crawler, url, self.session_id
                 )
-
+                logger.info(f"Found {len(houses)} houses on the page")
+                
                 # Initialize HouseService with notification service
                 async with HouseService(
                     notification_service=self.notification_service
                 ) as house_service:
-                    # Only process new houses
                     new_houses = await house_service.identify_new_houses_async(houses)
 
-                    if new_houses:
-                        logger.info(
+                    if not new_houses:
+                        logger.info("No new houses found. Exiting...")
+                        return {
+                            "total_houses_count": len(houses),
+                            "new_houses_count": 0,
+                            "existing_houses_count": len(houses),
+                            "updated_houses_count": 0,
+                            "success": True,
+                        }
+                        
+                    logger.info(
                             f"Fetching details for {len(new_houses)} new houses..."
                         )
-                        # Fetch detailed pages for new houses
-                        fetched_pages = await execute_detailed_property_extraction(
-                            crawler, new_houses, self.session_id
-                        )
+                    
+                    # Fetch detailed pages for new houses
+                    fetched_pages = await execute_detailed_property_extraction(
+                        crawler, new_houses, self.session_id
+                    )
 
-                        # Extract detailed data using LLM and update house objects
-                        detailed_houses = await execute_llm_extraction(
-                            fetched_pages, provider=LLMProvider.GEMINI
-                        )
+                    # Extract detailed data using LLM and update house objects
+                    detailed_houses = await execute_llm_extraction(
+                        fetched_pages, provider=LLMProvider.GEMINI
+                    )
 
-                        # Merge detailed properties into existing houses
-                        if detailed_houses:
-                            logger.info(
-                                f"Merging details for {len(detailed_houses)} houses..."
-                            )
-                            for detailed_house in detailed_houses:
-                                # Find matching house in houses list
-                                for house in houses:
-                                    if (
-                                        house.address == detailed_house.address
-                                        and house.city == detailed_house.city
+                    # Merge detailed properties into existing houses
+                    if not detailed_houses:
+                        logger.info("No detailed houses found. Exiting...")
+                        return {
+                            "total_houses_count": len(houses),
+                            "new_houses_count": 0,
+                            "existing_houses_count": len(houses),
+                            "updated_houses_count": 0,
+                            "success": True,
+                        }
+                    
+                    logger.info(
+                            f"Merging details for {len(detailed_houses)} houses..."
+                        )
+                    for detailed_house in detailed_houses:
+                        for house in houses:
+                            if (
+                                house.address == detailed_house.address
+                                and house.city == detailed_house.city
+                            ):
+                                for field, value in detailed_house.model_dump(
+                                    exclude_unset=True
+                                ).items():
+                                    if value is not None and (
+                                        getattr(house, field) is None
+                                        or field
+                                        not in ["address", "city", "status"]
                                     ):
-                                        # Update house with detailed information
-                                        for field, value in detailed_house.model_dump(
-                                            exclude_unset=True
-                                        ).items():
-                                            if value is not None and (
-                                                getattr(house, field) is None
-                                                or field
-                                                not in ["address", "city", "status"]
-                                            ):
-                                                setattr(house, field, value)
-                                        break
-
-                    # Atomic transaction for all database operations
+                                        setattr(house, field, value)
+                                break
+                            
                     result = await house_service.store_houses_atomic_async(
                         houses=houses,
                         all_houses=houses,

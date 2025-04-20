@@ -75,6 +75,7 @@ class DbLoginConfig(Base):
     password_selector = Column(String(255), nullable=False)
     submit_selector = Column(String(255), nullable=False)
     success_indicator_selector = Column(String(255), nullable=True)
+    success_check_url = Column(String(255), nullable=True)
     needs_login = Column(Boolean, default=True)
     credential_source = Column(String(100), nullable=False)
     created_at = Column(TIMESTAMP, default=func.now())
@@ -115,10 +116,10 @@ class DbExtractionConfig(Base):
 
     __tablename__ = "extraction_configs"
     __table_args__ = (
-        {"schema": "steal_house"},
         UniqueConstraint(
             "website_id", "scope", name="uix_extraction_config_website_scope"
         ),
+        {"schema": "steal_house"},
     )
 
     id = Column(Integer, primary_key=True)
@@ -218,6 +219,7 @@ class LoginConfig(BaseModel):
     password_selector: str
     submit_selector: str
     success_indicator_selector: Optional[str] = None
+    success_check_url: Optional[str] = None
     needs_login: bool = True
     credential_source: str
 
