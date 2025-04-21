@@ -14,10 +14,10 @@ if [ "$CURRENT_BRANCH" = "main" ]; then
   cd "$REPO_ROOT/scripts/docker"
   
   # Rebuild the crawler container
-  docker-compose -f docker-compose-dev.yml build --no-cache crawler
+  docker compose -f docker-compose-dev.yml build --no-cache crawler
   
   # Restart the services
-  docker-compose -f docker-compose-dev.yml up -d
+  docker compose -f docker-compose-dev.yml up -d
   
   echo "Docker rebuild complete!"
 fi 
