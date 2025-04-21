@@ -4,11 +4,22 @@ import os
 
 from .vesteda_crawler import VestedaCrawler
 
+import logging
+
+log_level = logging.DEBUG if os.getenv("CRAWLER_VERBOSE") else logging.INFO
+logging.basicConfig(
+    level=log_level,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+logger = logging.getLogger(__name__)
+
 
 def main():
     """
     Entry point for running the Vesteda crawler with command-line options.
     """
+    
     parser = argparse.ArgumentParser(
         description="Run Vesteda crawler or test notifications"
     )
