@@ -1,5 +1,15 @@
 #!/bin/bash
 
+current_time=$(date +%H%M)
+
+start_time=30    # 00:30 als 0030
+end_time=700     # 07:00 als 0700
+
+if (( 10#$current_time >= 10#$start_time && 10#$current_time < 10#$end_time )); then
+  echo "Script does not run between 00:30 and 07:00"
+  exit 0
+fi
+
 # Define project root path
 PROJECT_ROOT="/Users/quintenmeijboom/Documents/Repos/cursor_steal_house"
 
