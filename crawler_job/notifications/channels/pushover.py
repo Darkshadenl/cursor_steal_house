@@ -1,7 +1,6 @@
 import logging
 import os
 import httpx
-from typing import Optional
 
 from .base import AbstractNotificationChannel
 
@@ -47,8 +46,7 @@ class PushoverNotificationChannel(AbstractNotificationChannel):
 
             async with httpx.AsyncClient() as client:
                 response = await client.post(self.api_url, data=payload)
-                print(response)
-                response.raise_for_status() # TODO don't crash if fail
+                response.raise_for_status()
 
             logger.info("Pushover notification sent successfully")
             return True

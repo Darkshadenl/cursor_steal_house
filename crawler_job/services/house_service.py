@@ -226,8 +226,10 @@ class HouseService:
                         updated_houses.append((house_obj[0], old_status))
                 existing_db_houses.append(existing_house)
             else:
-                stored_db_house = await repo.create(house)
-                new_db_houses.append(stored_db_house)
+                new_db_houses.append(await repo.create(house))
+
+        # Commit all changes at once
+        await repo.session.commit()
 
         new_houses = await db_houses_to_pydantic_async(new_db_houses)
         existing_houses = await db_houses_to_pydantic_async(existing_db_houses)
