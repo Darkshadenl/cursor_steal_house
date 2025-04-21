@@ -12,16 +12,6 @@ echo "===== Starting containers at $(date) =====" >> "$LOG_FILE"
 echo "Script running as: $(whoami)" >> "$LOG_FILE"
 echo "Script permissions: $(ls -la $0)" >> "$LOG_FILE"
 
-# Load environment variables if .env exists
-if [ -f "$PROJECT_ROOT/.env" ]; then
-  set -a
-  source "$PROJECT_ROOT/.env"
-  set +a
-  echo "Loaded environment variables from .env" >> "$LOG_FILE"
-else
-  echo "No .env file found" >> "$LOG_FILE"
-fi
-
 # Keep Mac awake for 10 minutes
 caffeinate -i -t 600 &
 CAFFEINE_PID=$!
