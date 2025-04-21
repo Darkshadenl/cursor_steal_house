@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Get current branch
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Check if we're on main branch
+if [ "$CURRENT_BRANCH" = "main" ]; then
+  echo "Merge to main detected! Rebuilding Docker containers..."
+  
+  # Get repository root directory
+  REPO_ROOT=$(git rev-parse --show-toplevel)
+  
+  # Change to the docker-compose file directory
+  cd "$REPO_ROOT/scripts/docker"
+  
+  # Rebuild the crawler container
+  docker-compose -f docker-compose-dev.yml build --no-cache crawler
+  
+  # Restart the services
+  docker-compose -f docker-compose-dev.yml up -d
+  
+  echo "Docker rebuild complete!"
+fi 
