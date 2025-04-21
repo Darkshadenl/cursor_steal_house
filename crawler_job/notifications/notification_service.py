@@ -4,6 +4,7 @@ from typing import List, Optional
 from dotenv import load_dotenv
 
 from crawler_job.models.house_models import House
+from crawler_job.services.llm_service import LLMProvider, LLMService
 from .channels.base import AbstractNotificationChannel
 from .channels.email import EmailNotificationChannel
 from .channels.pushover import PushoverNotificationChannel
@@ -22,7 +23,6 @@ class NotificationService:
         notification_channels_active = os.getenv("NOTIFICATION_CHANNELS_ACTIVE", "")
         email_recipients_file = os.getenv("EMAIL_RECIPIENTS_FILE")
         self.notifications_on = notifications_on
-
 
         if notification_channels_active:
             active_channel_names = [
@@ -43,9 +43,7 @@ class NotificationService:
                 f"Successfully initialized {len(self.active_channels)} notification channels"
             )
         else:
-            logger.warning(
-                "No notification channels are active."
-            )
+            logger.warning("No notification channels are active.")
 
     def _initialize_channels(
         self, channel_names: List[str], email_recipients_file: Optional[str]
@@ -108,13 +106,20 @@ class NotificationService:
 
         subject = f"New House Available: {house.address}, {house.city}"
 
+        llm_service = LLMService(provider=LLMProvider.GEMINI)
+        analysis = await llm_service.analyse_house(house)
+        main_url = "https://hurenbij.vesteda.com"
+
+        if house.detail_url.startswith("/object/"):
+            house.detail_url = f"{main_url}{house.detail_url}"
+
         # Format the message with details about the house
         message = (
             f"A new property is available at {house.address}, {house.city}.\n\n"
             f"Status: {house.status}\n"
-            f"Type: {house.house_type if hasattr(house, 'house_type') else 'Not specified'}\n"
-            f"Price: {house.price if hasattr(house, 'price') else 'Not specified'}\n\n"
-            f"View details: {house.detail_url}"
+            f"View details: {house.detail_url}\n\n"
+            f"{analysis}\n\n"
+            f"Full details: {house.to_readable_string()}"
         )
 
         # Send the notification to each active channel

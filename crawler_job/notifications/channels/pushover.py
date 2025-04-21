@@ -17,7 +17,6 @@ class PushoverNotificationChannel(AbstractNotificationChannel):
         self.pushover_user_key = os.getenv("PUSHOVER_USER_KEY")
         self.api_url = "https://api.pushover.net/1/messages.json"
 
-        # Validate required settings
         if not all([self.pushover_token, self.pushover_user_key]):
             raise ValueError(
                 "Missing required Pushover configuration in environment variables"
@@ -41,7 +40,8 @@ class PushoverNotificationChannel(AbstractNotificationChannel):
                 "user": self.pushover_user_key,
                 "title": subject,
                 "message": message,
-                "priority": 0,  # Normal priority
+                "priority": 0,
+                "html": 1,  
             }
 
             async with httpx.AsyncClient() as client:

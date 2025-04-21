@@ -99,7 +99,6 @@ class EmailNotificationChannel(AbstractNotificationChannel):
         success = True
 
         try:
-            # Connect to the SMTP server
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 server.starttls()  # Secure the connection
                 server.login(self.email_user, self.email_password)
@@ -113,8 +112,7 @@ class EmailNotificationChannel(AbstractNotificationChannel):
                         email_message["To"] = recipient
                         email_message["Subject"] = subject
 
-                        # Add the message body
-                        email_message.attach(MIMEText(message, "plain"))
+                        email_message.attach(MIMEText(message, "html"))
 
                         server.send_message(email_message)
                         logger.info(f"Email notification sent to {recipient}")
