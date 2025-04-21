@@ -15,15 +15,15 @@ logger = logging.getLogger(__name__)
 class NotificationService:
     """Service for managing notification channels and sending notifications."""
 
-    def __init__(self):
+    def __init__(self, notifications_on: bool):
         """Initialize the notification service with active channels based on environment variables."""
         self.active_channels: List[AbstractNotificationChannel] = []
 
-        # Get notification configuration from environment variables
         notification_channels_active = os.getenv("NOTIFICATION_CHANNELS_ACTIVE", "")
         email_recipients_file = os.getenv("EMAIL_RECIPIENTS_FILE")
+        self.notifications_on = notifications_on
 
-        # Parse the active channels string and initialize each channel
+
         if notification_channels_active:
             active_channel_names = [
                 name.strip().lower() for name in notification_channels_active.split(",")
@@ -38,13 +38,13 @@ class NotificationService:
                 "No notification channels configured in NOTIFICATION_CHANNELS_ACTIVE"
             )
 
-        if self.active_channels:
+        if self.active_channels and self.notifications_on:
             logger.info(
                 f"Successfully initialized {len(self.active_channels)} notification channels"
             )
         else:
             logger.warning(
-                "No notification channels are active. Check your .env configuration."
+                "No notification channels are active."
             )
 
     def _initialize_channels(
@@ -99,6 +99,9 @@ class NotificationService:
         Args:
             house: The new house to send a notification about
         """
+        if not self.notifications_on:
+            return
+
         if not self.active_channels:
             logger.info("No active notification channels, skipping notification")
             return
@@ -141,9 +144,14 @@ class NotificationService:
             house: The updated house to send a notification about
             old_status: The previous status of the house
         """
+        if not self.notifications_on:
+            return
+
         if not self.active_channels:
             logger.info("No active notification channels, skipping notification")
             return
+
+        subject = f"Updated House: {house.address}, {house.city}"
 
         subject = f"House Status Updated: {house.address}, {house.city}"
 

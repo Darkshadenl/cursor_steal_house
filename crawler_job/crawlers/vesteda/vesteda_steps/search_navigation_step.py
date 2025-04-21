@@ -18,7 +18,7 @@ async def execute_search_navigation(crawler: AsyncWebCrawler, session_id: str) -
     if (
         result
         and result.success
-        and result.redirected_url != "https://hurenbij.vesteda.com/login/"
+        and result.redirected_url != "https://hurenbij.vesteda.com/login"
     ):
         print(f"Search navigation successful: {result.url}")
         return result.url

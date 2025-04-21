@@ -15,7 +15,6 @@ from .vesteda_steps import (
 from crawler_job.services.house_service import HouseService
 from crawler_job.models.house_models import (
     House,
-    FetchedPage,
 )
 from crawler_job.services.llm_service import LLMProvider
 from crawler_job.notifications.notification_service import NotificationService
@@ -39,8 +38,12 @@ load_dotenv()
 
 
 class VestedaCrawler:
-    def __init__(self):
-        # Get verbose setting from environment variable, default to False
+    def __init__(
+        self,
+        verbose: bool = False,
+        test_notifications_only: bool = False,
+        notifications_on: bool = False,
+    ):
         verbose = os.getenv("CRAWLER_VERBOSE", "False").lower() == "true"
         logger.info(f"Browser verbose mode: {verbose}")
 
@@ -57,10 +60,23 @@ class VestedaCrawler:
         self.deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
         self.google_api_key = os.getenv("GOOGLE_API_KEY")
 
-        # Initialize notification service after loading environment variables
-        self.notification_service = NotificationService()
+        self.notification_service = NotificationService(notifications_on)
 
-    async def run_full_crawl(self) -> Dict[str, Any]:
+        try:
+            logger.info("Starting vesteda crawl...")
+
+            if test_notifications_only == True:
+                logger.info(f"{YELLOW}Running in test notifications only mode{RESET}")
+                asyncio.run(self.test_notifications_only())
+            else:
+                asyncio.run(self.run_full_crawl())
+
+            logger.info(f"{GREEN}Crawl completed successfully!{RESET}")
+        except Exception as e:
+            logger.error(f"{RED}Error during crawl: {str(e)}{RESET}")
+            raise e
+
+    async def run_full_crawl(self):
         """
         Run a full crawl of Vesteda website and store results in database
 
@@ -69,11 +85,9 @@ class VestedaCrawler:
         """
         try:
             async with AsyncWebCrawler(config=self.browser_config) as crawler:
-                # Navigate to search page
                 url = await execute_search_navigation(crawler, self.session_id)
 
-                # Handle login if needed
-                if url == "https://hurenbij.vesteda.com/login/":
+                if url == "https://hurenbij.vesteda.com/login":
                     logger.info("Login required. Accepting cookies and logging in...")
                     await accept_cookies(crawler, url, self.session_id)
                     await execute_login_step(
@@ -81,85 +95,59 @@ class VestedaCrawler:
                     )
                     url = await execute_search_navigation(crawler, self.session_id)
 
-                # Extract property listings as House objects
                 houses: List[House] = await execute_property_extraction(
                     crawler, url, self.session_id
                 )
                 logger.info(f"Found {len(houses)} houses on the page")
-                
-                # Initialize HouseService with notification service
-                async with HouseService(
-                    notification_service=self.notification_service
-                ) as house_service:
-                    new_houses = await house_service.identify_new_houses_async(houses)
 
-                    if not new_houses:
-                        logger.info("No new houses found. Exiting...")
-                        return {
-                            "total_houses_count": len(houses),
-                            "new_houses_count": 0,
-                            "existing_houses_count": len(houses),
-                            "updated_houses_count": 0,
-                            "success": True,
-                        }
-                        
-                    logger.info(
-                            f"Fetching details for {len(new_houses)} new houses..."
-                        )
-                    
+            async with HouseService(
+                notification_service=self.notification_service
+            ) as house_service:
+                new_houses = await house_service.identify_new_houses_async(houses)
+
+                if not new_houses:
+                    logger.info("No new houses found. Exiting...")
+                    return
+
+                logger.info(f"Fetching details for {len(new_houses)} new houses...")
+                
+                async with AsyncWebCrawler(config=self.browser_config) as crawler:
                     # Fetch detailed pages for new houses
                     fetched_pages = await execute_detailed_property_extraction(
                         crawler, new_houses, self.session_id
                     )
 
-                    # Extract detailed data using LLM and update house objects
-                    detailed_houses = await execute_llm_extraction(
-                        fetched_pages, provider=LLMProvider.GEMINI
-                    )
+                # Extract detailed data using LLM and update house objects
+                detailed_houses = await execute_llm_extraction(
+                    fetched_pages, provider=LLMProvider.GEMINI
+                )
 
-                    # Merge detailed properties into existing houses
-                    if not detailed_houses:
-                        logger.info("No detailed houses found. Exiting...")
-                        return {
-                            "total_houses_count": len(houses),
-                            "new_houses_count": 0,
-                            "existing_houses_count": len(houses),
-                            "updated_houses_count": 0,
-                            "success": True,
-                        }
-                    
-                    logger.info(
-                            f"Merging details for {len(detailed_houses)} houses..."
-                        )
-                    for detailed_house in detailed_houses:
-                        for house in houses:
-                            if (
-                                house.address == detailed_house.address
-                                and house.city == detailed_house.city
-                            ):
-                                for field, value in detailed_house.model_dump(
-                                    exclude_unset=True
-                                ).items():
-                                    if value is not None and (
-                                        getattr(house, field) is None
-                                        or field
-                                        not in ["address", "city", "status"]
-                                    ):
-                                        setattr(house, field, value)
-                                break
-                            
-                    result = await house_service.store_houses_atomic_async(
-                        houses=houses,
-                        all_houses=houses,
-                    )
+                # Merge detailed properties into existing houses
+                if not detailed_houses:
+                    logger.info("No detailed houses found. Exiting...")
+                    return
 
-                return {
-                    "total_houses_count": len(houses),
-                    "new_houses_count": result["new_count"],
-                    "existing_houses_count": result["existing_count"],
-                    "updated_houses_count": result.get("updated_count", 0),
-                    "success": True,
-                }
+                logger.info(f"Merging details for {len(detailed_houses)} houses...")
+                for detailed_house in detailed_houses:
+                    for house in houses:
+                        if (
+                            house.address == detailed_house.address
+                            and house.city == detailed_house.city
+                        ):
+                            for field, value in detailed_house.model_dump(
+                                exclude_unset=True
+                            ).items():
+                                if value is not None and (
+                                    getattr(house, field) is None
+                                    or field not in ["address", "city", "status"]
+                                ):
+                                    setattr(house, field, value)
+                            break
+
+                await house_service.store_houses_atomic_async(
+                    houses=houses,
+                    all_houses=houses,
+                )
 
         except Exception as e:
             logger.error(f"{RED}Error during crawl: {str(e)}{RESET}")
@@ -192,23 +180,3 @@ class VestedaCrawler:
         except Exception as e:
             logger.error(f"{RED}Error sending test notifications: {str(e)}{RESET}")
             return {"success": False, "error": str(e)}
-
-
-if __name__ == "__main__":
-    crawler = VestedaCrawler()
-    try:
-        print(os.getenv("NOTIFICATION_CHANNELS_ACTIVE"))
-
-        logger.info("Starting vesteda crawl...")
-
-        # If TEST_NOTIFICATIONS_ONLY is set, only run test notifications
-        if os.getenv("TEST_NOTIFICATIONS_ONLY", "false").lower() == "true":
-            logger.info(f"{YELLOW}Running in test notifications only mode{RESET}")
-            result = asyncio.run(crawler.test_notifications_only())
-        else:
-            result = asyncio.run(crawler.run_full_crawl())
-
-        logger.info(f"{GREEN}Crawl completed successfully!{RESET}")
-    except Exception as e:
-        logger.error(f"{RED}Error during crawl: {str(e)}{RESET}")
-        raise e
