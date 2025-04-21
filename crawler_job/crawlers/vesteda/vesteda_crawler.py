@@ -20,7 +20,6 @@ from crawler_job.services.llm_service import LLMProvider
 from crawler_job.notifications.notification_service import NotificationService
 from typing import List, Dict, Any
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -28,7 +27,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ANSI color codes
 GREEN = "\033[92m"
 RED = "\033[91m"
 YELLOW = "\033[93m"
@@ -110,7 +108,7 @@ class VestedaCrawler:
                     return
 
                 logger.info(f"Fetching details for {len(new_houses)} new houses...")
-                
+
                 async with AsyncWebCrawler(config=self.browser_config) as crawler:
                     # Fetch detailed pages for new houses
                     fetched_pages = await execute_detailed_property_extraction(
