@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
 import warnings
 
+from crawler_job.notifications.notification_service import NotificationService
+
 from .repositories import (
     HouseRepository,
 )
@@ -42,7 +44,7 @@ async def get_repository(
 class HouseService:
     """Service for handling house data storage and retrieval"""
 
-    def __init__(self, notification_service=None):
+    def __init__(self, notification_service: Optional[NotificationService] = None):
         """Initialize with a new database session and optional notification service
 
         Args:
@@ -131,9 +133,7 @@ class HouseService:
                     await self._store_houses_with_repo(houses, repo)
                 )
 
-                # Send notifications if notification service is available
                 if self.notification_service:
-                    # Send notifications for new houses
                     if new_houses:
                         logger.info(
                             f"Sending notifications for {len(new_houses)} new houses"

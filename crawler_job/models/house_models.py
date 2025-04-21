@@ -213,6 +213,23 @@ class House(BaseModel):
             request_viewing_url=data.get("request_viewing_url"),
             options=data.get("options"),
         )
+        
+    def to_readable_string(self) -> str:
+        """Convert the house model to a human-readable string representation.
+        Only includes fields that have values (not None).
+
+        Returns:
+            str: A formatted string with key-value pairs of house information
+        """
+        # Get all fields that have values
+        fields = {
+            k: str(v) for k, v in self.model_dump().items()
+            if v is not None
+        }
+        
+        # Create formatted string with each field on a new line
+        return "\n".join(f"{k}: {v}" for k, v in fields.items())
+
 
 
 class FetchedPage(BaseModel):

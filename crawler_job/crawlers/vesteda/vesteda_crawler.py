@@ -120,7 +120,6 @@ class VestedaCrawler:
                     fetched_pages, provider=LLMProvider.GEMINI
                 )
 
-                # Merge detailed properties into existing houses
                 if not detailed_houses:
                     logger.info("No detailed houses found. Exiting...")
                     return
