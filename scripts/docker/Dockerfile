@@ -60,7 +60,7 @@ RUN echo '#!/bin/bash\n\
     \n\
     # Run the crawler\n\
     echo "Starting crawler..."\n\
-    python -m crawler_job.crawlers.vesteda.vesteda_crawler\n\
+    python -m crawler_job.crawlers.vesteda.vesteda --notifications-on\n\
     ' > /app/start.sh && chmod +x /app/start.sh
 
 # Default command to run the start script
