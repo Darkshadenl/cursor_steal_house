@@ -13,11 +13,8 @@ if [ "$CURRENT_BRANCH" = "main" ]; then
   # Change to the docker-compose file directory
   cd "$REPO_ROOT/scripts/docker"
   
-  # Rebuild the crawler container
-  docker compose -f docker-compose-dev.yml build crawler
-  
   # Restart the services
-  docker compose -f docker-compose-dev.yml up -d
+  docker compose -f docker-compose-dev.yml up --build -d
   
   echo "Docker rebuild complete!"
 fi 
