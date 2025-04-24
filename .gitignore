@@ -79,3 +79,4 @@ full-deployment.sh
 prompts/
 implementation_plans/
 .pytest_cache/
+test_*.*
