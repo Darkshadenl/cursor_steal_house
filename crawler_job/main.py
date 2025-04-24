@@ -8,8 +8,8 @@ from typing import Dict, Any
 
 from crawler_job.services.db_connection import get_db_session
 from crawler_job.services.repositories.config_repository import WebsiteConfigRepository
-from crawler_job.crawlers.scraper_factory import ScraperFactory
 from crawler_job.notifications.notification_service import NotificationService
+from crawler_job.factories import ScraperFactory
 
 # Configure logging
 logging.basicConfig(

@@ -2,7 +2,7 @@ from typing import Dict, Type, Optional
 
 from crawl4ai import AsyncWebCrawler
 
-from crawler_job.crawlers.base_scraper import BaseWebsiteScraper
+from ..flexibleCrawlers.base_scraper import BaseWebsiteScraper
 from ..flexibleCrawlers.vesteda_scraper import VestedaScraper
 from crawler_job.services.repositories.json_config_repository import JsonConfigRepository
 
