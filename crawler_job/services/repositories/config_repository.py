@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import and_
 
-from crawler_job.models.config_models import (
+from crawler_job.models.db_config_models import (
     DbWebsite,
     DbLoginConfig,
     DbNavigationConfig,

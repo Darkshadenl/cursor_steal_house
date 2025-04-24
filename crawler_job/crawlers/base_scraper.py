@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any, Tuple
 
 from crawler_job.models.house_models import House
-from crawler_job.models.config_models import WebsiteConfig
+from crawler_job.models.db_config_models import WebsiteConfig
 from crawler_job.services.repositories.config_repository import WebsiteConfigRepository
 
 

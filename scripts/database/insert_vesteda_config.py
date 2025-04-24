@@ -11,7 +11,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from crawler_job.services.db_connection import get_db_context, engine
-from crawler_job.models.config_models import (
+from crawler_job.models.db_config_models import (
     DbWebsite,
     DbLoginConfig,
     DbNavigationConfig,

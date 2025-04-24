@@ -1,0 +1,101 @@
+{
+    "website_identifier": "vesteda",
+    "website_name": "Vesteda",
+    "base_url": "https://www.vesteda.com",
+    "is_active": true,
+    "scrape_strategy": "multi_step",
+    "strategy_config": {
+        "navigation_config": {
+            "listings_page_url": "/en/rental-properties"
+        },
+        "filtering_config": {
+            "steps": [
+                {
+                    "step_name": "Wait for filters",
+                    "action": "wait",
+                    "selector": "#filter-container",
+                    "wait_condition": {
+                        "type": "selector",
+                        "selector": "#filter-container.loaded"
+                    }
+                },
+                {
+                    "step_name": "Set max price",
+                    "action": "input",
+                    "selector": "input#max-price",
+                    "value": "2000"
+                }
+            ]
+        },
+        "gallery_extraction_config": {
+            "listing_item_selector": "article.property-card",
+            "next_page_selector": "a.pagination-next:not(.disabled)",
+            "max_pages": 5,
+            "fields": [
+                {
+                    "target_field": "url",
+                    "selector": "a.property-link",
+                    "extraction_type": "attribute",
+                    "attribute_name": "href",
+                    "is_required": true
+                },
+                {
+                    "target_field": "title",
+                    "selector": "h3.property-title",
+                    "extraction_type": "text",
+                    "is_required": true
+                },
+                {
+                    "target_field": "price_text",
+                    "selector": ".price-tag",
+                    "extraction_type": "text"
+                },
+                {
+                    "target_field": "location",
+                    "selector": ".location",
+                    "extraction_type": "text"
+                }
+            ]
+        },
+        "detail_page_extraction_config": {
+            "fields": [
+                {
+                    "target_field": "description",
+                    "selector": ".property-description",
+                    "extraction_type": "html",
+                    "is_required": true
+                },
+                {
+                    "target_field": "sqm",
+                    "selector": ".property-details .sqm",
+                    "extraction_type": "text",
+                    "transformation_rule": [
+                        {
+                            "type": "parse_int"
+                        }
+                    ]
+                },
+                {
+                    "target_field": "rooms",
+                    "selector": ".property-details .rooms",
+                    "extraction_type": "text",
+                    "transformation_rule": [
+                        {
+                            "type": "parse_int"
+                        }
+                    ]
+                },
+                {
+                    "target_field": "availability",
+                    "selector": ".availability-date",
+                    "extraction_type": "text"
+                },
+                {
+                    "target_field": "features",
+                    "selector": ".property-features li",
+                    "extraction_type": "text"
+                }
+            ]
+        }
+    }
+} 

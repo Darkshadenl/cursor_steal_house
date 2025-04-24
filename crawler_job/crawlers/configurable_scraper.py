@@ -9,7 +9,7 @@ from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
 from playwright.async_api import ElementHandle
 
 from crawler_job.models.house_models import House, FetchedPage
-from crawler_job.models.config_models import WebsiteConfig, FieldMapping
+from crawler_job.models.db_config_models import WebsiteConfig, FieldMapping
 from crawler_job.services.repositories.config_repository import WebsiteConfigRepository
 from crawler_job.services.house_service import HouseService
 from crawler_job.services.llm_service import LLMService, LLMProvider
