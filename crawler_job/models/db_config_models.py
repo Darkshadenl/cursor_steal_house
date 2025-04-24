@@ -1,7 +1,6 @@
-from datetime import datetime
 from typing import Dict, List, Optional, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import (
     Column,
     Integer,
@@ -9,13 +8,11 @@ from sqlalchemy import (
     Boolean,
     ForeignKey,
     Text,
-    DateTime,
     TIMESTAMP,
     JSON,
     func,
     UniqueConstraint,
 )
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
 # Import the Base from db_models to ensure consistent base
@@ -280,8 +277,8 @@ class FieldMapping(BaseModel):
 
 
 # Resolve forward references
-WebsiteConfig.update_forward_refs()
-ExtractionConfig.update_forward_refs()
+WebsiteConfig.model_rebuild()
+ExtractionConfig.model_rebuild()
 
 
 __all__ = [

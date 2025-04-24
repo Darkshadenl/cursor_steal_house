@@ -2,7 +2,7 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from crawler_job.models.config_models import (
+from crawler_job.models.db_config_models import (
     WebsiteConfig,
     WebsiteInfo,
     LoginConfig,
