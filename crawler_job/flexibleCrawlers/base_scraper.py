@@ -2,9 +2,7 @@ from typing import Dict, Any, AsyncGenerator, List, Optional
 import os
 from abc import ABC, abstractmethod
 
-from crawl4ai import AsyncWebCrawler
-from crawl4ai.config import CrawlerRunConfig
-
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
 from crawler_job.models.db_config_models import WebsiteConfig
 
 

@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional, Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import (
     Column,
     Integer,
@@ -31,7 +31,6 @@ class DbWebsite(Base):
     name = Column(String(100), nullable=False, unique=True)
     base_url = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
-    description = Column(Text, nullable=True)
     created_at = Column(TIMESTAMP, default=func.now())
     updated_at = Column(TIMESTAMP, default=func.now(), onupdate=func.now())
 
@@ -200,8 +199,7 @@ class WebsiteInfo(BaseModel):
     is_active: bool
     description: Optional[str] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LoginConfig(BaseModel):
@@ -220,8 +218,7 @@ class LoginConfig(BaseModel):
     needs_login: bool = True
     credential_source: str
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NavigationConfig(BaseModel):
@@ -235,8 +232,7 @@ class NavigationConfig(BaseModel):
     steps: Optional[List[Dict[str, Any]]] = None
     next_page_selector: Optional[str] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ExtractionConfig(BaseModel):
@@ -253,8 +249,7 @@ class ExtractionConfig(BaseModel):
     base_selector: Optional[str] = None
     field_mappings: Optional[List["FieldMapping"]] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FieldMapping(BaseModel):
@@ -272,8 +267,7 @@ class FieldMapping(BaseModel):
     is_required: bool = False
     default_value: Optional[str] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Resolve forward references

@@ -23,6 +23,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+# Old flexible method.
 async def insert_vesteda_config_async():
     """Inserts the default configuration for the Vesteda website if it doesn't exist."""
     # Use the async context manager to handle session creation and closing
@@ -44,7 +45,6 @@ async def insert_vesteda_config_async():
                 name="Vesteda",
                 base_url="https://hurenbij.vesteda.com",
                 is_active=True,
-                description="Vesteda residential property rentals",
             )
             session.add(website)
             await session.flush()  # Flush to get website.id
@@ -71,7 +71,6 @@ async def insert_vesteda_config_async():
             # 4. Create Gallery Extraction Config
             gallery_extraction = DbExtractionConfig(
                 website_id=website.id,
-                scope="gallery",
                 extraction_method="css",
                 base_selector="div.card.card-result-list",
             )
