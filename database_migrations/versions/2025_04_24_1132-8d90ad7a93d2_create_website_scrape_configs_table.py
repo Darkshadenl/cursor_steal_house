@@ -45,6 +45,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("website_identifier"),
+        schema="steal_house",
     )
 
 
