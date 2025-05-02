@@ -80,39 +80,37 @@ class JsonConfigRepository:
             )
             return None
 
-    async def get_config_by_identifier_async(
-        self, identifier: int
+    async def get_config_by_website_name_async(
+        self, website_name: str
     ) -> Optional[WebsiteConfig]:
-        """Retrieve and parse the configuration for a given website identifier.
+        """Retrieve and parse the configuration for a given website name.
 
         Args:
-            identifier: The unique identifier of the website.
+            website_name: The name of the website.
 
         Returns:
             Optional[WebsiteConfig]: The parsed configuration if found and valid, None otherwise.
         """
         try:
+            # First, get the website by name
+            website_query = select(DbWebsite).where(DbWebsite.name == website_name)
+            website_result = await self.session.execute(website_query)
+            website = website_result.scalar_one_or_none()
+
+            if not website:
+                print(f"Website with name '{website_name}' not found")
+                return None
+
             # Query the database for the configuration
             query = select(DbWebsiteScrapeConfig).where(
-                DbWebsiteScrapeConfig.website_identifier == identifier,
+                DbWebsiteScrapeConfig.website_identifier == website.id,
                 DbWebsiteScrapeConfig.is_enabled == True,
             )
             result = await self.session.execute(query)
             config_record = result.scalar_one_or_none()
 
             if not config_record:
-                print(
-                    f"No enabled configuration found for website identifier '{identifier}'"
-                )
-                return None
-
-            # Get the website info
-            website_query = select(DbWebsite).where(DbWebsite.id == identifier)
-            website_result = await self.session.execute(website_query)
-            website = website_result.scalar_one_or_none()
-
-            if not website:
-                print(f"Website with ID {identifier} not found")
+                print(f"No enabled configuration found for website '{website_name}'")
                 return None
 
             # Create the website_info object
@@ -133,12 +131,12 @@ class JsonConfigRepository:
 
                 return WebsiteConfig.model_validate(config_data)
             except Exception as e:
-                print(f"Error parsing configuration for '{identifier}': {str(e)}")
+                print(f"Error parsing configuration for '{website_name}': {str(e)}")
                 return None
 
         except Exception as e:
             print(
-                f"Database error while retrieving configuration for '{identifier}': {str(e)}"
+                f"Database error while retrieving configuration for '{website_name}': {str(e)}"
             )
             return None
 

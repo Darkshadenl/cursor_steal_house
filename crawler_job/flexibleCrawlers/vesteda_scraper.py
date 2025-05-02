@@ -1,8 +1,12 @@
+import logging
 from typing import Dict, Any
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
 
 from ..models.db_config_models import WebsiteConfig
 from .base_scraper import BaseWebsiteScraper
+
+logger = logging.getLogger(__name__)
+
 
 class VestedaScraper(BaseWebsiteScraper):
     """Vesteda-specific scraper implementation."""
@@ -16,65 +20,8 @@ class VestedaScraper(BaseWebsiteScraper):
         """
         super().__init__(crawler, config)
 
-        # Vesteda-specific run configurations
-        self.filter_config = self.standard_run_config.model_copy(
-            update={
-                "wait_for_navigation": "networkidle0",  # Wait for all network requests to finish
-                "default_timeout_ms": 60000,  # Longer timeout for filter operations
-            }
-        )
-
-        self.detail_config = self.standard_run_config.model_copy(
-            update={
-                "block_resources": {
-                    "types": [
-                        "image",
-                        "font",
-                        "media",
-                        "stylesheet",
-                    ],  # Block more resources for detail pages
-                    "patterns": [
-                        "*.google-analytics.com",
-                        "*.doubleclick.net",
-                    ],  # Block tracking
-                }
-            }
-        )
-
-    async def apply_filters_async(self) -> None:
-        """Override filter application for Vesteda-specific behavior."""
-        if not self.config.strategy_config.filtering_config:
-            return
-
-        # Wait for filter container to be ready
-        await self.crawler.wait_for_selector(
-            "#filter-container.loaded", config=self.filter_config
-        )
-
-        # Apply filters with custom configuration
-        for step in self.config.strategy_config.filtering_config.steps:
-            try:
-                if step.action == "click":
-                    # Ensure element is visible and clickable
-                    element = await self.crawler.wait_for_selector(
-                        step.selector, config=self.filter_config
-                    )
-                    if element:
-                        await element.click()
-                        # Wait for results to update
-                        await self.crawler.wait_for_selector(
-                            ".results-container.updated", config=self.filter_config
-                        )
-                elif step.action == "input" and step.value:
-                    await self.crawler.type(
-                        step.selector, step.value, config=self.filter_config
-                    )
-                    # Trigger change event to update results
-                    await self.crawler.eval_on_selector(
-                        step.selector, "el => el.dispatchEvent(new Event('change'))"
-                    )
-            except Exception as e:
-                print(f"Vesteda filter step '{step.step_name}' failed: {str(e)}")
+        logger.info(f"Vesteda scraper initialized with config: {self.config}")
+        self.detail_config: CrawlerRunConfig = self.standard_run_config()
 
     async def extract_details_async(self, url: str) -> Dict[str, Any]:
         """Override detail extraction for Vesteda-specific optimizations.
