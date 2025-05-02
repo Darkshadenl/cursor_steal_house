@@ -2,7 +2,7 @@ from typing import Dict, List, Optional, Any, Tuple
 import logging
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import and_
+from sqlalchemy import and_, select
 
 from crawler_job.models.db_config_models import (
     DbWebsite,
@@ -189,17 +189,14 @@ class WebsiteConfigRepository:
             ValueError: If website with given name doesn't exist
         """
         try:
-            # Query website by name
-            db_website = (
-                self.db_session.query(DbWebsite)
-                .filter(DbWebsite.name == website_name)
-                .first()
-            )
+            stmt = select(DbWebsite).where(DbWebsite.name == website_name)
+            result = await self.db_session.execute(stmt)
+            website = result.scalars().first()
 
-            if not db_website:
+            if not website:
                 raise ValueError(f"Website with name '{website_name}' not found")
 
-            return db_website.id
+            return website.id 
 
         except SQLAlchemyError as e:
             self.logger.error(f"Database error while getting website ID: {str(e)}")

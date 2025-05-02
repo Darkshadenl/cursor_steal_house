@@ -4,15 +4,12 @@ from sqlalchemy import (
     String,
     Boolean,
     ForeignKey,
-    Date,
     Text,
-    Float,
     JSON,
     DateTime,
     func,
 )
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 
@@ -105,9 +102,12 @@ class DbWebsiteScrapeConfig(Base):
     """SQLAlchemy model for storing website scraping configurations in JSON format."""
 
     __tablename__ = "website_scrape_configs"
+    __table_args__ = {"schema": "steal_house"}
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    website_identifier = Column(String, unique=True, nullable=False)
+    website_identifier = Column(
+        Integer, ForeignKey("steal_house.websites.id"), unique=True, nullable=False
+    )
     config_json = Column(JSON, nullable=False)
     version = Column(Integer, nullable=True, default=1)
     is_enabled = Column(Boolean, nullable=False, default=True)
