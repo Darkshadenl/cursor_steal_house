@@ -2,7 +2,7 @@ from typing import Dict, Any, AsyncGenerator, List, Optional
 import os
 from abc import ABC, abstractmethod
 
-from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+from crawl4ai import AsyncWebCrawler, CacheMode, CrawlerRunConfig, DefaultMarkdownGenerator, PruningContentFilter
 from crawler_job.models.db_config_models import WebsiteConfig
 
 
@@ -18,15 +18,32 @@ class BaseWebsiteScraper(ABC):
         """
         self.crawler = crawler
         self.config = config
-        self.standard_run_config = self._build_standard_run_config()
 
-    def _build_standard_run_config(self) -> CrawlerRunConfig:
+    def _build_standard_run_config(self, session_id: str) -> CrawlerRunConfig:
         """Build the standard crawler run configuration.
 
         Returns:
             CrawlerRunConfig: The default configuration for crawl4ai.
         """
-        return CrawlerRunConfig()
+        prune_filter = PruningContentFilter(
+            # Lower → more content retained, higher → more content pruned
+            threshold=0.45,
+            threshold_type="dynamic",
+            min_word_threshold=3,
+        )
+        return CrawlerRunConfig(
+            log_console=False,
+            exclude_domains=["deploy.mopinion.com", "app.cobrowser.com"],
+            mean_delay=1,
+            markdown_generator=DefaultMarkdownGenerator(
+                content_filter=prune_filter,
+            ),
+            cache_mode=CacheMode.BYPASS,
+            session_id=session_id,
+            js_only=False,
+            magic=True,
+            user_agent_mode="random",
+        )
 
     async def login_async(self) -> bool:
         """Perform login if login configuration is provided.
