@@ -31,7 +31,7 @@ class ScraperFactory:
         self.crawler = crawler
         self.json_config_repo = json_config_repo
 
-    async def get_scraper_async(self, identifier: str) -> BaseWebsiteScraper:
+    async def get_scraper_async(self, identifier: int) -> BaseWebsiteScraper:
         """Get a scraper instance for the given website identifier.
 
         Args:
@@ -43,19 +43,21 @@ class ScraperFactory:
         Raises:
             ValueError: If no valid configuration is found for the website.
         """
-        # Try to get new JSON configuration
-        website_config = await self.json_config_repo.get_config_by_identifier_async(
+        # Try to get JSON configuration
+        website_config = await self.json_config_repo.get_config_by_website_id_async(
             identifier
         )
 
         if website_config:
-            # New config found, use corresponding scraper class or fallback to base
+            # JSON config found, use corresponding scraper class or crash
             scraper_class = SCRAPER_CLASSES.get(identifier, BaseWebsiteScraper)
             print(
                 f"Using scraper class {scraper_class.__name__} for identifier '{identifier}' with JSON config."
             )
             return scraper_class(crawler=self.crawler, config=website_config)
         else:
-            error_msg = f"No valid configuration found for website identifier '{identifier}' in either new JSON system or old system."
+            error_msg = (
+                f"No valid configuration found for website identifier '{identifier}'."
+            )
             print(error_msg)
             raise ValueError(error_msg)

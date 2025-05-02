@@ -26,17 +26,7 @@ class BaseWebsiteScraper(ABC):
         Returns:
             CrawlerRunConfig: The default configuration for crawl4ai.
         """
-        headless_mode = os.getenv("SCRAPER_HEADLESS", "true").lower() == "true"
-        return CrawlerRunConfig(
-            browser="chromium",
-            headless=headless_mode,
-            default_timeout_ms=30000,
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-            block_resources={
-                "types": ["image", "font", "media"]
-            },  # Block unnecessary resources
-            wait_for_navigation="networkidle",
-        )
+        return CrawlerRunConfig()
 
     async def login_async(self) -> bool:
         """Perform login if login configuration is provided.

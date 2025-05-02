@@ -10,6 +10,7 @@ from crawler_job.services.db_connection import get_db_session
 from crawler_job.services.repositories.config_repository import WebsiteConfigRepository
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.factories import ScraperFactory
+from crawler_job.services.repositories.json_config_repository import JsonConfigRepository
 
 # Configure logging
 logging.basicConfig(
@@ -49,7 +50,7 @@ async def run_crawler_async(
         # Initialize services
         db_session = get_db_session()
         config_repository = WebsiteConfigRepository(db_session)
-        notification_service = NotificationService()
+        notification_service = NotificationService(notifications_on=not test_notifications_only)
 
         # If test_notifications_only is True, only run test notifications
         if test_notifications_only:
@@ -70,14 +71,15 @@ async def run_crawler_async(
                 "successful_channels": successful_channels,
             }
 
-        # Create scraper factory
-        factory = ScraperFactory(config_repository, notification_service)
-
-        # Create appropriate scraper for the website
-        scraper = await factory.create_scraper_async(website_name)
-
         # Get website ID
         website_id = await config_repository.get_website_id_by_name_async(website_name)
+
+        json_config_repo = JsonConfigRepository(db_session)
+        # Create scraper factory
+        factory = ScraperFactory(config_repository, json_config_repo)
+
+        # Create appropriate scraper for the website
+        scraper = await factory.get_scraper_async(website_id)
 
         # Run the scraper
         logger.info(f"Starting crawl for website: {website_name}")
