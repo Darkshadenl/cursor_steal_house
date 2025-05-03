@@ -176,16 +176,108 @@ class DbFieldMapping(Base):
 # Pydantic models for configuration data
 
 
+class FieldConfig(BaseModel):
+    """
+    Pydantic model for field configuration in extraction.
+    """
+
+    target_field: str
+    selector: str
+    extraction_type: str = "text"  # 'text', 'attribute', or 'html'
+    attribute_name: Optional[str] = None
+    is_required: bool = False
+    transformation_rule: Optional[List[Dict[str, Any]]] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class GalleryExtractionConfig(BaseModel):
+    """
+    Pydantic model for gallery extraction configuration.
+    """
+
+    listing_item_selector: str
+    next_page_selector: Optional[str] = None
+    max_pages: Optional[int] = None
+    fields: List[FieldConfig]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DetailPageExtractionConfig(BaseModel):
+    """
+    Pydantic model for detail page extraction configuration.
+    """
+
+    fields: List[FieldConfig]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class NavigationConfig(BaseModel):
+    """
+    Pydantic model for navigation configuration.
+    """
+
+    listings_page_url: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FilteringConfig(BaseModel):
+    """
+    Pydantic model for filtering configuration.
+    """
+
+    steps: List[Dict[str, Any]]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LoginConfig(BaseModel):
+    """
+    Pydantic model for login configuration.
+    """
+
+    login_url_path: Optional[str] = None
+    username_selector: str
+    password_selector: str
+    submit_selector: str
+    success_indicator_selector: Optional[str] = None
+    success_check_url: Optional[str] = None
+    needs_login: bool = True
+    credential_source: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StrategyConfig(BaseModel):
+    """
+    Pydantic model for strategy configuration.
+    """
+
+    navigation_config: NavigationConfig
+    filtering_config: Optional[FilteringConfig] = None
+    gallery_extraction_config: GalleryExtractionConfig
+    detail_page_extraction_config: DetailPageExtractionConfig
+    login_config: Optional[LoginConfig] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class WebsiteConfig(BaseModel):
     """
     Pydantic model for the complete website configuration.
     """
 
-    website_info: "WebsiteInfo"
-    login_config: Optional["LoginConfig"] = None
-    navigation_config: Optional["NavigationConfig"] = None
-    gallery_extraction_config: Optional["ExtractionConfig"] = None
-    detail_extraction_config: Optional["ExtractionConfig"] = None
+    website_identifier: str
+    website_name: str
+    base_url: str
+    is_active: bool = True
+    scrape_strategy: str
+    strategy_config: StrategyConfig
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WebsiteInfo(BaseModel):
@@ -198,39 +290,6 @@ class WebsiteInfo(BaseModel):
     base_url: str
     is_active: bool
     description: Optional[str] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class LoginConfig(BaseModel):
-    """
-    Pydantic model for login configuration.
-    """
-
-    id: int
-    website_id: int
-    login_url_path: Optional[str] = None
-    username_selector: str
-    password_selector: str
-    submit_selector: str
-    success_indicator_selector: Optional[str] = None
-    success_check_url: Optional[str] = None
-    needs_login: bool = True
-    credential_source: str
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class NavigationConfig(BaseModel):
-    """
-    Pydantic model for navigation configuration.
-    """
-
-    id: int
-    website_id: int
-    gallery_url_path: str
-    steps: Optional[List[Dict[str, Any]]] = None
-    next_page_selector: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -272,7 +331,7 @@ class FieldMapping(BaseModel):
 
 # Resolve forward references
 WebsiteConfig.model_rebuild()
-ExtractionConfig.model_rebuild()
+StrategyConfig.model_rebuild()
 
 
 __all__ = [
@@ -287,4 +346,9 @@ __all__ = [
     "NavigationConfig",
     "ExtractionConfig",
     "FieldMapping",
+    "FieldConfig",
+    "GalleryExtractionConfig",
+    "DetailPageExtractionConfig",
+    "FilteringConfig",
+    "StrategyConfig",
 ]

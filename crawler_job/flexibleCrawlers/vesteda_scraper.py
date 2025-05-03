@@ -21,7 +21,7 @@ class VestedaScraper(BaseWebsiteScraper):
         super().__init__(crawler, config)
 
         logger.info(f"Vesteda scraper initialized with config: {self.config}")
-        self.detail_config: CrawlerRunConfig = self.standard_run_config()
+        self.detail_config: CrawlerRunConfig = self._build_standard_run_config('vesteda')
 
     async def extract_details_async(self, url: str) -> Dict[str, Any]:
         """Override detail extraction for Vesteda-specific optimizations.
