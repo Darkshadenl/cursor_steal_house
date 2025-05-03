@@ -9,7 +9,7 @@ from crawler_job.models.db_config_models import WebsiteConfig
 class BaseWebsiteScraper(ABC):
     """Base class for website scrapers using the hybrid configuration system."""
 
-    def __init__(self, crawler: AsyncWebCrawler, config: WebsiteConfig):
+    def __init__(self, crawler: AsyncWebCrawler, config: WebsiteConfig, session_id: str):
         """Initialize the scraper.
 
         Args:
@@ -18,28 +18,19 @@ class BaseWebsiteScraper(ABC):
         """
         self.crawler = crawler
         self.config = config
-
-    def _build_standard_run_config(self, session_id: str) -> CrawlerRunConfig:
+        self.session_id = session_id
+        self.standard_run_config = self._build_standard_run_config()
+        
+    def _build_standard_run_config(self) -> CrawlerRunConfig:
         """Build the standard crawler run configuration.
 
         Returns:
             CrawlerRunConfig: The default configuration for crawl4ai.
         """
-        prune_filter = PruningContentFilter(
-            # Lower → more content retained, higher → more content pruned
-            threshold=0.45,
-            threshold_type="dynamic",
-            min_word_threshold=3,
-        )
         return CrawlerRunConfig(
             log_console=False,
-            exclude_domains=["deploy.mopinion.com", "app.cobrowser.com"],
-            mean_delay=1,
-            markdown_generator=DefaultMarkdownGenerator(
-                content_filter=prune_filter,
-            ),
             cache_mode=CacheMode.BYPASS,
-            session_id=session_id,
+            session_id=self.session_id,
             js_only=False,
             magic=True,
             user_agent_mode="random",
@@ -56,10 +47,32 @@ class BaseWebsiteScraper(ABC):
 
         login_config = self.config.strategy_config.login_config
         try:
-            # Navigate to login page
-            await self.crawler.goto(
-                login_config.login_page_url, config=self.standard_run_config
+            base_url = self.config.base_url
+            login_url = self.config.strategy_config.login_config.login_url_path
+
+            full_login_url = f"{base_url}{login_url}"
+            email = 
+            
+            run_config = CrawlerRunConfig(
+                session_id=self.session_id,
+                cache_mode=CacheMode.BYPASS,
+                js_only=True,
+                magic=True,
+                js_code=[
+                    "document.querySelector('input[type=\"email\"]').value = '" + email + "';",
+                    "document.querySelector('input[type=\"password\"]').value = '"
+                    + password
+                    + "';",
+                    "document.querySelector('button[type=\"submit\"]').click();",
+                ],
             )
+
+            # Navigate to login page
+            await self.crawler.arun(
+                full_login_url, config=self.standard_run_config
+            )
+            
+            
 
             # Fill in credentials
             await self.crawler.type(

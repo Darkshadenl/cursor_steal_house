@@ -24,7 +24,7 @@ class WebsiteConfigRepository:
     Repository for loading website configurations from the database.
     """
 
-    def __init__(self, db_session: Session):
+    def __init__(self, db_session: AsyncSession):
         """
         Initialize WebsiteConfigRepository with a database session.
 
