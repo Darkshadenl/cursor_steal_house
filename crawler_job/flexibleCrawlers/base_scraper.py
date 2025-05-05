@@ -1,15 +1,29 @@
+import logging
 from typing import Dict, Any, AsyncGenerator, List, Optional
 import os
 from abc import ABC, abstractmethod
+import asyncio
 
-from crawl4ai import AsyncWebCrawler, CacheMode, CrawlerRunConfig, DefaultMarkdownGenerator, PruningContentFilter
+
+from crawl4ai import (
+    AsyncWebCrawler,
+    CacheMode,
+    CrawlResult,
+    CrawlerRunConfig,
+    DefaultMarkdownGenerator,
+    PruningContentFilter,
+)
 from crawler_job.models.db_config_models import WebsiteConfig
+
+logger = logging.getLogger(__name__)
 
 
 class BaseWebsiteScraper(ABC):
     """Base class for website scrapers using the hybrid configuration system."""
 
-    def __init__(self, crawler: AsyncWebCrawler, config: WebsiteConfig, session_id: str):
+    def __init__(
+        self, crawler: AsyncWebCrawler, config: WebsiteConfig, session_id: str
+    ):
         """Initialize the scraper.
 
         Args:
@@ -20,7 +34,41 @@ class BaseWebsiteScraper(ABC):
         self.config = config
         self.session_id = session_id
         self.standard_run_config = self._build_standard_run_config()
-        
+
+    async def validate_current_page(self, expected_url: str, check_url: str) -> bool:
+        """Validate if the current page is the expected page.
+
+        Args:
+            expected_url: The expected URL to validate against.
+
+        Returns:
+            bool: True if the current page is the expected page, False otherwise.
+        """
+        check_config = CrawlerRunConfig(
+            session_id=self.session_id,
+            cache_mode=CacheMode.BYPASS,
+            js_only=True,
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        )
+
+        await asyncio.sleep(1)
+        logger.info(f"Verifying... Expected URL: {expected_url}")
+
+        check_result: CrawlResult = await self.crawler.arun(
+            url=check_url, config=check_config
+        )  # type: ignore
+
+        if not check_result.success:
+            raise Exception(f"Check verification failed: {check_result.error_message}")
+
+        if (
+            check_result.url != expected_url
+            and check_result.redirected_url != expected_url
+        ):
+            raise Exception(f"Veficitation failed: We're not on the expected page")
+
+        return True
+
     def _build_standard_run_config(self) -> CrawlerRunConfig:
         """Build the standard crawler run configuration.
 
@@ -48,54 +96,42 @@ class BaseWebsiteScraper(ABC):
         login_config = self.config.strategy_config.login_config
         try:
             base_url = self.config.base_url
-            login_url = self.config.strategy_config.login_config.login_url_path
+            login_url = login_config.login_url_path
 
             full_login_url = f"{base_url}{login_url}"
-            email = 
-            
+            email = os.getenv(self.config.website_identifier.upper() + "_EMAIL")
+            password = os.getenv(self.config.website_identifier.upper() + "_PASSWORD")
+
             run_config = CrawlerRunConfig(
                 session_id=self.session_id,
                 cache_mode=CacheMode.BYPASS,
                 js_only=True,
                 magic=True,
                 js_code=[
-                    "document.querySelector('input[type=\"email\"]').value = '" + email + "';",
-                    "document.querySelector('input[type=\"password\"]').value = '"
-                    + password
-                    + "';",
-                    "document.querySelector('button[type=\"submit\"]').click();",
+                    f"document.querySelector('{login_config.username_selector}').value = '{email}';",
+                    f"document.querySelector('{login_config.password_selector}').value = '{password}';",
+                    f"document.querySelector('{login_config.submit_selector}').click();",
                 ],
             )
 
-            # Navigate to login page
-            await self.crawler.arun(
-                full_login_url, config=self.standard_run_config
-            )
-            
-            
-
-            # Fill in credentials
-            await self.crawler.type(
-                login_config.username_selector,
-                os.getenv("SCRAPER_USERNAME", ""),
-                config=self.standard_run_config,
-            )
-            await self.crawler.type(
-                login_config.password_selector,
-                os.getenv("SCRAPER_PASSWORD", ""),
-                config=self.standard_run_config,
+            logger.info(
+                f"Navigating to login page of {self.config.website_name} and logging in.\nUrl: {full_login_url}"
             )
 
-            # Submit form
-            await self.crawler.click(
-                login_config.submit_button_selector, config=self.standard_run_config
+            login_result: CrawlResult = await self.crawler.arun(
+                full_login_url, config=run_config
+            )  # type: ignore
+
+            if not login_result.success:
+                raise Exception(
+                    f"Login form submission failed: {login_result.error_message}"
+                )
+
+            await self.validate_current_page(
+                login_config.expected_url, login_config.success_check_url
             )
 
-            # Wait for success indicator
-            success = await self.crawler.wait_for_selector(
-                login_config.post_login_check_selector, config=self.standard_run_config
-            )
-            return success is not None
+            return login_result.success
 
         except Exception as e:
             print(f"Login failed: {str(e)}")

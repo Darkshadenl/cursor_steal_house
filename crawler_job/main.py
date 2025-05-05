@@ -31,9 +31,7 @@ RED = "\033[91m"
 YELLOW = "\033[93m"
 RESET = "\033[0m"
 
-# Load environment variables
 load_dotenv()
-
 
 async def run_crawler_async(
     website_name: str, test_notifications_only: bool
