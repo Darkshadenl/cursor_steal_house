@@ -225,27 +225,31 @@ class BaseWebsiteScraper(ABC):
         results = []
 
         self.crawler = self._build_crawler()
+        
+        try:
+            await self.crawler.start()
+            await self.crawler.awarmup()
 
-        await self.crawler.awarmup()
-        await self.crawler.start()
+            await self.navigate_to_gallery_async()
 
-        await self.navigate_to_gallery_async()
+            if not await self.login_async():
+                logger.error("Login failed, aborting scrape")
+                return results
 
-        if not await self.login_async():
-            logger.error("Login failed, aborting scrape")
-            return results
+            await self.navigate_to_gallery_async()
 
-        await self.navigate_to_gallery_async()
+            await self.apply_filters_async()
 
-        await self.apply_filters_async()
-
-        async for item in await self.extract_gallery_async():
-            if "url" in item:
-                details = await self.extract_details_async(item["url"])
-                results.append({**item, **details})
-            else:
-                results.append(item)
-
-        await self.crawler.close()
+            async for item in await self.extract_gallery_async():
+                if "url" in item:
+                    details = await self.extract_details_async(item["url"])
+                    results.append({**item, **details})
+                else:
+                    results.append(item)
+        except Exception as e:
+            logger.error(f"Error during scraping: {e}")
+            raise e
+        finally:
+            await self.crawler.close()
 
         return results

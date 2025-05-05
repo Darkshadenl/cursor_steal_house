@@ -1,6 +1,4 @@
-from typing import Dict, Type, Optional
-
-from crawl4ai import AsyncWebCrawler
+from typing import Dict, Type
 
 from ..flexibleCrawlers.base_scraper import BaseWebsiteScraper
 from ..flexibleCrawlers.vesteda_scraper import VestedaScraper

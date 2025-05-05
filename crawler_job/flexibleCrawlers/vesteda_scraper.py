@@ -9,8 +9,6 @@ from crawl4ai import (
     JsonCssExtractionStrategy,
 )
 
-from crawler_job.main import RED, RESET
-
 from ..models.db_config_models import WebsiteConfig
 from .base_scraper import BaseWebsiteScraper
 
@@ -115,7 +113,7 @@ class VestedaScraper(BaseWebsiteScraper):
 
         if not self.crawler:
             raise Exception("Crawler not initialized")
-        
+
         logger.info("Extracting property listings of Vesteda step...")
         gallery_extraction_config = (
             self.config.strategy_config.gallery_extraction_config
@@ -124,9 +122,9 @@ class VestedaScraper(BaseWebsiteScraper):
 
         if self.current_url not in correct_urls:
             raise Exception(f"Invalid URL: {self.current_url}")
-        
+
         schema = gallery_extraction_config.schema
-        
+
         gallery_config = CrawlerRunConfig(
             extraction_strategy=JsonCssExtractionStrategy(schema),
             cache_mode=CacheMode.BYPASS,
@@ -134,10 +132,10 @@ class VestedaScraper(BaseWebsiteScraper):
             magic=False,
             user_agent_mode="random",
         )
-        
-        result: CrawlResult = await self.crawler.arun(url=self.current_url, config=gallery_config) # type: ignore
-        
+
+        result: CrawlResult = await self.crawler.arun(url=self.current_url, config=gallery_config)  # type: ignore
+
         if not result.success:
-            raise Exception(f"Failed to extract property listings: {result.error_message}")
-        
-        
+            raise Exception(
+                f"Failed to extract property listings: {result.error_message}"
+            )
