@@ -104,9 +104,7 @@ class JsonConfigRepository:
                 description=getattr(website, "description", None),
             )
 
-            # Parse and validate the JSON configuration
             try:
-                # Add website_info to the config if not already present
                 config_data = config_record.config_json
                 if "website_info" not in config_data:
                     config_data["website_info"] = website_info.model_dump()  # type: ignore
