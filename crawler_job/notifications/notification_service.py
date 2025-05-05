@@ -24,6 +24,9 @@ class NotificationService:
         email_recipients_file = os.getenv("EMAIL_RECIPIENTS_FILE")
         self.notifications_on = notifications_on
 
+        if not notifications_on:
+            logger.info("Notifications are disabled.")
+
         if notification_channels_active:
             active_channel_names = [
                 name.strip().lower() for name in notification_channels_active.split(",")

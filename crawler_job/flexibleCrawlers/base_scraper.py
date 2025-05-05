@@ -1,22 +1,21 @@
+import json
 import logging
-from typing import Dict, Any, AsyncGenerator, List, Optional
+from typing import Dict, Any, List, Optional
 import os
 from abc import ABC, abstractmethod
 import asyncio
 
 from crawl4ai import (
     AsyncWebCrawler,
-    BrowserConfig,
     CacheMode,
     CrawlResult,
     CrawlerRunConfig,
 )
-from crawler_job.crawlers.vesteda.vesteda_steps.llm_extraction_step import execute_llm_extraction
 from crawler_job.models.db_config_models import WebsiteConfig
 from crawler_job.models.house_models import House, FetchedPage
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.services.house_service import HouseService
-from crawler_job.services.llm_service import LLMProvider
+from crawler_job.services.llm_service import LLMProvider, LLMService
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,12 @@ logger = logging.getLogger(__name__)
 class BaseWebsiteScraper(ABC):
     """Base class for website scrapers using the hybrid configuration system."""
 
-    def __init__(self, config: WebsiteConfig, session_id: str, notification_service: Optional[NotificationService] = None):
+    def __init__(
+        self,
+        config: WebsiteConfig,
+        session_id: str,
+        notification_service: Optional[NotificationService] = None,
+    ):
         """Initialize the scraper.
 
         Args:
@@ -44,6 +48,12 @@ class BaseWebsiteScraper(ABC):
         self.accepted_cookies = False
         self.navigated_to_gallery = False
         self.current_url = ""
+        self.default_results = {
+            "success": False,
+            "total_houses_count": 0,
+            "new_houses_count": 0,
+            "updated_houses_count": 0,
+        }
 
     async def validate_current_page(self, expected_url: str, check_url: str) -> bool:
         """Validate if the current page is the expected page.
@@ -241,18 +251,19 @@ class BaseWebsiteScraper(ABC):
 
     async def _check_if_houses_exist(self, houses: List[House]) -> List[House]:
         async with HouseService(
-                # notification_service=self.notification_service
-            ) as house_service:
-                new_houses = await house_service.identify_new_houses_async(houses)
+            # notification_service=self.notification_service
+        ) as house_service:
+            new_houses = await house_service.identify_new_houses_async(houses)
 
-                if not new_houses:
-                    logger.info("No new houses found. Exiting...")
-                    return []
+            if not new_houses:
+                return []
 
-                logger.info(f"Fetching details for {len(new_houses)} new houses...")
-                return new_houses
-    
-    def _merge_detailed_houses(self, houses: List[House], detailed_houses: List[House]) -> None:
+            logger.info(f"Fetching details for {len(new_houses)} new houses...")
+            return new_houses
+
+    def _merge_detailed_houses(
+        self, houses: List[House], detailed_houses: List[House]
+    ) -> None:
         for detailed_house in detailed_houses:
             for house in houses:
                 if (
@@ -260,7 +271,7 @@ class BaseWebsiteScraper(ABC):
                     and house.city == detailed_house.city
                 ):
                     for field, value in detailed_house.model_dump(
-                    exclude_unset=True
+                        exclude_unset=True
                     ).items():
                         if value is not None and (
                             getattr(house, field) is None
@@ -268,30 +279,63 @@ class BaseWebsiteScraper(ABC):
                         ):
                             setattr(house, field, value)
                     break
-    
+
     async def _store_houses(self, houses: List[House]) -> None:
         async with HouseService(
-                # notification_service=self.notification_service
-            ) as house_service:
-                await house_service.store_houses_atomic_async(
-                    houses=houses,
+            # notification_service=self.notification_service
+        ) as house_service:
+            await house_service.store_houses_atomic_async(
+                houses=houses,
+            )
+
+    async def execute_llm_extraction(
+        self, fetched_pages: List[FetchedPage], provider: LLMProvider
+    ) -> List[House]:
+        """
+        Extract structured data from markdown using LLM
+
+        Args:
+            fetched_pages: List of fetched detail pages
+            provider: LLM provider to use
+
+        Returns:
+            List[House]: List of House objects with extracted data
+        """
+        llm_service = LLMService()
+        schema = House.model_json_schema()
+        houses: List[House] = []
+
+        logger.info("Extracting structured data using LLM...")
+
+        for page in fetched_pages:
+            if not page.success:
+                continue
+
+            try:
+                extracted_data: Optional[Dict[str, Any]] = await llm_service.extract(
+                    page.markdown, schema, provider
                 )
-    
+
+                if extracted_data is None:
+                    logger.warning(f"No data extracted for {page.url}")
+                    continue
+
+                json_data = json.loads(extracted_data)  # type: ignore
+                house = House.from_dict(json_data)
+                houses.append(house)
+                logger.info(f"Successfully extracted data for {page.url}")
+            except Exception as e:
+                logger.warning(f"Error extracting data for {page.url}: {str(e)}")
+                continue
+
+        return houses
+
     async def run_async(self) -> Dict[str, Any]:
         """Run the complete scraping process.
 
         Returns:
             List[Dict[str, Any]]: The collected data from all listings.
         """
-        results = []
-        default_results = {
-            "success": False,
-            "total_houses_count": 0,
-            "new_houses_count": 0,
-            "existing_houses_count": 0,
-            "updated_houses_count": 0,
-        }
-
         logger.info(f"Building crawler...")
         self.crawler = self._build_crawler()
 
@@ -304,42 +348,41 @@ class BaseWebsiteScraper(ABC):
 
             if not await self.login_async():
                 logger.error("Login failed, aborting scrape")
-                return default_results
+                return self.default_results
 
             await self.navigate_to_gallery_async()
 
             await self.apply_filters_async()
             houses = await self.extract_gallery_async()
             new_houses = await self._check_if_houses_exist(houses)
-            
-            if not houses or len(houses) == 0:
-                logger.info("No houses found, we're done here!")
-                return default_results
-            
+
+            if not new_houses or len(new_houses) == 0:
+                logger.info("No new houses found, we're done here!")
+                self.default_results["success"] = True
+                return self.default_results
+
             fetched_pages = await self.extract_details_async(new_houses)
-            detailed_houses = await execute_llm_extraction(
-                    fetched_pages, provider=LLMProvider.GEMINI
-                )
-            
+            detailed_houses = await self.execute_llm_extraction(
+                fetched_pages, provider=LLMProvider.GEMINI
+            )
+
             if not detailed_houses:
-                    logger.info("No detailed houses found. Exiting...")
-                    return default_results
-                
+                logger.info("No detailed houses found. Exiting...")
+                self.default_results["success"] = True
+                return self.default_results
+
             self._merge_detailed_houses(houses, detailed_houses)
-            
+
             await self._store_houses(houses)
-            
+
             return {
                 "success": True,
                 "total_houses_count": len(houses),
                 "new_houses_count": len(new_houses),
                 "updated_houses_count": len(houses) - len(new_houses),
             }
-            
         except Exception as e:
             logger.error(f"Error during scraping: {e}")
             raise e
         finally:
             await self.crawler.close()
-
-        return
