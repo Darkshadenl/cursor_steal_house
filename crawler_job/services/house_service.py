@@ -113,7 +113,6 @@ class HouseService:
     async def store_houses_atomic_async(
         self,
         houses: List[House],
-        all_houses: List[House],
     ) -> Dict[str, int]:
         """
         Store houses in an atomic transaction

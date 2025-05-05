@@ -11,8 +11,12 @@ from crawl4ai import (
     CrawlResult,
     CrawlerRunConfig,
 )
+from crawler_job.crawlers.vesteda.vesteda_steps.llm_extraction_step import execute_llm_extraction
 from crawler_job.models.db_config_models import WebsiteConfig
-from crawler_job.models.house_models import House
+from crawler_job.models.house_models import House, FetchedPage
+from crawler_job.notifications.notification_service import NotificationService
+from crawler_job.services.house_service import HouseService
+from crawler_job.services.llm_service import LLMProvider
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +24,16 @@ logger = logging.getLogger(__name__)
 class BaseWebsiteScraper(ABC):
     """Base class for website scrapers using the hybrid configuration system."""
 
-    def __init__(self, config: WebsiteConfig, session_id: str):
+    def __init__(self, config: WebsiteConfig, session_id: str, notification_service: Optional[NotificationService] = None):
         """Initialize the scraper.
 
         Args:
             crawler: The crawl4ai crawler instance to use.
             config: The validated website configuration.
+            notification_service: The notification service to use.
         """
         self.config = config
+        self.notification_service = notification_service
 
         if self.config.strategy_config.login_config:
             self.login_config = self.config.strategy_config.login_config
@@ -207,14 +213,14 @@ class BaseWebsiteScraper(ABC):
             "Implementing gallery extraction configuration in derived class!"
         )
 
-    async def extract_details_async(self, url: str) -> Dict[str, Any]:
+    async def extract_details_async(self, houses: List[House]) -> List[FetchedPage]:
         """Extract data from a detail page.
 
         Args:
-            url: The URL of the detail page to scrape.
+            houses: The list of houses to scrape.
 
         Returns:
-            Dict[str, Any]: The extracted data.
+            List[FetchedPage]: The list of fetched pages.
         """
         if not self.config.strategy_config.detail_page_extraction_config:
             raise Exception("No detail page extraction configuration provided.")
@@ -233,7 +239,45 @@ class BaseWebsiteScraper(ABC):
             return True
         return False
 
-    async def run_async(self) -> List[Dict[str, Any]]:
+    async def _check_if_houses_exist(self, houses: List[House]) -> List[House]:
+        async with HouseService(
+                # notification_service=self.notification_service
+            ) as house_service:
+                new_houses = await house_service.identify_new_houses_async(houses)
+
+                if not new_houses:
+                    logger.info("No new houses found. Exiting...")
+                    return []
+
+                logger.info(f"Fetching details for {len(new_houses)} new houses...")
+                return new_houses
+    
+    def _merge_detailed_houses(self, houses: List[House], detailed_houses: List[House]) -> None:
+        for detailed_house in detailed_houses:
+            for house in houses:
+                if (
+                    house.address == detailed_house.address
+                    and house.city == detailed_house.city
+                ):
+                    for field, value in detailed_house.model_dump(
+                    exclude_unset=True
+                    ).items():
+                        if value is not None and (
+                            getattr(house, field) is None
+                            or field not in ["address", "city", "status"]
+                        ):
+                            setattr(house, field, value)
+                    break
+    
+    async def _store_houses(self, houses: List[House]) -> None:
+        async with HouseService(
+                # notification_service=self.notification_service
+            ) as house_service:
+                await house_service.store_houses_atomic_async(
+                    houses=houses,
+                )
+    
+    async def run_async(self) -> None:
         """Run the complete scraping process.
 
         Returns:
@@ -253,17 +297,30 @@ class BaseWebsiteScraper(ABC):
 
             if not await self.login_async():
                 logger.error("Login failed, aborting scrape")
-                return results
+                return
 
             await self.navigate_to_gallery_async()
 
             await self.apply_filters_async()
             houses = await self.extract_gallery_async()
+            new_houses = await self._check_if_houses_exist(houses)
             
-            for house in houses:
-                details = await self.extract_details_async(house.url)
-                results.append({**house.to_dict(), **details})
+            if not houses or len(houses) == 0:
+                logger.info("No houses found, we're done here!")
+                return
             
+            fetched_pages = await self.extract_details_async(new_houses)
+            detailed_houses = await execute_llm_extraction(
+                    fetched_pages, provider=LLMProvider.GEMINI
+                )
+            
+            if not detailed_houses:
+                    logger.info("No detailed houses found. Exiting...")
+                    return
+                
+            self._merge_detailed_houses(houses, detailed_houses)
+            
+            await self._store_houses(houses)
             
         except Exception as e:
             logger.error(f"Error during scraping: {e}")
@@ -271,4 +328,4 @@ class BaseWebsiteScraper(ABC):
         finally:
             await self.crawler.close()
 
-        return results
+        return
