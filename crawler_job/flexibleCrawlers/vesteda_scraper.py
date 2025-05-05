@@ -21,14 +21,20 @@ from crawler_job.notifications.notification_service import NotificationService
 
 from ..models.db_config_models import WebsiteConfig
 from .base_scraper import BaseWebsiteScraper
+from crawler_job.services.logger_service import setup_logger
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 
 class VestedaScraper(BaseWebsiteScraper):
     """Vesteda-specific scraper implementation."""
 
-    def __init__(self, config: WebsiteConfig, session_id: str, notification_service: Optional[NotificationService] = None):
+    def __init__(
+        self,
+        config: WebsiteConfig,
+        session_id: str,
+        notification_service: Optional[NotificationService] = None,
+    ):
         """Initialize the Vesteda scraper.
 
         Args:

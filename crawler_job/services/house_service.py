@@ -180,7 +180,6 @@ class HouseService:
     async def store_houses_atomic(
         self,
         houses: List[House],
-        all_houses: List[House],
     ) -> Dict[str, int]:
         """
         Legacy method for storing houses atomically
@@ -192,7 +191,7 @@ class HouseService:
         Returns:
             Dict[str, int]: Dictionary with counts of new, existing, and updated houses
         """
-        return await self.store_houses_atomic_async(houses, all_houses)
+        return await self.store_houses_atomic_async(houses)
 
     async def _store_houses_with_repo(
         self, houses: List[House], repo: HouseRepository

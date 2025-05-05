@@ -1,6 +1,7 @@
 from typing import Dict, Optional, Type
 
 from crawler_job.notifications.notification_service import NotificationService
+from crawler_job.services.logger_service import setup_logger
 
 from ..flexibleCrawlers.base_scraper import BaseWebsiteScraper
 from ..flexibleCrawlers.vesteda_scraper import VestedaScraper
@@ -13,6 +14,7 @@ SCRAPER_CLASSES: Dict[str, Type[BaseWebsiteScraper]] = {
     "vesteda": VestedaScraper,
 }
 
+logger = setup_logger(__name__)
 
 class ScraperFactory:
     """Factory for creating website scrapers with hybrid configuration support."""
@@ -49,17 +51,17 @@ class ScraperFactory:
             scraper_class = SCRAPER_CLASSES.get(
                 website_name.lower(), BaseWebsiteScraper
             )
-            print(
+            logger.info(
                 f"Using scraper class {scraper_class.__name__} for identifier '{website_name}' with JSON config."
             )
             return scraper_class(
                 config=website_config,
                 session_id=website_config.session_id,
                 notification_service=notification_service,
-            )
+            )   
         else:
             error_msg = (
                 f"No valid configuration found for website identifier '{website_name}'."
             )
-            print(error_msg)
+            logger.error(error_msg)
             raise ValueError(error_msg)

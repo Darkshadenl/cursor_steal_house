@@ -115,12 +115,12 @@ Rules:
                 response_format=schema,
             )
 
-            content = response.choices[0].message.content
+            content = response.choices[0].message.content # type: ignore
 
             if content == "null":
                 return None
 
-            return self.remove_markdown_block_syntax(content)
+            return self.remove_markdown_block_syntax(content) # type: ignore
         except Exception as e:
             print(f"Error in {provider.value} extraction: {str(e)}")
             return None

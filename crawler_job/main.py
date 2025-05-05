@@ -4,38 +4,25 @@ import logging
 import os
 from dotenv import load_dotenv
 import sys
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from crawler_job.services.db_connection import get_db_session
 from crawler_job.notifications.notification_service import NotificationService
+from crawler_job.services.logger_service import setup_logger
 from crawler_job.factories import ScraperFactory
 from crawler_job.services.repositories.json_config_repository import (
     JsonConfigRepository,
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("steal_house_crawler.log"),
-    ],
-)
-logger = logging.getLogger(__name__)
 
-# ANSI color codes for terminal output
-GREEN = "\033[92m"
-RED = "\033[91m"
-YELLOW = "\033[93m"
-RESET = "\033[0m"
+logger = setup_logger(__name__)
 
 load_dotenv()
 
 
 async def run_crawler_async(
-    website_name: str, notifications_enabled: bool, test_notifications_only: bool
-) -> Dict[str, Any]:
+    websites: List[str], notifications_enabled: bool, test_notifications_only: bool
+) -> bool:
     """
     Run the crawler for the specified website.
 
@@ -53,16 +40,16 @@ async def run_crawler_async(
         )
 
         if test_notifications_only:
-            logger.info(f"{YELLOW}Running in test notifications only mode{RESET}")
+            logger.info("Running in test notifications only mode")
             successful_channels = await notification_service.send_test_notification()
 
             if successful_channels:
                 logger.info(
-                    f"{GREEN}Test notifications sent successfully to: {', '.join(successful_channels)}{RESET}"
+                    f"Test notifications sent successfully to: {', '.join(successful_channels)}"
                 )
             else:
                 logger.warning(
-                    f"{YELLOW}No test notifications were sent successfully. Please check your configuration.{RESET}"
+                    "No test notifications were sent successfully. Please check your configuration."
                 )
 
             return {
@@ -72,31 +59,34 @@ async def run_crawler_async(
 
         json_config_repo = JsonConfigRepository(db_session)
         factory = ScraperFactory(json_config_repo)
+        results: List[Dict[str, Any]] = []
 
-        scraper = await factory.get_scraper_async(website_name, notification_service)
-
-        logger.info(f"Starting crawl for website: {website_name}")
-        result = await scraper.run_async()
-
-        if result["success"]:
-            logger.info(
-                f"{GREEN}Crawl completed successfully for website: {website_name}{RESET}"
-            )
-            logger.info(f"Total houses found: {result['total_houses_count']}")
-            logger.info(f"New houses: {result['new_houses_count']}")
-            logger.info(f"Updated houses: {result['updated_houses_count']}")
-        else:
-            logger.error(
-                f"{RED}Crawl failed for website: {website_name}. Error: {result.get('error', 'Unknown error')}{RESET}"
+        for website_name in websites:
+            scraper = await factory.get_scraper_async(
+                website_name, notification_service
             )
 
-        return result
+            logger.info(f"Starting crawl for website: {website_name}")
+            result = await scraper.run_async()
+            results.append(result)
+            if result["success"]:
+                logger.info(f"Crawl completed successfully for website: {website_name}")
+                logger.info(f"Total houses found: {result['total_houses_count']}")
+                logger.info(f"New houses: {result['new_houses_count']}")
+                logger.info(f"Updated houses: {result['updated_houses_count']}")
+            else:
+                logger.error(
+                    f"Crawl failed for website: {website_name}. Error: {result.get('error', 'Unknown error')}"
+                )
+
+        success = all(result["success"] for result in results)
+
+        return success
 
     except Exception as e:
-        logger.error(f"{RED}Error running crawler: {str(e)}{RESET}")
-        return {"success": False, "error": str(e)}
+        logger.error(f"Error running crawler: {str(e)}")
+        return False
     finally:
-        # Close DB session
         if "db_session" in locals():
             await db_session.close()
 
@@ -105,20 +95,22 @@ def parse_args():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(description="StealHouse Website Crawler")
     parser.add_argument(
-        "--website",
-        type=str,
-        help="Name of the website to crawl (e.g., 'Vesteda')",
-        default=os.getenv("CRAWLER_WEBSITE", "Vesteda"),
+        "--websites",
+        type=List[str],
+        help="Name of the websites to crawl (e.g., 'Vesteda, Sleutel')",
+        default=os.getenv("CRAWLER_WEBSITES", "Vesteda"),
     )
     parser.add_argument(
         "--notifications-enabled",
         action="store_true",
+        type=bool,
         help="Enable notifications",
         default=os.getenv("NOTIFICATIONS_ENABLED", "true").lower() == "true",
     )
     parser.add_argument(
         "--test-notifications-only",
         action="store_true",
+        type=bool,
         help="Only send test notifications without crawling",
         default=os.getenv("TEST_NOTIFICATIONS_ONLY", "false").lower() == "true",
     )
@@ -127,20 +119,18 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    website_name = args.website
-    test_notifications_only = args.test_notifications_only
-    notifications_enabled = args.notifications_enabled
+    websites: List[str] = args.websites
+    test_notifications_only: bool = args.test_notifications_only
+    notifications_enabled: bool = args.notifications_enabled
     try:
         result = asyncio.run(
-            run_crawler_async(
-                website_name, test_notifications_only, notifications_enabled
-            )
+            run_crawler_async(websites, test_notifications_only, notifications_enabled)
         )
 
-        sys.exit(0 if result.get("success", False) else 1)
+        sys.exit(0 if result else 1)
     except KeyboardInterrupt:
-        logger.info(f"{YELLOW}Crawl interrupted by user.{RESET}")
+        logger.info("Crawl interrupted by user.")
         sys.exit(130)
     except Exception as e:
-        logger.error(f"{RED}Unhandled exception: {str(e)}{RESET}")
+        logger.error(f"Unhandled exception: {str(e)}")
         sys.exit(1)

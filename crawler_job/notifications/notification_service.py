@@ -1,16 +1,15 @@
 import os
-import logging
 from typing import List, Optional
-from dotenv import load_dotenv
 
 from crawler_job.models.house_models import House
 from crawler_job.services.llm_service import LLMProvider, LLMService
+from crawler_job.services.logger_service import setup_logger
 from .channels.base import AbstractNotificationChannel
 from .channels.email import EmailNotificationChannel
 from .channels.pushover import PushoverNotificationChannel
 from .channels.telegram import TelegramNotificationChannel
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 
 class NotificationService:

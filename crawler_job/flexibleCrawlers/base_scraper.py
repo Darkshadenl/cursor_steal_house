@@ -16,9 +16,9 @@ from crawler_job.models.house_models import House, FetchedPage
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.services.house_service import HouseService
 from crawler_job.services.llm_service import LLMProvider, LLMService
+from crawler_job.services.logger_service import setup_logger
 
-logger = logging.getLogger(__name__)
-
+logger = setup_logger(__name__)
 
 class BaseWebsiteScraper(ABC):
     """Base class for website scrapers using the hybrid configuration system."""
@@ -251,7 +251,7 @@ class BaseWebsiteScraper(ABC):
 
     async def _check_if_houses_exist(self, houses: List[House]) -> List[House]:
         async with HouseService(
-            # notification_service=self.notification_service
+            notification_service=self.notification_service
         ) as house_service:
             new_houses = await house_service.identify_new_houses_async(houses)
 
@@ -282,7 +282,7 @@ class BaseWebsiteScraper(ABC):
 
     async def _store_houses(self, houses: List[House]) -> None:
         async with HouseService(
-            # notification_service=self.notification_service
+            notification_service=self.notification_service
         ) as house_service:
             await house_service.store_houses_atomic_async(
                 houses=houses,
