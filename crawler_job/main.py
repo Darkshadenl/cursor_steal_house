@@ -7,7 +7,6 @@ import sys
 from typing import Dict, Any
 
 from crawler_job.services.db_connection import get_db_session
-from crawler_job.services.repositories.config_repository import WebsiteConfigRepository
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.factories import ScraperFactory
 from crawler_job.services.repositories.json_config_repository import (
@@ -33,6 +32,7 @@ RESET = "\033[0m"
 
 load_dotenv()
 
+
 async def run_crawler_async(
     website_name: str, test_notifications_only: bool
 ) -> Dict[str, Any]:
@@ -47,14 +47,11 @@ async def run_crawler_async(
         Dict[str, Any]: Results of the crawling process
     """
     try:
-        # Initialize services
         db_session = get_db_session()
-        config_repository = WebsiteConfigRepository(db_session)
         notification_service = NotificationService(
             notifications_on=not test_notifications_only
         )
 
-        # If test_notifications_only is True, only run test notifications
         if test_notifications_only:
             logger.info(f"{YELLOW}Running in test notifications only mode{RESET}")
             successful_channels = await notification_service.send_test_notification()
@@ -73,20 +70,15 @@ async def run_crawler_async(
                 "successful_channels": successful_channels,
             }
 
-        # Get website ID
-        # website_id = await config_repository.get_website_id_by_name_async(website_name)
-
         json_config_repo = JsonConfigRepository(db_session)
-        # Create scraper factory
         factory = ScraperFactory(json_config_repo)
 
-        # Create appropriate scraper for the website
         scraper = await factory.get_scraper_async(website_name)
 
-        # Run the scraper
         logger.info(f"Starting crawl for website: {website_name}")
         result = await scraper.run_async()
 
+        return {"success": True, "result": "hi"}
         # Log results
         # if result["success"]:
         #     logger.info(
