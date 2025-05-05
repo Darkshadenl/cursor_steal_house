@@ -1,1 +1,1 @@
-"""Database models for house data.""" 
+"""Database models for house data."""
