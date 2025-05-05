@@ -78,7 +78,7 @@ async def run_crawler_async(
 
         json_config_repo = JsonConfigRepository(db_session)
         # Create scraper factory
-        factory = ScraperFactory(config_repository, json_config_repo)
+        factory = ScraperFactory(json_config_repo)
 
         # Create appropriate scraper for the website
         scraper = await factory.get_scraper_async(website_name)
@@ -88,20 +88,20 @@ async def run_crawler_async(
         result = await scraper.run_async()
 
         # Log results
-        if result["success"]:
-            logger.info(
-                f"{GREEN}Crawl completed successfully for website: {website_name}{RESET}"
-            )
-            logger.info(f"Total houses found: {result['total_houses_count']}")
-            logger.info(f"New houses: {result['new_houses_count']}")
-            logger.info(f"Existing houses: {result['existing_houses_count']}")
-            logger.info(f"Updated houses: {result['updated_houses_count']}")
-        else:
-            logger.error(
-                f"{RED}Crawl failed for website: {website_name}. Error: {result.get('error', 'Unknown error')}{RESET}"
-            )
+        # if result["success"]:
+        #     logger.info(
+        #         f"{GREEN}Crawl completed successfully for website: {website_name}{RESET}"
+        #     )
+        #     logger.info(f"Total houses found: {result['total_houses_count']}")
+        #     logger.info(f"New houses: {result['new_houses_count']}")
+        #     logger.info(f"Existing houses: {result['existing_houses_count']}")
+        #     logger.info(f"Updated houses: {result['updated_houses_count']}")
+        # else:
+        #     logger.error(
+        #         f"{RED}Crawl failed for website: {website_name}. Error: {result.get('error', 'Unknown error')}{RESET}"
+        #     )
 
-        return result
+        # return result
 
     except Exception as e:
         logger.error(f"{RED}Error running crawler: {str(e)}{RESET}")

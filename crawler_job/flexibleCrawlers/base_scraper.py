@@ -22,7 +22,7 @@ class BaseWebsiteScraper(ABC):
     """Base class for website scrapers using the hybrid configuration system."""
 
     def __init__(
-        self, crawler: AsyncWebCrawler, config: WebsiteConfig, session_id: str
+        self, config: WebsiteConfig, session_id: str
     ):
         """Initialize the scraper.
 
@@ -30,7 +30,6 @@ class BaseWebsiteScraper(ABC):
             crawler: The crawl4ai crawler instance to use.
             config: The validated website configuration.
         """
-        self.crawler = crawler
         self.config = config
         self.session_id = session_id
         self.standard_run_config = self._build_standard_run_config()

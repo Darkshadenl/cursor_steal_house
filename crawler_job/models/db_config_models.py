@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import (
     Column,
+    DateTime,
     Integer,
     String,
     Boolean,
@@ -51,6 +52,23 @@ class DbWebsite(Base):
         "DbExtractionConfig", back_populates="website", cascade="all, delete-orphan"
     )
 
+class DbWebsiteScrapeConfig(Base):
+    """SQLAlchemy model for storing website scraping configurations in JSON format."""
+
+    __tablename__ = "website_scrape_configs"
+    __table_args__ = {"schema": "steal_house"}
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    website_identifier = Column(
+        Integer, ForeignKey("steal_house.websites.id"), unique=True, nullable=False
+    )
+    config_json = Column(JSON, nullable=False)
+    version = Column(Integer, nullable=True, default=1)
+    is_enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(
+        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
 
 class DbLoginConfig(Base):
     """
@@ -72,7 +90,6 @@ class DbLoginConfig(Base):
     submit_selector = Column(String(255), nullable=False)
     success_indicator_selector = Column(String(255), nullable=True)
     success_check_url = Column(String(255), nullable=True)
-    needs_login = Column(Boolean, default=True)
     credential_source = Column(String(100), nullable=False)
     created_at = Column(TIMESTAMP, default=func.now())
     updated_at = Column(TIMESTAMP, default=func.now(), onupdate=func.now())
@@ -351,4 +368,5 @@ __all__ = [
     "DetailPageExtractionConfig",
     "FilteringConfig",
     "StrategyConfig",
+    "DbWebsiteScrapeConfig",
 ]
