@@ -243,10 +243,9 @@ class LoginConfig(BaseModel):
     username_selector: str
     password_selector: str
     submit_selector: str
+    success_check_url: str
+    expected_url: str
     success_indicator_selector: Optional[str] = None
-    success_check_url: Optional[str] = None
-    needs_login: bool = True
-    credential_source: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -274,8 +273,9 @@ class WebsiteConfig(BaseModel):
     website_name: str
     base_url: str
     is_active: bool = True
-    scrape_strategy: str
+    scrape_strategy: str = "multi_step" or "sitemap"
     strategy_config: StrategyConfig
+    session_id: str
 
     model_config = ConfigDict(from_attributes=True)
 
