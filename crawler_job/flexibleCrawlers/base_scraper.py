@@ -36,6 +36,7 @@ class BaseWebsiteScraper(ABC):
         self.crawler: Optional[AsyncWebCrawler] = None
         self.accepted_cookies = False
         self.navigated_to_gallery = False
+        self.current_url = ""
 
     async def validate_current_page(self, expected_url: str, check_url: str) -> bool:
         """Validate if the current page is the expected page.
@@ -97,6 +98,7 @@ class BaseWebsiteScraper(ABC):
         """
         if not self.login_config or self.navigated_to_gallery:
             return True
+
         if not self.crawler:
             raise Exception("Crawler not initialized")
 
@@ -133,9 +135,11 @@ class BaseWebsiteScraper(ABC):
                     f"Login form submission failed: {login_result.error_message}"
                 )
 
-            await self.validate_current_page(
+            valid: bool = await self.validate_current_page(
                 self.login_config.expected_url, self.login_config.success_check_url
             )
+            if valid:
+                await self._accept_cookies(self.current_url)
 
             return login_result.success
 
@@ -167,7 +171,10 @@ class BaseWebsiteScraper(ABC):
 
     async def apply_filters_async(self) -> None:
         """Apply filters if filtering configuration is provided."""
-        pass
+        if not self.config.strategy_config.filtering_config:
+            raise Exception("No filtering configuration provided.")
+        logger.error("Implementing filtering configuration in derived class!")
+        raise NotImplementedError("Implementing filtering configuration in derived class!")
 
     async def extract_gallery_async(self) -> AsyncGenerator[Dict[str, Any], None]:
         """Extract data from the gallery/listings page.
@@ -175,7 +182,12 @@ class BaseWebsiteScraper(ABC):
         Yields:
             Dict[str, Any]: Extracted data for each listing item.
         """
-        pass
+        if not self.config.strategy_config.gallery_extraction_config:
+            logger.info("No gallery extraction configuration provided.")
+            raise Exception("No gallery extraction configuration provided.")
+        
+        logger.error("Implementing gallery extraction configuration in derived class!")
+        raise NotImplementedError("Implementing gallery extraction configuration in derived class!")
 
     async def extract_details_async(self, url: str) -> Dict[str, Any]:
         """Extract data from a detail page.
@@ -186,15 +198,21 @@ class BaseWebsiteScraper(ABC):
         Returns:
             Dict[str, Any]: The extracted data.
         """
-        pass
+        if not self.config.strategy_config.detail_page_extraction_config:
+            raise Exception("No detail page extraction configuration provided.")
+        
+        logger.error("Implementing detail page extraction configuration in derived class!")
+        raise NotImplementedError("Implementing detail page extraction configuration in derived class!")
 
     @abstractmethod
     def _build_crawler(self) -> AsyncWebCrawler:
         pass
 
-    @abstractmethod
-    def _accept_cookies(self) -> None:
-        pass
+    async def _accept_cookies(self, current_url: str) -> bool:
+        if not self.config.accept_cookies:
+            logger.info("Accepting cookies not required/enabled.")
+            return True
+        return False
 
     async def run_async(self) -> List[Dict[str, Any]]:
         """Run the complete scraping process.
@@ -205,6 +223,8 @@ class BaseWebsiteScraper(ABC):
         results = []
 
         self.crawler = self._build_crawler()
+
+        await self.crawler.awarmup()
         await self.crawler.start()
 
         await self.navigate_to_gallery_async()
@@ -217,12 +237,12 @@ class BaseWebsiteScraper(ABC):
 
         await self.apply_filters_async()
 
-        async for item in self.extract_gallery_async():
-            if "url" in item:
-                details = await self.extract_details_async(item["url"])
-                results.append({**item, **details})
-            else:
-                results.append(item)
+        # async for item in self.extract_gallery_async():
+        #     if "url" in item:
+        #         details = await self.extract_details_async(item["url"])
+        #         results.append({**item, **details})
+        #     else:
+        #         results.append(item)
 
         await self.crawler.close()
 

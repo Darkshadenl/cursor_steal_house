@@ -26,7 +26,7 @@ class VestedaScraper(BaseWebsiteScraper):
         """
         super().__init__(config, session_id)
 
-        logger.info(f"Vesteda scraper initialized with config: {self.config}")
+        logger.info(f"Vesteda scraper initialized...")
 
     def _build_crawler(self) -> AsyncWebCrawler:
         self.browser_config = BrowserConfig(
@@ -37,11 +37,16 @@ class VestedaScraper(BaseWebsiteScraper):
         )
 
         self.crawler = AsyncWebCrawler(
-            browser_config=self.browser_config,
+            config=self.browser_config,
         )
+        
         return self.crawler
 
     async def _accept_cookies(self, current_url: str) -> bool:
+        if not self.config.accept_cookies:
+            logger.info("Accepting cookies not required/enabled.")
+            return True
+
         if self.accepted_cookies:
             logger.info("Cookies already accepted.")
             return self.accepted_cookies

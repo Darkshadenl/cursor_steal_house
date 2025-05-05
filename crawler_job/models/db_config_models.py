@@ -52,6 +52,7 @@ class DbWebsite(Base):
         "DbExtractionConfig", back_populates="website", cascade="all, delete-orphan"
     )
 
+
 class DbWebsiteScrapeConfig(Base):
     """SQLAlchemy model for storing website scraping configurations in JSON format."""
 
@@ -69,6 +70,7 @@ class DbWebsiteScrapeConfig(Base):
     updated_at = Column(
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )
+
 
 class DbLoginConfig(Base):
     """
@@ -289,10 +291,11 @@ class WebsiteConfig(BaseModel):
     website_identifier: str
     website_name: str
     base_url: str
-    is_active: bool = True
+    is_active: bool
     scrape_strategy: str = "multi_step" or "sitemap"
     strategy_config: StrategyConfig
     session_id: str
+    accept_cookies: bool
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -307,7 +310,6 @@ class WebsiteInfo(BaseModel):
     base_url: str
     is_active: bool
     description: Optional[str] = None
-
     model_config = ConfigDict(from_attributes=True)
 
 
