@@ -228,7 +228,7 @@ class DetailPageExtractionConfig(BaseModel):
     Pydantic model for detail page extraction configuration.
     """
 
-    fields: List[FieldConfig]
+    schema: Dict[str, Any]
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -277,7 +277,7 @@ class StrategyConfig(BaseModel):
     navigation_config: NavigationConfig
     filtering_config: Optional[FilteringConfig] = None
     gallery_extraction_config: GalleryExtractionConfig
-    detail_page_extraction_config: DetailPageExtractionConfig
+    detail_page_extraction_config: Optional[DetailPageExtractionConfig] = None
     login_config: Optional[LoginConfig] = None
 
     model_config = ConfigDict(from_attributes=True)

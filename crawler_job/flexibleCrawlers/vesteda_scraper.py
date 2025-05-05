@@ -6,11 +6,17 @@ from crawl4ai import (
     BrowserConfig,
     CacheMode,
     CrawlResult,
+    CrawlerMonitor,
     CrawlerRunConfig,
+    DefaultMarkdownGenerator,
+    DisplayMode,
     JsonCssExtractionStrategy,
+    PruningContentFilter,
+    RateLimiter,
+    SemaphoreDispatcher,
 )
 
-from crawler_job.models.house_models import House
+from crawler_job.models.house_models import FetchedPage, House
 
 from ..models.db_config_models import WebsiteConfig
 from .base_scraper import BaseWebsiteScraper
@@ -146,10 +152,10 @@ class VestedaScraper(BaseWebsiteScraper):
             raise Exception(
                 f"Failed to extract property listings: {result.error_message}"
             )
-        
+
         if not result.extracted_content:
             raise Exception("No extracted content")
-        
+
         raw_data = json.loads(result.extracted_content)
         houses = []
 
@@ -198,11 +204,99 @@ class VestedaScraper(BaseWebsiteScraper):
             house = House.from_dict(processed_data)
             houses.append(house)
 
-        logger.info(
-            f"Successfully extracted and transformed {len(houses)} properties"
-        )
+        logger.info(f"Successfully extracted and transformed {len(houses)} properties")
         return houses
 
-        
-        
-        
+    async def extract_details_async(self, houses: List[House]) -> List[FetchedPage]:
+        """
+        Extract detailed property information for the given houses
+
+        Args:
+            houses: List of House objects with basic info
+
+        Returns:
+            List[FetchedPage]: List of fetched detail pages
+        """
+        if not self.crawler:
+            raise Exception("Crawler not initialized")
+
+        logger.info("Starting detailed property extraction...")
+
+        prune_filter = PruningContentFilter(
+            # Lower → more content retained, higher → more content pruned
+            threshold=0.45,
+            threshold_type="dynamic",
+            min_word_threshold=3,
+        )
+        config = CrawlerRunConfig(
+            log_console=False,
+            exclude_domains=["deploy.mopinion.com", "app.cobrowser.com"],
+            mean_delay=1,
+            markdown_generator=DefaultMarkdownGenerator(
+                content_filter=prune_filter,
+            ),
+            cache_mode=CacheMode.BYPASS,
+            session_id=self.session_id,
+            js_only=False,
+            magic=True,
+            user_agent_mode="random",
+        )
+
+        dispatcher = SemaphoreDispatcher(
+            semaphore_count=1,
+            max_session_permit=1,
+            monitor=CrawlerMonitor(
+                max_visible_rows=10, display_mode=DisplayMode.DETAILED
+            ),
+            rate_limiter=RateLimiter(
+                base_delay=(3.0, 5.0),
+                max_delay=30.0,
+                max_retries=3,
+                rate_limit_codes=[429, 503],
+            ),
+        )
+
+        urls = []
+        for house in houses:
+            if house.detail_url:
+                url = f"{self.config.base_url}{house.detail_url}"
+                urls.append(url)
+
+        logger.info(f"Starting fetch for {len(urls)} properties...")
+
+        try:
+            results: List[CrawlResult] = await self.crawler.arun_many(
+                urls=urls, config=config, dispatcher=dispatcher
+            )  # type: ignore
+
+            fetched_pages = []
+            for result in results:
+                if result.success:
+                    fetched_pages.append(
+                        FetchedPage(
+                            url=result.url,
+                            markdown=result.markdown.raw_markdown,  # type: ignore
+                            success=True,
+                        )
+                    )
+                else:
+                    error_msg = (
+                        result.error_message
+                        if hasattr(result, "error_message")
+                        else "Unknown error"
+                    )
+                    logger.error(f"Error fetching property: {error_msg}")
+                    fetched_pages.append(
+                        FetchedPage(url=result.url, markdown="", success=False)
+                    )
+
+            logger.info(
+                f"Completed fetching property pages. Successfully fetched {sum(1 for page in fetched_pages if page.success)} out of {len(urls)} properties."
+            )
+            return fetched_pages
+        except Exception as e:
+            logger.error(
+                f"Critical error during detailed property extraction: {str(e)}"
+            )
+            # Return partial results if possible
+            return [FetchedPage(url=url, markdown="", success=False) for url in urls]
