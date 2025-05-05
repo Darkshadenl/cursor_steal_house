@@ -34,7 +34,7 @@ load_dotenv()
 
 
 async def run_crawler_async(
-    website_name: str, test_notifications_only: bool
+    website_name: str, notifications_enabled: bool, test_notifications_only: bool
 ) -> Dict[str, Any]:
     """
     Run the crawler for the specified website.
@@ -49,7 +49,7 @@ async def run_crawler_async(
     try:
         db_session = get_db_session()
         notification_service = NotificationService(
-            notifications_on=not test_notifications_only
+            notifications_on=notifications_enabled
         )
 
         if test_notifications_only:
@@ -78,22 +78,20 @@ async def run_crawler_async(
         logger.info(f"Starting crawl for website: {website_name}")
         result = await scraper.run_async()
 
-        return {"success": True, "result": "hi"}
-        # Log results
-        # if result["success"]:
-        #     logger.info(
-        #         f"{GREEN}Crawl completed successfully for website: {website_name}{RESET}"
-        #     )
-        #     logger.info(f"Total houses found: {result['total_houses_count']}")
-        #     logger.info(f"New houses: {result['new_houses_count']}")
-        #     logger.info(f"Existing houses: {result['existing_houses_count']}")
-        #     logger.info(f"Updated houses: {result['updated_houses_count']}")
-        # else:
-        #     logger.error(
-        #         f"{RED}Crawl failed for website: {website_name}. Error: {result.get('error', 'Unknown error')}{RESET}"
-        #     )
+        if result["success"]:
+            logger.info(
+                f"{GREEN}Crawl completed successfully for website: {website_name}{RESET}"
+            )
+            logger.info(f"Total houses found: {result['total_houses_count']}")
+            logger.info(f"New houses: {result['new_houses_count']}")
+            logger.info(f"Existing houses: {result['existing_houses_count']}")
+            logger.info(f"Updated houses: {result['updated_houses_count']}")
+        else:
+            logger.error(
+                f"{RED}Crawl failed for website: {website_name}. Error: {result.get('error', 'Unknown error')}{RESET}"
+            )
 
-        # return result
+        return result
 
     except Exception as e:
         logger.error(f"{RED}Error running crawler: {str(e)}{RESET}")
@@ -114,6 +112,12 @@ def parse_args():
         default=os.getenv("CRAWLER_WEBSITE", "Vesteda"),
     )
     parser.add_argument(
+        "--notifications-enabled",
+        action="store_true",
+        help="Enable notifications",
+        default=os.getenv("NOTIFICATIONS_ENABLED", "true").lower() == "true",
+    )
+    parser.add_argument(
         "--test-notifications-only",
         action="store_true",
         help="Only send test notifications without crawling",
@@ -123,16 +127,17 @@ def parse_args():
 
 
 if __name__ == "__main__":
-    # Parse command line arguments
     args = parse_args()
     website_name = args.website
     test_notifications_only = args.test_notifications_only
-
+    notifications_enabled = args.notifications_enabled
     try:
-        # Run the crawler
-        result = asyncio.run(run_crawler_async(website_name, test_notifications_only))
+        result = asyncio.run(
+            run_crawler_async(
+                website_name, test_notifications_only, notifications_enabled
+            )
+        )
 
-        # Exit with appropriate code
         sys.exit(0 if result.get("success", False) else 1)
     except KeyboardInterrupt:
         logger.info(f"{YELLOW}Crawl interrupted by user.{RESET}")

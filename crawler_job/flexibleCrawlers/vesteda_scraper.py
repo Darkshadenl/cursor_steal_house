@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import AsyncGenerator, Dict, Any, List
+from typing import AsyncGenerator, Dict, Any, List, Optional
 from crawl4ai import (
     AsyncWebCrawler,
     BrowserConfig,
@@ -17,6 +17,7 @@ from crawl4ai import (
 )
 
 from crawler_job.models.house_models import FetchedPage, House
+from crawler_job.notifications.notification_service import NotificationService
 
 from ..models.db_config_models import WebsiteConfig
 from .base_scraper import BaseWebsiteScraper
@@ -27,14 +28,15 @@ logger = logging.getLogger(__name__)
 class VestedaScraper(BaseWebsiteScraper):
     """Vesteda-specific scraper implementation."""
 
-    def __init__(self, config: WebsiteConfig, session_id: str):
+    def __init__(self, config: WebsiteConfig, session_id: str, notification_service: Optional[NotificationService] = None):
         """Initialize the Vesteda scraper.
 
         Args:
             crawler: The crawl4ai crawler instance to use.
             config: The validated website configuration.
+            notification_service: The notification service to use.
         """
-        super().__init__(config, session_id)
+        super().__init__(config, session_id, notification_service)
 
         logger.info(f"Vesteda scraper initialized...")
 

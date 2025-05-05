@@ -110,7 +110,7 @@ class NotificationService:
         analysis = await llm_service.analyse_house(house)
         main_url = "https://hurenbij.vesteda.com"
 
-        if house.detail_url.startswith("/object/"):
+        if house.detail_url and house.detail_url.startswith("/object/"):
             house.detail_url = f"{main_url}{house.detail_url}"
 
         # Format the message with details about the house
@@ -165,8 +165,6 @@ class NotificationService:
             f"The status of a property at {house.address}, {house.city} has changed.\n\n"
             f"Previous status: {old_status}\n"
             f"New status: {house.status}\n"
-            f"Type: {house.house_type if hasattr(house, 'house_type') else 'Not specified'}\n"
-            f"Price: {house.price if hasattr(house, 'price') else 'Not specified'}\n\n"
             f"View details: {house.detail_url}"
         )
 

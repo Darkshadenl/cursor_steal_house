@@ -277,13 +277,20 @@ class BaseWebsiteScraper(ABC):
                     houses=houses,
                 )
     
-    async def run_async(self) -> None:
+    async def run_async(self) -> Dict[str, Any]:
         """Run the complete scraping process.
 
         Returns:
             List[Dict[str, Any]]: The collected data from all listings.
         """
         results = []
+        default_results = {
+            "success": False,
+            "total_houses_count": 0,
+            "new_houses_count": 0,
+            "existing_houses_count": 0,
+            "updated_houses_count": 0,
+        }
 
         logger.info(f"Building crawler...")
         self.crawler = self._build_crawler()
@@ -297,7 +304,7 @@ class BaseWebsiteScraper(ABC):
 
             if not await self.login_async():
                 logger.error("Login failed, aborting scrape")
-                return
+                return default_results
 
             await self.navigate_to_gallery_async()
 
@@ -307,7 +314,7 @@ class BaseWebsiteScraper(ABC):
             
             if not houses or len(houses) == 0:
                 logger.info("No houses found, we're done here!")
-                return
+                return default_results
             
             fetched_pages = await self.extract_details_async(new_houses)
             detailed_houses = await execute_llm_extraction(
@@ -316,11 +323,18 @@ class BaseWebsiteScraper(ABC):
             
             if not detailed_houses:
                     logger.info("No detailed houses found. Exiting...")
-                    return
+                    return default_results
                 
             self._merge_detailed_houses(houses, detailed_houses)
             
             await self._store_houses(houses)
+            
+            return {
+                "success": True,
+                "total_houses_count": len(houses),
+                "new_houses_count": len(new_houses),
+                "updated_houses_count": len(houses) - len(new_houses),
+            }
             
         except Exception as e:
             logger.error(f"Error during scraping: {e}")
