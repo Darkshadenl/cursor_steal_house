@@ -29,7 +29,8 @@ class BaseWebsiteScraper(ABC):
         self.config = config
         self.session_id = session_id
         self.standard_run_config = self._build_standard_run_config()
-        self.crawler = None
+        self.crawler: Optional[AsyncWebCrawler] = None
+        self.accepted_cookies = False
 
     async def validate_current_page(self, expected_url: str, check_url: str) -> bool:
         """Validate if the current page is the expected page.
@@ -114,6 +115,9 @@ class BaseWebsiteScraper(ABC):
                 f"Navigating to login page of {self.config.website_name} and logging in.\nUrl: {full_login_url}"
             )
 
+            if not self.crawler:
+                raise Exception("Crawler not initialized")
+
             login_result: CrawlResult = await self.crawler.arun(
                 full_login_url, config=run_config
             )  # type: ignore
@@ -135,7 +139,10 @@ class BaseWebsiteScraper(ABC):
 
     async def navigate_to_gallery_async(self) -> None:
         """Navigate to the listings/gallery page."""
-        await self.crawler.goto(
+        if not self.crawler:
+            raise Exception("Crawler not initialized")
+
+        await self.crawler.arun(
             self.config.strategy_config.navigation_config.listings_page_url,
             config=self.standard_run_config,
         )
@@ -275,6 +282,10 @@ class BaseWebsiteScraper(ABC):
 
     @abstractmethod
     def _build_crawler(self) -> AsyncWebCrawler:
+        pass
+    
+    @abstractmethod
+    def _accept_cookies(self) -> None:
         pass
 
     async def run_async(self) -> List[Dict[str, Any]]:
