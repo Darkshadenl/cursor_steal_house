@@ -51,10 +51,9 @@ class BaseWebsiteScraper(ABC):
             session_id=self.session_id,
             cache_mode=CacheMode.BYPASS,
             js_only=True,
-            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            user_agent_mode="random",
         )
 
-        await asyncio.sleep(1)
         logger.info(f"Verifying... Expected URL: {expected_url}")
 
         if not self.crawler:
@@ -103,6 +102,7 @@ class BaseWebsiteScraper(ABC):
             raise Exception("Crawler not initialized")
 
         try:
+            logger.info(f"Logging in to {self.config.website_name}")
             base_url = self.config.base_url
             login_url = self.login_config.login_url_path
 
@@ -110,16 +110,19 @@ class BaseWebsiteScraper(ABC):
             email = os.getenv(self.config.website_identifier.upper() + "_EMAIL")
             password = os.getenv(self.config.website_identifier.upper() + "_PASSWORD")
 
+            js_code = [
+                f"document.querySelector('{self.login_config.username_selector}').value = '{email}';",
+                f"document.querySelector('{self.login_config.password_selector}').value = '{password}';",
+                f"document.querySelector('{self.login_config.submit_selector}').click();",
+            ]
+
             run_config = CrawlerRunConfig(
                 session_id=self.session_id,
                 cache_mode=CacheMode.BYPASS,
                 js_only=True,
                 magic=True,
-                js_code=[
-                    f"document.querySelector('{self.login_config.username_selector}').value = '{email}';",
-                    f"document.querySelector('{self.login_config.password_selector}').value = '{password}';",
-                    f"document.querySelector('{self.login_config.submit_selector}').click();",
-                ],
+                # wait_for='input[type="email"][name="txtEmail"].form-control[placeholder="E-mailadres"]',
+                js_code=js_code,
             )
 
             logger.info(
@@ -134,6 +137,8 @@ class BaseWebsiteScraper(ABC):
                 raise Exception(
                     f"Login form submission failed: {login_result.error_message}"
                 )
+
+            await asyncio.sleep(2)
 
             valid: bool = await self.validate_current_page(
                 self.login_config.expected_url, self.login_config.success_check_url
@@ -155,8 +160,11 @@ class BaseWebsiteScraper(ABC):
         if not self.crawler:
             raise Exception("Crawler not initialized")
 
+        logger.info(f"Navigating to gallery...")
+        url = f"{self.config.base_url}{self.config.strategy_config.navigation_config.listings_page_url}"
+
         result: CrawlResult = await self.crawler.arun(
-            self.config.strategy_config.navigation_config.listings_page_url,
+            url,
             config=self.standard_run_config,
         )  # type: ignore
 
@@ -165,7 +173,9 @@ class BaseWebsiteScraper(ABC):
         if result and result.success and result.redirected_url != full_login_url:
             logger.info(f"Search navigation successful: {result.url}")
             self.navigated_to_gallery = True
+            self.current_url = result.url
         else:
+            self.current_url = result.redirected_url
             logger.error(f"Search navigation failed: {result.error_message}")
             logger.error(f"Redirected URL: {result.redirected_url}")
 
@@ -174,9 +184,11 @@ class BaseWebsiteScraper(ABC):
         if not self.config.strategy_config.filtering_config:
             logger.info("No filtering configuration provided.")
             return
-        
+
         logger.error("Implementing filtering configuration in derived class!")
-        raise NotImplementedError("Implementing filtering configuration in derived class!")
+        raise NotImplementedError(
+            "Implementing filtering configuration in derived class!"
+        )
 
     async def extract_gallery_async(self) -> AsyncGenerator[Dict[str, Any], None]:
         """Extract data from the gallery/listings page.
@@ -187,9 +199,11 @@ class BaseWebsiteScraper(ABC):
         if not self.config.strategy_config.gallery_extraction_config:
             logger.info("No gallery extraction configuration provided.")
             raise Exception("No gallery extraction configuration provided.")
-        
+
         logger.error("Implementing gallery extraction configuration in derived class!")
-        raise NotImplementedError("Implementing gallery extraction configuration in derived class!")
+        raise NotImplementedError(
+            "Implementing gallery extraction configuration in derived class!"
+        )
 
     async def extract_details_async(self, url: str) -> Dict[str, Any]:
         """Extract data from a detail page.
@@ -202,9 +216,13 @@ class BaseWebsiteScraper(ABC):
         """
         if not self.config.strategy_config.detail_page_extraction_config:
             raise Exception("No detail page extraction configuration provided.")
-        
-        logger.error("Implementing detail page extraction configuration in derived class!")
-        raise NotImplementedError("Implementing detail page extraction configuration in derived class!")
+
+        logger.error(
+            "Implementing detail page extraction configuration in derived class!"
+        )
+        raise NotImplementedError(
+            "Implementing detail page extraction configuration in derived class!"
+        )
 
     @abstractmethod
     def _build_crawler(self) -> AsyncWebCrawler:
@@ -224,9 +242,11 @@ class BaseWebsiteScraper(ABC):
         """
         results = []
 
+        logger.info(f"Building crawler...")
         self.crawler = self._build_crawler()
-        
+
         try:
+            logger.info(f"Starting crawler...")
             await self.crawler.start()
             await self.crawler.awarmup()
 

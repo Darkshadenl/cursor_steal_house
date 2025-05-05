@@ -1,5 +1,6 @@
+import json
 import logging
-from typing import AsyncGenerator, Dict, Any
+from typing import AsyncGenerator, Dict, Any, List
 from crawl4ai import (
     AsyncWebCrawler,
     BrowserConfig,
@@ -8,6 +9,8 @@ from crawl4ai import (
     CrawlerRunConfig,
     JsonCssExtractionStrategy,
 )
+
+from crawler_job.models.house_models import House
 
 from ..models.db_config_models import WebsiteConfig
 from .base_scraper import BaseWebsiteScraper
@@ -104,7 +107,7 @@ class VestedaScraper(BaseWebsiteScraper):
             self.accepted_cookies = True
             return self.accepted_cookies
 
-    async def extract_gallery_async(self) -> AsyncGenerator[Dict[str, Any], None]:
+    async def extract_gallery_async(self) -> List[House]:
         if not self.navigated_to_gallery:
             raise Exception("Not navigated to gallery")
 
@@ -118,7 +121,11 @@ class VestedaScraper(BaseWebsiteScraper):
         gallery_extraction_config = (
             self.config.strategy_config.gallery_extraction_config
         )
-        correct_urls = gallery_extraction_config.correct_urls
+
+        correct_urls = [
+            f"{self.config.base_url}{path}"
+            for path in gallery_extraction_config.correct_urls_paths
+        ]
 
         if self.current_url not in correct_urls:
             raise Exception(f"Invalid URL: {self.current_url}")
@@ -139,3 +146,63 @@ class VestedaScraper(BaseWebsiteScraper):
             raise Exception(
                 f"Failed to extract property listings: {result.error_message}"
             )
+        
+        if not result.extracted_content:
+            raise Exception("No extracted content")
+        
+        raw_data = json.loads(result.extracted_content)
+        houses = []
+
+        for house_data in raw_data:
+            # Pre-process the data before passing to from_dict
+            processed_data = house_data.copy()
+
+            # Process bedrooms field
+            try:
+                if "bedrooms" in house_data and house_data["bedrooms"]:
+                    processed_data["bedrooms"] = int(house_data["bedrooms"])
+            except ValueError:
+                logger.warning(
+                    f"Could not convert bedrooms to int: {house_data.get('bedrooms')}"
+                )
+                processed_data["bedrooms"] = None
+
+            # Process area field to square_meters
+            try:
+                if "area" in house_data and house_data["area"]:
+                    # Strip "m²" and convert to int
+                    area_str = house_data.get("area", "").replace("m2", "").strip()
+                    if area_str:
+                        processed_data["square_meters"] = int(area_str)
+            except ValueError:
+                logger.warning(
+                    f"Could not convert area to int: {house_data.get('area')}"
+                )
+                processed_data["square_meters"] = None
+
+            # Rename price to rental_price
+            if "price" in processed_data:
+                processed_data["rental_price"] = processed_data.pop("price")
+
+            # Check if demand message indicates high demand
+            demand_message = processed_data.get("demand_message")
+            high_demand = False
+            if demand_message and any(
+                keyword in demand_message.lower()
+                for keyword in ["hoge interesse", "veel interesse", "popular"]
+            ):
+                high_demand = True
+            processed_data["high_demand"] = high_demand
+
+            # Create House object using from_dict
+            house = House.from_dict(processed_data)
+            houses.append(house)
+
+        logger.info(
+            f"Successfully extracted and transformed {len(houses)} properties"
+        )
+        return houses
+
+        
+        
+        

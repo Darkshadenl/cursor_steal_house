@@ -215,7 +215,7 @@ class GalleryExtractionConfig(BaseModel):
     Pydantic model for gallery extraction configuration.
     """
 
-    correct_urls: List[str]
+    correct_urls_paths: List[str]
     schema: Dict[str, Any]
     next_page_selector: Optional[str] = None
     previous_page_selector: Optional[str] = None
@@ -262,7 +262,7 @@ class LoginConfig(BaseModel):
     username_selector: str
     password_selector: str
     submit_selector: str
-    success_check_url: str
+    success_check_url_path: str
     expected_url: str
     success_indicator_selector: Optional[str] = None
 
