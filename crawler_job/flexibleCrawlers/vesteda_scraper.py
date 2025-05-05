@@ -1,12 +1,15 @@
 import logging
-from typing import Dict, Any
+from typing import AsyncGenerator, Dict, Any
 from crawl4ai import (
     AsyncWebCrawler,
     BrowserConfig,
     CacheMode,
     CrawlResult,
     CrawlerRunConfig,
+    JsonCssExtractionStrategy,
 )
+
+from crawler_job.main import RED, RESET
 
 from ..models.db_config_models import WebsiteConfig
 from .base_scraper import BaseWebsiteScraper
@@ -39,7 +42,7 @@ class VestedaScraper(BaseWebsiteScraper):
         self.crawler = AsyncWebCrawler(
             config=self.browser_config,
         )
-        
+
         return self.crawler
 
     async def _accept_cookies(self, current_url: str) -> bool:
@@ -102,3 +105,39 @@ class VestedaScraper(BaseWebsiteScraper):
             logger.info("Cookie popup not found or already accepted")
             self.accepted_cookies = True
             return self.accepted_cookies
+
+    async def extract_gallery_async(self) -> AsyncGenerator[Dict[str, Any], None]:
+        if not self.navigated_to_gallery:
+            raise Exception("Not navigated to gallery")
+
+        if not self.config.strategy_config.gallery_extraction_config:
+            raise Exception("No gallery extraction configuration provided.")
+
+        if not self.crawler:
+            raise Exception("Crawler not initialized")
+        
+        logger.info("Extracting property listings of Vesteda step...")
+        gallery_extraction_config = (
+            self.config.strategy_config.gallery_extraction_config
+        )
+        correct_urls = gallery_extraction_config.correct_urls
+
+        if self.current_url not in correct_urls:
+            raise Exception(f"Invalid URL: {self.current_url}")
+        
+        schema = gallery_extraction_config.schema
+        
+        gallery_config = CrawlerRunConfig(
+            extraction_strategy=JsonCssExtractionStrategy(schema),
+            cache_mode=CacheMode.BYPASS,
+            session_id=self.session_id,
+            magic=False,
+            user_agent_mode="random",
+        )
+        
+        result: CrawlResult = await self.crawler.arun(url=self.current_url, config=gallery_config) # type: ignore
+        
+        if not result.success:
+            raise Exception(f"Failed to extract property listings: {result.error_message}")
+        
+        

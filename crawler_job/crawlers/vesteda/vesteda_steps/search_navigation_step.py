@@ -8,7 +8,6 @@ async def execute_search_navigation(crawler: AsyncWebCrawler, session_id: str) -
         session_id=session_id,
         cache_mode=CacheMode.BYPASS,
         magic=True,
-        user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
     )
 
     result = await crawler.arun(

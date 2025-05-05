@@ -172,7 +172,9 @@ class BaseWebsiteScraper(ABC):
     async def apply_filters_async(self) -> None:
         """Apply filters if filtering configuration is provided."""
         if not self.config.strategy_config.filtering_config:
-            raise Exception("No filtering configuration provided.")
+            logger.info("No filtering configuration provided.")
+            return
+        
         logger.error("Implementing filtering configuration in derived class!")
         raise NotImplementedError("Implementing filtering configuration in derived class!")
 
@@ -237,12 +239,12 @@ class BaseWebsiteScraper(ABC):
 
         await self.apply_filters_async()
 
-        # async for item in self.extract_gallery_async():
-        #     if "url" in item:
-        #         details = await self.extract_details_async(item["url"])
-        #         results.append({**item, **details})
-        #     else:
-        #         results.append(item)
+        async for item in await self.extract_gallery_async():
+            if "url" in item:
+                details = await self.extract_details_async(item["url"])
+                results.append({**item, **details})
+            else:
+                results.append(item)
 
         await self.crawler.close()
 

@@ -103,10 +103,6 @@ async def run_crawler_async(
         if "db_session" in locals():
             await db_session.close()
 
-        # Close browser if scraper was created
-        if "scraper" in locals() and hasattr(scraper, "crawler"):
-            await scraper.crawler.close()
-
 
 def parse_args():
     """Parse command line arguments"""

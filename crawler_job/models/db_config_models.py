@@ -215,10 +215,10 @@ class GalleryExtractionConfig(BaseModel):
     Pydantic model for gallery extraction configuration.
     """
 
-    listing_item_selector: str
+    correct_urls: List[str]
+    schema: Dict[str, Any]
     next_page_selector: Optional[str] = None
-    max_pages: Optional[int] = None
-    fields: List[FieldConfig]
+    previous_page_selector: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
