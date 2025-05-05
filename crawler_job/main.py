@@ -84,7 +84,6 @@ async def run_crawler_async(
             )
             logger.info(f"Total houses found: {result['total_houses_count']}")
             logger.info(f"New houses: {result['new_houses_count']}")
-            logger.info(f"Existing houses: {result['existing_houses_count']}")
             logger.info(f"Updated houses: {result['updated_houses_count']}")
         else:
             logger.error(
