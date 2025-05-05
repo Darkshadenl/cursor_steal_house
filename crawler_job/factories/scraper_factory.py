@@ -1,4 +1,6 @@
-from typing import Dict, Type
+from typing import Dict, Optional, Type
+
+from crawler_job.notifications.notification_service import NotificationService
 
 from ..flexibleCrawlers.base_scraper import BaseWebsiteScraper
 from ..flexibleCrawlers.vesteda_scraper import VestedaScraper
@@ -27,12 +29,12 @@ class ScraperFactory:
         """
         self.json_config_repo = json_config_repo
 
-    async def get_scraper_async(self, website_name: str) -> BaseWebsiteScraper:
+    async def get_scraper_async(self, website_name: str, notification_service: Optional[NotificationService] = None) -> BaseWebsiteScraper:
         """Get a scraper instance for the given website identifier.
 
         Args:
             identifier: The unique identifier of the website.
-
+            notification_service: The notification service to use.
         Returns:
             BaseWebsiteScraper: A configured scraper instance.
 
@@ -53,6 +55,7 @@ class ScraperFactory:
             return scraper_class(
                 config=website_config,
                 session_id=website_config.session_id,
+                notification_service=notification_service,
             )
         else:
             error_msg = (

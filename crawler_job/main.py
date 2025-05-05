@@ -73,7 +73,7 @@ async def run_crawler_async(
         json_config_repo = JsonConfigRepository(db_session)
         factory = ScraperFactory(json_config_repo)
 
-        scraper = await factory.get_scraper_async(website_name)
+        scraper = await factory.get_scraper_async(website_name, notification_service)
 
         logger.info(f"Starting crawl for website: {website_name}")
         result = await scraper.run_async()
