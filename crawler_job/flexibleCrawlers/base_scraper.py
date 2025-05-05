@@ -27,10 +27,10 @@ class BaseWebsiteScraper(ABC):
             config: The validated website configuration.
         """
         self.config = config
-        
-        if (self.config.strategy_config.login_config):
+
+        if self.config.strategy_config.login_config:
             self.login_config = self.config.strategy_config.login_config
-            
+
         self.session_id = session_id
         self.standard_run_config = self._build_standard_run_config()
         self.crawler: Optional[AsyncWebCrawler] = None
@@ -95,13 +95,14 @@ class BaseWebsiteScraper(ABC):
         Returns:
             bool: True if login was successful or not required, False if login failed.
         """
-        if not self.config.strategy_config.login_config:
+        if not self.login_config or self.navigated_to_gallery:
             return True
+        if not self.crawler:
+            raise Exception("Crawler not initialized")
 
-        login_config = self.config.strategy_config.login_config
         try:
             base_url = self.config.base_url
-            login_url = login_config.login_url_path
+            login_url = self.login_config.login_url_path
 
             full_login_url = f"{base_url}{login_url}"
             email = os.getenv(self.config.website_identifier.upper() + "_EMAIL")
@@ -113,18 +114,15 @@ class BaseWebsiteScraper(ABC):
                 js_only=True,
                 magic=True,
                 js_code=[
-                    f"document.querySelector('{login_config.username_selector}').value = '{email}';",
-                    f"document.querySelector('{login_config.password_selector}').value = '{password}';",
-                    f"document.querySelector('{login_config.submit_selector}').click();",
+                    f"document.querySelector('{self.login_config.username_selector}').value = '{email}';",
+                    f"document.querySelector('{self.login_config.password_selector}').value = '{password}';",
+                    f"document.querySelector('{self.login_config.submit_selector}').click();",
                 ],
             )
 
             logger.info(
                 f"Navigating to login page of {self.config.website_name} and logging in.\nUrl: {full_login_url}"
             )
-
-            if not self.crawler:
-                raise Exception("Crawler not initialized")
 
             login_result: CrawlResult = await self.crawler.arun(
                 full_login_url, config=run_config
@@ -136,7 +134,7 @@ class BaseWebsiteScraper(ABC):
                 )
 
             await self.validate_current_page(
-                login_config.expected_url, login_config.success_check_url
+                self.login_config.expected_url, self.login_config.success_check_url
             )
 
             return login_result.success
@@ -147,31 +145,30 @@ class BaseWebsiteScraper(ABC):
 
     async def navigate_to_gallery_async(self) -> None:
         """Navigate to the listings/gallery page."""
+        if self.navigated_to_gallery:
+            return
+
         if not self.crawler:
             raise Exception("Crawler not initialized")
 
-        result: CrawlResult= await self.crawler.arun(
+        result: CrawlResult = await self.crawler.arun(
             self.config.strategy_config.navigation_config.listings_page_url,
             config=self.standard_run_config,
-        ) # type: ignore
-        
+        )  # type: ignore
+
         full_login_url = f"{self.config.base_url}{self.login_config.login_url_path}"
-        
-        if (
-            result
-            and result.success
-            and result.redirected_url != full_login_url):
+
+        if result and result.success and result.redirected_url != full_login_url:
             logger.info(f"Search navigation successful: {result.url}")
             self.navigated_to_gallery = True
         else:
             logger.error(f"Search navigation failed: {result.error_message}")
             logger.error(f"Redirected URL: {result.redirected_url}")
-            
 
     async def apply_filters_async(self) -> None:
         """Apply filters if filtering configuration is provided."""
         pass
-    
+
     async def extract_gallery_async(self) -> AsyncGenerator[Dict[str, Any], None]:
         """Extract data from the gallery/listings page.
 
@@ -194,7 +191,7 @@ class BaseWebsiteScraper(ABC):
     @abstractmethod
     def _build_crawler(self) -> AsyncWebCrawler:
         pass
-    
+
     @abstractmethod
     def _accept_cookies(self) -> None:
         pass
@@ -209,7 +206,7 @@ class BaseWebsiteScraper(ABC):
 
         self.crawler = self._build_crawler()
         await self.crawler.start()
-        
+
         await self.navigate_to_gallery_async()
 
         if not await self.login_async():
@@ -228,5 +225,5 @@ class BaseWebsiteScraper(ABC):
                 results.append(item)
 
         await self.crawler.close()
-        
+
         return results
