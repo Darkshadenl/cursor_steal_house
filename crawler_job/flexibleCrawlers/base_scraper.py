@@ -4,14 +4,12 @@ import os
 from abc import ABC, abstractmethod
 import asyncio
 
-
 from crawl4ai import (
     AsyncWebCrawler,
+    BrowserConfig,
     CacheMode,
     CrawlResult,
     CrawlerRunConfig,
-    DefaultMarkdownGenerator,
-    PruningContentFilter,
 )
 from crawler_job.models.db_config_models import WebsiteConfig
 
@@ -21,9 +19,7 @@ logger = logging.getLogger(__name__)
 class BaseWebsiteScraper(ABC):
     """Base class for website scrapers using the hybrid configuration system."""
 
-    def __init__(
-        self, config: WebsiteConfig, session_id: str
-    ):
+    def __init__(self, config: WebsiteConfig, session_id: str):
         """Initialize the scraper.
 
         Args:
@@ -33,6 +29,7 @@ class BaseWebsiteScraper(ABC):
         self.config = config
         self.session_id = session_id
         self.standard_run_config = self._build_standard_run_config()
+        self.crawler = None
 
     async def validate_current_page(self, expected_url: str, check_url: str) -> bool:
         """Validate if the current page is the expected page.
@@ -276,6 +273,10 @@ class BaseWebsiteScraper(ABC):
 
         return result
 
+    @abstractmethod
+    def _build_crawler(self) -> AsyncWebCrawler:
+        pass
+
     async def run_async(self) -> List[Dict[str, Any]]:
         """Run the complete scraping process.
 
@@ -284,24 +285,24 @@ class BaseWebsiteScraper(ABC):
         """
         results = []
 
-        # Login if needed
+        self.crawler = self._build_crawler()
+        await self.crawler.start()
+
         if not await self.login_async():
-            print("Login failed, aborting scrape")
+            logger.error("Login failed, aborting scrape")
             return results
 
-        # Navigate to gallery
         await self.navigate_to_gallery_async()
 
-        # Apply filters
         await self.apply_filters_async()
 
-        # Extract gallery items
         async for item in self.extract_gallery_async():
             if "url" in item:
-                # Get details for each item
                 details = await self.extract_details_async(item["url"])
                 results.append({**item, **details})
             else:
                 results.append(item)
 
+        await self.crawler.close()
+        
         return results
