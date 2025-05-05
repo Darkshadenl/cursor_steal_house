@@ -12,6 +12,7 @@ from crawl4ai import (
     CrawlerRunConfig,
 )
 from crawler_job.models.db_config_models import WebsiteConfig
+from crawler_job.models.house_models import House
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,6 @@ class BaseWebsiteScraper(ABC):
                 cache_mode=CacheMode.BYPASS,
                 js_only=True,
                 magic=True,
-                # wait_for='input[type="email"][name="txtEmail"].form-control[placeholder="E-mailadres"]',
                 js_code=js_code,
             )
 
@@ -141,8 +141,10 @@ class BaseWebsiteScraper(ABC):
             await asyncio.sleep(2)
 
             valid: bool = await self.validate_current_page(
-                self.login_config.expected_url, self.login_config.success_check_url
+                self.login_config.expected_url,
+                f"{self.config.base_url}{self.login_config.success_check_url_path}",
             )
+            self.current_url = login_result.url
             if valid:
                 await self._accept_cookies(self.current_url)
 
@@ -190,11 +192,11 @@ class BaseWebsiteScraper(ABC):
             "Implementing filtering configuration in derived class!"
         )
 
-    async def extract_gallery_async(self) -> AsyncGenerator[Dict[str, Any], None]:
+    async def extract_gallery_async(self) -> List[House]:
         """Extract data from the gallery/listings page.
 
-        Yields:
-            Dict[str, Any]: Extracted data for each listing item.
+        Returns:
+            List[House]: Extracted data for each listing item.
         """
         if not self.config.strategy_config.gallery_extraction_config:
             logger.info("No gallery extraction configuration provided.")
@@ -217,9 +219,6 @@ class BaseWebsiteScraper(ABC):
         if not self.config.strategy_config.detail_page_extraction_config:
             raise Exception("No detail page extraction configuration provided.")
 
-        logger.error(
-            "Implementing detail page extraction configuration in derived class!"
-        )
         raise NotImplementedError(
             "Implementing detail page extraction configuration in derived class!"
         )
@@ -259,13 +258,13 @@ class BaseWebsiteScraper(ABC):
             await self.navigate_to_gallery_async()
 
             await self.apply_filters_async()
-
-            async for item in await self.extract_gallery_async():
-                if "url" in item:
-                    details = await self.extract_details_async(item["url"])
-                    results.append({**item, **details})
-                else:
-                    results.append(item)
+            houses = await self.extract_gallery_async()
+            
+            for house in houses:
+                details = await self.extract_details_async(house.url)
+                results.append({**house.to_dict(), **details})
+            
+            
         except Exception as e:
             logger.error(f"Error during scraping: {e}")
             raise e
