@@ -20,6 +20,7 @@ from crawler_job.services.logger_service import setup_logger
 
 logger = setup_logger(__name__)
 
+
 class BaseWebsiteScraper(ABC):
     """Base class for website scrapers using the hybrid configuration system."""
 
@@ -144,6 +145,8 @@ class BaseWebsiteScraper(ABC):
             logger.info(
                 f"Navigating to login page of {self.config.website_name} and logging in.\nUrl: {full_login_url}"
             )
+            logger.debug(f"Run config: {run_config}")
+            logger.debug(f"JS code: {js_code}")
 
             login_result: CrawlResult = await self.crawler.arun(
                 full_login_url, config=run_config
@@ -155,6 +158,9 @@ class BaseWebsiteScraper(ABC):
                 )
 
             await asyncio.sleep(2)
+            logger.debug(
+                f"{self.config.base_url}{self.login_config.success_check_url_path}"
+            )
 
             valid: bool = await self.validate_current_page(
                 self.login_config.expected_url,
@@ -342,7 +348,6 @@ class BaseWebsiteScraper(ABC):
         try:
             logger.info(f"Starting crawler...")
             await self.crawler.start()
-            await self.crawler.awarmup()
 
             await self.navigate_to_gallery_async()
 
