@@ -1,6 +1,5 @@
 import asyncio
 import argparse
-import logging
 import os
 from dotenv import load_dotenv
 import sys
@@ -20,6 +19,19 @@ logger = setup_logger(__name__)
 load_dotenv()
 
 
+def parse_websites(arg: str) -> List[str]:
+    """
+    Parse a comma-separated string of website names into a list.
+
+    Args:
+        arg: Comma-separated string of website names
+
+    Returns:
+        List of website names
+    """
+    return [website.strip() for website in arg.split(",")]
+
+
 async def run_crawler_async(
     websites: List[str], notifications_enabled: bool, test_notifications_only: bool
 ) -> bool:
@@ -27,7 +39,8 @@ async def run_crawler_async(
     Run the crawler for the specified website.
 
     Args:
-        website_name: Name of the website to crawl
+        websites: List of website names to crawl
+        notifications_enabled: Whether notifications are enabled
         test_notifications_only: If True, only send test notifications without crawling
 
     Returns:
@@ -52,10 +65,7 @@ async def run_crawler_async(
                     "No test notifications were sent successfully. Please check your configuration."
                 )
 
-            return {
-                "success": len(successful_channels) > 0,
-                "successful_channels": successful_channels,
-            }
+            return True
 
         json_config_repo = JsonConfigRepository(db_session)
         factory = ScraperFactory(json_config_repo)
@@ -96,21 +106,19 @@ def parse_args():
     parser = argparse.ArgumentParser(description="StealHouse Website Crawler")
     parser.add_argument(
         "--websites",
-        type=List[str],
-        help="Name of the websites to crawl (e.g., 'Vesteda, Sleutel')",
+        type=parse_websites,
+        help="Comma-separated list of websites to crawl (e.g., 'Vesteda,Sleutel')",
         default=os.getenv("CRAWLER_WEBSITES", "Vesteda"),
     )
     parser.add_argument(
         "--notifications-enabled",
         action="store_true",
-        type=bool,
         help="Enable notifications",
         default=os.getenv("NOTIFICATIONS_ENABLED", "true").lower() == "true",
     )
     parser.add_argument(
         "--test-notifications-only",
         action="store_true",
-        type=bool,
         help="Only send test notifications without crawling",
         default=os.getenv("TEST_NOTIFICATIONS_ONLY", "false").lower() == "true",
     )
