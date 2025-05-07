@@ -88,7 +88,7 @@ class BaseWebsiteScraper(ABC):
             check_result.url != expected_url
             and check_result.redirected_url != expected_url
         ):
-            raise Exception(f"Veficitation failed: We're not on the expected page")
+            raise Exception(f"Verification failed: We're not on the expected page")
 
         return True
 
@@ -120,11 +120,13 @@ class BaseWebsiteScraper(ABC):
             raise Exception("Crawler not initialized")
 
         try:
-            logger.info(f"Logging in to {self.config.website_name}")
             base_url = self.config.base_url
             login_url = self.login_config.login_url_path
 
             full_login_url = f"{base_url}{login_url}"
+            logger.info(
+                f"Navigating to login page of {self.config.website_name} and logging in.\nUrl: {full_login_url}"
+            )
             email = os.getenv(self.config.website_identifier.upper() + "_EMAIL")
             password = os.getenv(self.config.website_identifier.upper() + "_PASSWORD")
 
@@ -142,9 +144,6 @@ class BaseWebsiteScraper(ABC):
                 js_code=js_code,
             )
 
-            logger.info(
-                f"Navigating to login page of {self.config.website_name} and logging in.\nUrl: {full_login_url}"
-            )
             logger.debug(f"Run config: {run_config}")
             logger.debug(f"JS code: {js_code}")
 
@@ -158,9 +157,7 @@ class BaseWebsiteScraper(ABC):
                 )
 
             await asyncio.sleep(2)
-            logger.debug(
-                f"{self.config.base_url}{self.login_config.success_check_url_path}"
-            )
+            logger.debug(f"Validating login success of {self.config.website_name}")
 
             valid: bool = await self.validate_current_page(
                 self.login_config.expected_url,
@@ -388,6 +385,9 @@ class BaseWebsiteScraper(ABC):
             }
         except Exception as e:
             logger.error(f"Error during scraping: {e}")
+            while True:
+                # wait for 10 seconds
+                await asyncio.sleep(10)
             raise e
         finally:
             await self.crawler.close()

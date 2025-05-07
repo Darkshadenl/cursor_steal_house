@@ -114,7 +114,7 @@ def parse_args():
         "--notifications-enabled",
         action="store_true",
         help="Enable notifications",
-        default=os.getenv("NOTIFICATIONS_ENABLED", "true").lower() == "true",
+        default=os.getenv("NOTIFICATIONS_ENABLED", "false").lower() == "true",
     )
     parser.add_argument(
         "--test-notifications-only",

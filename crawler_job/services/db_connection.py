@@ -4,20 +4,26 @@ from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 
+from crawler_job.services.logger_service import setup_logger
+
 # Load environment variables
 load_dotenv()
+
+logger = setup_logger(__name__)
 
 # Database connection settings
 POSTGRES_USER = os.getenv("POSTGRES_USER")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 POSTGRES_DB = os.getenv("POSTGRES_DB")
-POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")  # Default to 5432 if not provided
+POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST")
 
 # Create database URL (note the postgresql+asyncpg:// prefix)
 DATABASE_URL = f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 
 # Create async engine
+logger.debug(DATABASE_URL)
+
 engine = create_async_engine(
     DATABASE_URL,
     pool_pre_ping=True,  # Enable the connection pool "pre-ping" feature

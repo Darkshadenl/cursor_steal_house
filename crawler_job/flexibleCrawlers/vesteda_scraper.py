@@ -52,6 +52,7 @@ class VestedaScraper(BaseWebsiteScraper):
             verbose=True,
             use_managed_browser=True,
             user_data_dir="./browser_data/vesteda",
+            extra_args=["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
         )
 
         self.crawler = AsyncWebCrawler(
@@ -212,7 +213,7 @@ class VestedaScraper(BaseWebsiteScraper):
             house = House.from_dict(processed_data)
             houses.append(house)
 
-        logger.info(f"Successfully extracted and transformed {len(houses)} properties")
+        logger.info(f"Successfully extracted {len(houses)} properties")
         return houses
 
     async def extract_details_async(self, houses: List[House]) -> List[FetchedPage]:
@@ -253,9 +254,7 @@ class VestedaScraper(BaseWebsiteScraper):
         dispatcher = SemaphoreDispatcher(
             semaphore_count=1,
             max_session_permit=1,
-            monitor=CrawlerMonitor(
-                max_visible_rows=10, display_mode=DisplayMode.DETAILED
-            ),
+            monitor=CrawlerMonitor(urls_total=10, enable_ui=True),
             rate_limiter=RateLimiter(
                 base_delay=(3.0, 5.0),
                 max_delay=30.0,
