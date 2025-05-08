@@ -22,6 +22,7 @@ class ScraperFactory:
     def __init__(
         self,
         json_config_repo: JsonConfigRepository,
+        debug_mode: bool = False,
     ):
         """Initialize the scraper factory.
 
@@ -30,6 +31,7 @@ class ScraperFactory:
             json_config_repo: Repository for new JSON configurations.
         """
         self.json_config_repo = json_config_repo
+        self.debug_mode = debug_mode
 
     async def get_scraper_async(self, website_name: str, notification_service: Optional[NotificationService] = None) -> BaseWebsiteScraper:
         """Get a scraper instance for the given website identifier.
@@ -58,7 +60,8 @@ class ScraperFactory:
                 config=website_config,
                 session_id=website_config.session_id,
                 notification_service=notification_service,
-            )   
+                debug_mode=self.debug_mode,
+            )
         else:
             error_msg = (
                 f"No valid configuration found for website identifier '{website_name}'."

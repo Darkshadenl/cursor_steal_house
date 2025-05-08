@@ -33,7 +33,10 @@ def parse_websites(arg: str) -> List[str]:
 
 
 async def run_crawler_async(
-    websites: List[str], notifications_enabled: bool, test_notifications_only: bool
+    websites: List[str],
+    notifications_enabled: bool,
+    test_notifications_only: bool,
+    debug_mode: bool,
 ) -> bool:
     """
     Run the crawler for the specified website.
@@ -68,7 +71,7 @@ async def run_crawler_async(
             return True
 
         json_config_repo = JsonConfigRepository(db_session)
-        factory = ScraperFactory(json_config_repo)
+        factory = ScraperFactory(json_config_repo, debug_mode)
         results: List[Dict[str, Any]] = []
 
         for website_name in websites:
@@ -122,6 +125,12 @@ def parse_args():
         help="Only send test notifications without crawling",
         default=os.getenv("TEST_NOTIFICATIONS_ONLY", "false").lower() == "true",
     )
+    parser.add_argument(
+        "--debug-mode",
+        action="store_true",
+        help="Enable debug mode",
+        default=os.getenv("DEBUG_MODE", "false").lower() == "true",
+    )
     return parser.parse_args()
 
 
@@ -130,9 +139,15 @@ if __name__ == "__main__":
     websites: List[str] = args.websites
     test_notifications_only: bool = args.test_notifications_only
     notifications_enabled: bool = args.notifications_enabled
+    debug_mode: bool = args.debug_mode
     try:
         result = asyncio.run(
-            run_crawler_async(websites, test_notifications_only, notifications_enabled)
+            run_crawler_async(
+                websites,
+                test_notifications_only,
+                notifications_enabled,
+                debug_mode,
+            )
         )
 
         sys.exit(0 if result else 1)

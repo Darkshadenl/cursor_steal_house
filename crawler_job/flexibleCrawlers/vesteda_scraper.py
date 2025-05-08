@@ -1,6 +1,5 @@
 import json
-import logging
-from typing import AsyncGenerator, Dict, Any, List, Optional
+from typing import List, Optional
 from crawl4ai import (
     AsyncWebCrawler,
     BrowserConfig,
@@ -9,7 +8,6 @@ from crawl4ai import (
     CrawlerMonitor,
     CrawlerRunConfig,
     DefaultMarkdownGenerator,
-    DisplayMode,
     JsonCssExtractionStrategy,
     PruningContentFilter,
     RateLimiter,
@@ -34,6 +32,7 @@ class VestedaScraper(BaseWebsiteScraper):
         config: WebsiteConfig,
         session_id: str,
         notification_service: Optional[NotificationService] = None,
+        debug_mode: bool = False,
     ):
         """Initialize the Vesteda scraper.
 
@@ -42,7 +41,7 @@ class VestedaScraper(BaseWebsiteScraper):
             config: The validated website configuration.
             notification_service: The notification service to use.
         """
-        super().__init__(config, session_id, notification_service)
+        super().__init__(config, session_id, notification_service, debug_mode)
 
         logger.info(f"Vesteda scraper initialized...")
 
@@ -52,7 +51,13 @@ class VestedaScraper(BaseWebsiteScraper):
             verbose=True,
             use_managed_browser=True,
             user_data_dir="./browser_data/vesteda",
-            extra_args=["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage", "--remote-debugging-address=0.0.0.0", "--remote-debugging-port=9222"],
+            extra_args=[
+                "--no-sandbox",
+                "--disable-gpu",
+                "--disable-dev-shm-usage",
+                "--remote-debugging-address=0.0.0.0",
+                "--remote-debugging-port=9222",
+            ],
         )
 
         self.crawler = AsyncWebCrawler(
