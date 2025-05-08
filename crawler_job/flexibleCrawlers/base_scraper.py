@@ -65,17 +65,18 @@ class BaseWebsiteScraper(ABC):
         Returns:
             bool: True if the current page is the expected page, False otherwise.
         """
+        if not self.crawler:
+            raise Exception("Crawler not initialized")
+
         check_config = CrawlerRunConfig(
             session_id=self.session_id,
             cache_mode=CacheMode.BYPASS,
-            js_only=True,
+            js_only=False,
+            magic=False,
             user_agent_mode="random",
         )
 
         logger.info(f"Verifying... Expected URL: {expected_url}")
-
-        if not self.crawler:
-            raise Exception("Crawler not initialized")
 
         check_result: CrawlResult = await self.crawler.arun(
             url=check_url, config=check_config
@@ -83,6 +84,8 @@ class BaseWebsiteScraper(ABC):
 
         if not check_result.success:
             raise Exception(f"Check verification failed: {check_result.error_message}")
+
+        # logger.debug(f"Check result: {check_result}")
 
         if (
             check_result.url != expected_url
@@ -99,11 +102,11 @@ class BaseWebsiteScraper(ABC):
             CrawlerRunConfig: The default configuration for crawl4ai.
         """
         return CrawlerRunConfig(
-            log_console=False,
+            log_console=True,
             cache_mode=CacheMode.BYPASS,
             session_id=self.session_id,
             js_only=False,
-            magic=True,
+            magic=False,
             user_agent_mode="random",
         )
 
@@ -118,6 +121,9 @@ class BaseWebsiteScraper(ABC):
 
         if not self.crawler:
             raise Exception("Crawler not initialized")
+
+        if not self.accepted_cookies:
+            await self._accept_cookies(self.current_url)  # type: ignore
 
         try:
             base_url = self.config.base_url
@@ -138,14 +144,16 @@ class BaseWebsiteScraper(ABC):
 
             run_config = CrawlerRunConfig(
                 session_id=self.session_id,
+                exclude_all_images=True,
+                exclude_social_media_links=True,
                 cache_mode=CacheMode.BYPASS,
-                js_only=True,
-                magic=True,
+                js_only=False,
+                magic=False,
                 js_code=js_code,
             )
 
-            logger.debug(f"Run config: {run_config}")
-            logger.debug(f"JS code: {js_code}")
+            # logger.debug(f"Run config: {run_config}")
+            # logger.debug(f"JS code: {js_code}")
 
             login_result: CrawlResult = await self.crawler.arun(
                 full_login_url, config=run_config
@@ -155,19 +163,17 @@ class BaseWebsiteScraper(ABC):
                 raise Exception(
                     f"Login form submission failed: {login_result.error_message}"
                 )
-
+            # logger.debug(f"Login result: {login_result}")
             await asyncio.sleep(2)
-            logger.debug(f"Validating login success of {self.config.website_name}")
+            logger.info(f"Validating login success of {self.config.website_name}")
 
             valid: bool = await self.validate_current_page(
                 self.login_config.expected_url,
                 f"{self.config.base_url}{self.login_config.success_check_url_path}",
             )
-            self.current_url = login_result.url
-            if valid:
-                await self._accept_cookies(self.current_url)
+            self.current_url = self.login_config.expected_url
 
-            return login_result.success
+            return valid
 
         except Exception as e:
             print(f"Login failed: {str(e)}")
@@ -192,12 +198,12 @@ class BaseWebsiteScraper(ABC):
         full_login_url = f"{self.config.base_url}{self.login_config.login_url_path}"
 
         if result and result.success and result.redirected_url != full_login_url:
-            logger.info(f"Search navigation successful: {result.url}")
+            logger.info(f"Navigating to gallery successful: {result.url}")
             self.navigated_to_gallery = True
             self.current_url = result.url
         else:
             self.current_url = result.redirected_url
-            logger.error(f"Search navigation failed: {result.error_message}")
+            logger.error(f"Navigating to gallery failed: {result.error_message}")
             logger.error(f"Redirected URL: {result.redirected_url}")
 
     async def apply_filters_async(self) -> None:
