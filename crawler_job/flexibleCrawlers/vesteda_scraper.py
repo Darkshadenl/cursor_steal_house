@@ -82,6 +82,7 @@ class VestedaScraper(BaseWebsiteScraper):
             js_only=True,
             magic=True,
             session_id=self.session_id,
+            log_console=self.debug_mode,
             js_code="""
                 (async () => {
                     Cookiebot.submitCustomConsent(false, true, false); Cookiebot.hide();
@@ -158,6 +159,7 @@ class VestedaScraper(BaseWebsiteScraper):
             session_id=self.session_id,
             magic=False,
             user_agent_mode="random",
+            log_console=self.debug_mode,
         )
 
         result: CrawlResult = await self.crawler.arun(url=self.current_url, config=gallery_config)  # type: ignore
@@ -243,7 +245,7 @@ class VestedaScraper(BaseWebsiteScraper):
             min_word_threshold=3,
         )
         config = CrawlerRunConfig(
-            log_console=False,
+            log_console=self.debug_mode,
             exclude_domains=["deploy.mopinion.com", "app.cobrowser.com"],
             mean_delay=1,
             markdown_generator=DefaultMarkdownGenerator(
