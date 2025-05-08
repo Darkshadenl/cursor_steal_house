@@ -12,11 +12,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements.txt first for better caching
+# Copy requirements-docker.txt first for better caching
 COPY requirements-docker.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements-docker.txt
 
 # Copy crawler code
 COPY crawler_job /app/crawler_job
