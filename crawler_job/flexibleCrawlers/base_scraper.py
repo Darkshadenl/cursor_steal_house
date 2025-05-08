@@ -72,6 +72,7 @@ class BaseWebsiteScraper(ABC):
         check_config = CrawlerRunConfig(
             session_id=self.session_id,
             cache_mode=CacheMode.BYPASS,
+            log_console=self.debug_mode,
             js_only=False,
             magic=False,
             user_agent_mode="random",
@@ -103,9 +104,9 @@ class BaseWebsiteScraper(ABC):
             CrawlerRunConfig: The default configuration for crawl4ai.
         """
         return CrawlerRunConfig(
-            log_console=True,
             cache_mode=CacheMode.BYPASS,
             session_id=self.session_id,
+            log_console=self.debug_mode,
             js_only=False,
             magic=False,
             user_agent_mode="random",
@@ -151,6 +152,7 @@ class BaseWebsiteScraper(ABC):
                 js_only=False,
                 magic=False,
                 js_code=js_code,
+                log_console=self.debug_mode,
             )
 
             # logger.debug(f"Run config: {run_config}")
