@@ -29,6 +29,7 @@ class BaseWebsiteScraper(ABC):
         config: WebsiteConfig,
         session_id: str,
         notification_service: Optional[NotificationService] = None,
+        debug_mode: bool = False,
     ):
         """Initialize the scraper.
 
@@ -39,7 +40,7 @@ class BaseWebsiteScraper(ABC):
         """
         self.config = config
         self.notification_service = notification_service
-
+        self.debug_mode = debug_mode
         if self.config.strategy_config.login_config:
             self.login_config = self.config.strategy_config.login_config
 
