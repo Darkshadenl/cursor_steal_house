@@ -215,10 +215,11 @@ class GalleryExtractionConfig(BaseModel):
     Pydantic model for gallery extraction configuration.
     """
 
-    correct_urls_paths: List[str]
-    schema: Dict[str, Any]
+    correct_urls_paths: Optional[List[str]] = None
+    schema: Optional[Dict[str, Any]] = None
     next_page_selector: Optional[str] = None
     previous_page_selector: Optional[str] = None
+    regex: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -238,7 +239,8 @@ class NavigationConfig(BaseModel):
     Pydantic model for navigation configuration.
     """
 
-    listings_page_url: str
+    sitemap: Optional[str] = None
+    gallery: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -262,8 +264,8 @@ class LoginConfig(BaseModel):
     username_selector: str
     password_selector: str
     submit_selector: str
-    success_check_url_path: str
-    expected_url: str
+    success_check_url_path: Optional[str] = None
+    expected_url_path: str
     success_indicator_selector: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -292,7 +294,7 @@ class WebsiteConfig(BaseModel):
     website_name: str
     base_url: str
     is_active: bool
-    scrape_strategy: str = "multi_step" or "sitemap"
+    scrape_strategy: str = "gallery" or "sitemap"
     strategy_config: StrategyConfig
     session_id: str
     accept_cookies: bool

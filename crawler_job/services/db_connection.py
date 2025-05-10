@@ -22,7 +22,7 @@ POSTGRES_HOST = os.getenv("POSTGRES_HOST")
 DATABASE_URL = f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 
 # Create async engine
-logger.debug(DATABASE_URL)
+logger.debug(f"DATABASE_URL: {DATABASE_URL}")
 
 engine = create_async_engine(
     DATABASE_URL,

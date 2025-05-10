@@ -1,5 +1,6 @@
 from typing import Dict, Optional, Type
 
+from crawler_job.flexibleCrawlers.huis_sleutel_scraper import HuisSleutelScraper
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.services.logger_service import setup_logger
 
@@ -12,12 +13,12 @@ from crawler_job.services.repositories.json_config_repository import (
 # Map website identifiers to their specific scraper classes
 SCRAPER_CLASSES: Dict[str, Type[BaseWebsiteScraper]] = {
     "vesteda": VestedaScraper,
+    "de_huis_sleutel": HuisSleutelScraper,
 }
 
-logger = setup_logger(__name__)
+
 
 class ScraperFactory:
-    """Factory for creating website scrapers with hybrid configuration support."""
 
     def __init__(
         self,
@@ -32,6 +33,7 @@ class ScraperFactory:
         """
         self.json_config_repo = json_config_repo
         self.debug_mode = debug_mode
+        self.logger = setup_logger(__name__)
 
     async def get_scraper_async(self, website_name: str, notification_service: Optional[NotificationService] = None) -> BaseWebsiteScraper:
         """Get a scraper instance for the given website identifier.
@@ -53,7 +55,7 @@ class ScraperFactory:
             scraper_class = SCRAPER_CLASSES.get(
                 website_name.lower(), BaseWebsiteScraper
             )
-            logger.info(
+            self.logger.info(
                 f"Using scraper class {scraper_class.__name__} for identifier '{website_name}' with JSON config."
             )
             return scraper_class(
@@ -66,5 +68,5 @@ class ScraperFactory:
             error_msg = (
                 f"No valid configuration found for website identifier '{website_name}'."
             )
-            logger.error(error_msg)
+            self.logger.error(error_msg)
             raise ValueError(error_msg)

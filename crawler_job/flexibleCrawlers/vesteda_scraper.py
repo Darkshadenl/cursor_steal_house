@@ -34,21 +34,14 @@ class VestedaScraper(BaseWebsiteScraper):
         notification_service: Optional[NotificationService] = None,
         debug_mode: bool = False,
     ):
-        """Initialize the Vesteda scraper.
-
-        Args:
-            crawler: The crawl4ai crawler instance to use.
-            config: The validated website configuration.
-            notification_service: The notification service to use.
-        """
         super().__init__(config, session_id, notification_service, debug_mode)
 
         logger.info(f"Vesteda scraper initialized...")
 
     def _build_crawler(self) -> AsyncWebCrawler:
         self.browser_config = BrowserConfig(
-            headless=True,
-            verbose=True,
+            headless=not self.debug_mode,
+            verbose=self.debug_mode,
             use_managed_browser=True,
             user_data_dir="./browser_data/vesteda",
             extra_args=[
@@ -143,6 +136,9 @@ class VestedaScraper(BaseWebsiteScraper):
             self.config.strategy_config.gallery_extraction_config
         )
 
+        if not gallery_extraction_config.correct_urls_paths:
+            raise Exception("No correct URLs provided")
+
         correct_urls = [
             f"{self.config.base_url}{path}"
             for path in gallery_extraction_config.correct_urls_paths
@@ -153,6 +149,9 @@ class VestedaScraper(BaseWebsiteScraper):
 
         schema = gallery_extraction_config.schema
 
+        if not schema:
+            raise Exception("No schema provided")
+
         gallery_config = CrawlerRunConfig(
             extraction_strategy=JsonCssExtractionStrategy(schema),
             cache_mode=CacheMode.BYPASS,
@@ -160,6 +159,8 @@ class VestedaScraper(BaseWebsiteScraper):
             magic=False,
             user_agent_mode="random",
             log_console=self.debug_mode,
+            exclude_all_images=True,
+            exclude_social_media_links=True,
         )
 
         result: CrawlResult = await self.crawler.arun(url=self.current_url, config=gallery_config)  # type: ignore
@@ -256,6 +257,8 @@ class VestedaScraper(BaseWebsiteScraper):
             js_only=False,
             magic=True,
             user_agent_mode="random",
+            exclude_all_images=True,
+            exclude_social_media_links=True,
         )
 
         dispatcher = SemaphoreDispatcher(
@@ -312,5 +315,4 @@ class VestedaScraper(BaseWebsiteScraper):
             logger.error(
                 f"Critical error during detailed property extraction: {str(e)}"
             )
-            # Return partial results if possible
             return [FetchedPage(url=url, markdown="", success=False) for url in urls]

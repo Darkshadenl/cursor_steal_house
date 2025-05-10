@@ -75,22 +75,29 @@ async def run_crawler_async(
         results: List[Dict[str, Any]] = []
 
         for website_name in websites:
+            # if website_name == "vesteda":
+            #     continue
+
             scraper = await factory.get_scraper_async(
                 website_name, notification_service
             )
 
             logger.info(f"Starting crawl for website: {website_name}")
-            result = await scraper.run_async()
-            results.append(result)
-            if result["success"]:
-                logger.info(f"Crawl completed successfully for website: {website_name}")
-                logger.info(f"Total houses found: {result['total_houses_count']}")
-                logger.info(f"New houses: {result['new_houses_count']}")
-                logger.info(f"Updated houses: {result['updated_houses_count']}")
-            else:
-                logger.error(
-                    f"Crawl failed for website: {website_name}. Error: {result.get('error', 'Unknown error')}"
-                )
+            try:
+                
+                result = await scraper.run_async()
+                results.append(result)
+                if result["success"]:
+                    logger.info(f"Crawl completed successfully for website: {website_name}")
+                    logger.info(f"Total houses found: {result['total_houses_count']}")
+                    logger.info(f"New houses: {result['new_houses_count']}")
+                    logger.info(f"Updated houses: {result['updated_houses_count']}")
+                else:
+                    logger.error(
+                        f"Crawl failed for website: {website_name}. Error: {result.get('error', 'Unknown error')}"
+                    )
+            except Exception as e:
+                logger.error(f"Error running crawler: {str(e)}")
 
         success = all(result["success"] for result in results)
 
@@ -144,8 +151,8 @@ if __name__ == "__main__":
         result = asyncio.run(
             run_crawler_async(
                 websites,
-                test_notifications_only,
                 notifications_enabled,
+                test_notifications_only,
                 debug_mode,
             )
         )

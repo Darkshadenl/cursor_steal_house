@@ -1,4 +1,5 @@
 import logging
+import os
 from colorlog import ColoredFormatter
 
 
@@ -18,7 +19,11 @@ def setup_logger(name: str) -> logging.Logger:
     handler.setFormatter(formatter)
 
     logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)
+    log_level = os.getenv("LOG_LEVEL", "DEBUG")
+    debug_mode = os.getenv("DEBUG_MODE", "false").lower() == "true"
+    if debug_mode:
+        log_level = "DEBUG"
+    logger.setLevel(log_level)
     logger.handlers.clear()
     logger.addHandler(handler)
 
