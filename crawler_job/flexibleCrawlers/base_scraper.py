@@ -324,7 +324,7 @@ class BaseWebsiteScraper(ABC):
                     f"Extracting data from the crawler using LLM for {result.url}..."
                 )
                 extra_instructions = (
-                    f"The detail url is: {result.url}\n {llm_instructions}"
+                    f"Determine for yourself if the property is a parking spot and fill in is_parkingspot based on that. \n The detail url is: {result.url}\n {llm_instructions}"
                 )
                 extracted_data: Optional[Dict[str, Any]] = await llm_service.extract(
                     data_str,
@@ -347,12 +347,7 @@ class BaseWebsiteScraper(ABC):
 
         logger.info(f"Extracted {len(houses)} houses from sitemap using regex.")
 
-        self.validate_sitemap_data(houses)
-
         return houses
-
-    def validate_sitemap_data(self, houses):
-        pass
 
     async def extract_gallery_async(self) -> List[House]:
         """Extract data from the gallery/listings page.
@@ -537,6 +532,15 @@ class BaseWebsiteScraper(ABC):
         sitemap_html = await self.navigate_to_sitemap_async()
         await self.apply_filters_async()
         houses = await self.extract_sitemap_async(sitemap_html)
+        new_houses = await self._check_if_houses_exist(houses)
+        await self._store_houses(new_houses)
+
+        return {
+            "success": True,
+            "total_houses_count": len(houses),
+            "new_houses_count": len(new_houses),
+            "updated_houses_count": len(houses) - len(new_houses),
+        }
 
     async def run_async(self) -> Dict[str, Any]:
         """Run the complete scraping process.
