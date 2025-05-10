@@ -73,6 +73,8 @@ class DbHouse(Base):
     # Extra options
     options = Column(Text, nullable=True)
 
+    is_parkingspot = Column(Boolean, default=False)
+
     def has_changes(self, other):
         """
         Check if another DbHouse instance has different values.

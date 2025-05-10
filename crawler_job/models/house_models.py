@@ -96,6 +96,10 @@ class House(BaseModel):
         None, description="Extra options or possibilities for the house"
     )
 
+    is_parkingspot: bool = Field(
+        False, description="Indicates if this property is a parking spot"
+    )
+
     def to_db_model(self):
         """Convert House Pydantic model to DbHouse SQLAlchemy model
 
@@ -132,6 +136,7 @@ class House(BaseModel):
             location_map_url=self.location_map_url,
             request_viewing_url=self.request_viewing_url,
             options=self.options,
+            is_parkingspot=self.is_parkingspot,
         )
 
     @classmethod
@@ -172,6 +177,7 @@ class House(BaseModel):
             location_map_url=db_model.location_map_url,
             request_viewing_url=db_model.request_viewing_url,
             options=db_model.options,
+            is_parkingspot=getattr(db_model, "is_parkingspot", False),
         )
 
     @classmethod
@@ -212,8 +218,9 @@ class House(BaseModel):
             location_map_url=data.get("location_map_url"),
             request_viewing_url=data.get("request_viewing_url"),
             options=data.get("options"),
+            is_parkingspot=data.get("is_parkingspot", False),
         )
-        
+
     def to_readable_string(self) -> str:
         """Convert the house model to a human-readable string representation.
         Only includes fields that have values (not None).
@@ -222,14 +229,10 @@ class House(BaseModel):
             str: A formatted string with key-value pairs of house information
         """
         # Get all fields that have values
-        fields = {
-            k: str(v) for k, v in self.model_dump().items()
-            if v is not None
-        }
-        
+        fields = {k: str(v) for k, v in self.model_dump().items() if v is not None}
+
         # Create formatted string with each field on a new line
         return "\n".join(f"{k}: {v}" for k, v in fields.items())
-
 
 
 class FetchedPage(BaseModel):
