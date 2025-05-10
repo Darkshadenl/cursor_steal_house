@@ -155,9 +155,6 @@ class BaseWebsiteScraper(ABC):
                 log_console=self.debug_mode,
             )
 
-            # logger.debug(f"Run config: {run_config}")
-            # logger.debug(f"JS code: {js_code}")
-
             login_result: CrawlResult = await self.crawler.arun(
                 full_login_url, config=run_config
             )  # type: ignore
@@ -168,7 +165,6 @@ class BaseWebsiteScraper(ABC):
                 )
 
             self.current_url = login_result.url
-            # logger.debug(f"Login result: {login_result}")
             return True
 
         except Exception as e:
@@ -428,6 +424,9 @@ class BaseWebsiteScraper(ABC):
         return houses
 
     async def validate_login(self) -> bool:
+        if self.navigated_to_gallery:
+            return True
+
         await asyncio.sleep(2)
         logger.info(f"Validating login success of {self.config.website_name}")
 
@@ -444,8 +443,8 @@ class BaseWebsiteScraper(ABC):
         await self.login_async()
         
         if not await self.validate_login():
-                logger.error("Login failed, aborting scrape")
-                return self.default_results
+            logger.error("Login failed, aborting scrape")
+            return self.default_results
 
         await self.navigate_to_gallery_async()
         await self.apply_filters_async()
