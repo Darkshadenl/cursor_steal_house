@@ -69,18 +69,18 @@ Rules:
                 temperature=0.1,
             )
 
-            content = response.choices[0].message.content
+            content = response.choices[0].message.content # type: ignore
 
             if content == "null":
-                return None
+                return None # type: ignore
 
-            return self.remove_markdown_block_syntax(content)
+            return self.remove_markdown_block_syntax(content) # type: ignore
         except Exception as e:
             print(f"Error in {self.provider.value} extraction: {str(e)}")
-            return None
+            return None # type: ignore
 
     async def extract(
-        self, markdown: str, schema: Dict[str, Any], provider: LLMProvider
+        self, markdown: str, schema: Dict[str, Any], provider: LLMProvider, extra_instructions: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """Extract structured data from markdown using specified LLM provider"""
         try:
@@ -106,6 +106,9 @@ Rules:
                     DO NOT USE MARKDOWN BLOCK SYNTAX (```json) IN THE RETURNED JSON.
                     THIS WILL CAUSE THE JSON.PARSE TO FAIL.
                     USE DOUBLE QUOTES FOR KEYS AND VALUES.
+                    
+                    Extra instructions, if any:
+                    {extra_instructions}
                     """,
                     },
                     {"role": "user", "content": markdown},

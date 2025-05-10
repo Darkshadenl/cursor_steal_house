@@ -185,13 +185,13 @@ class House(BaseModel):
             House: New House Pydantic model created from the dictionary
         """
         return cls(
-            address=data.get("address"),
-            city=data.get("city"),
-            postal_code=data.get("postal_code"),
-            neighborhood=data.get("neighborhood"),
-            status=data.get("status"),
+            address=data.get("address", ""),
+            city=data.get("city", ""),
+            postal_code=data.get("postal_code", ""),
+            neighborhood=data.get("neighborhood", ""),
+            status=data.get("status", ""),
             high_demand=data.get("high_demand", False),
-            demand_message=data.get("demand_message"),
+            demand_message=data.get("demand_message", ""),
             detail_url=data.get("detail_url"),
             rental_price=data.get("rental_price"),
             service_costs=data.get("service_costs"),
