@@ -1,5 +1,7 @@
 from typing import Dict, Optional, Type
 
+from crawl4ai import AsyncWebCrawler
+
 from crawler_job.flexibleCrawlers.huis_sleutel_scraper import HuisSleutelScraper
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.services.logger_service import setup_logger
@@ -23,6 +25,7 @@ class ScraperFactory:
     def __init__(
         self,
         json_config_repo: JsonConfigRepository,
+        crawler: AsyncWebCrawler,
         debug_mode: bool = False,
     ):
         """Initialize the scraper factory.
@@ -34,7 +37,7 @@ class ScraperFactory:
         self.json_config_repo = json_config_repo
         self.debug_mode = debug_mode
         self.logger = setup_logger(__name__)
-
+        self.crawler = crawler
     async def get_scraper_async(self, website_name: str, notification_service: Optional[NotificationService] = None) -> BaseWebsiteScraper:
         """Get a scraper instance for the given website identifier.
 
@@ -61,6 +64,7 @@ class ScraperFactory:
             return scraper_class(
                 config=website_config,
                 session_id=website_config.session_id,
+                crawler=self.crawler,
                 notification_service=notification_service,
                 debug_mode=self.debug_mode,
             )

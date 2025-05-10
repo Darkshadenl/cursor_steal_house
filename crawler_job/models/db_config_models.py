@@ -194,22 +194,6 @@ class DbFieldMapping(Base):
 
 # Pydantic models for configuration data
 
-
-class FieldConfig(BaseModel):
-    """
-    Pydantic model for field configuration in extraction.
-    """
-
-    target_field: str
-    selector: str
-    extraction_type: str = "text"  # 'text', 'attribute', or 'html'
-    attribute_name: Optional[str] = None
-    is_required: bool = False
-    transformation_rule: Optional[List[Dict[str, Any]]] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 class GalleryExtractionConfig(BaseModel):
     """
     Pydantic model for gallery extraction configuration.
@@ -217,9 +201,8 @@ class GalleryExtractionConfig(BaseModel):
 
     correct_urls_paths: Optional[List[str]] = None
     schema: Optional[Dict[str, Any]] = None
-    next_page_selector: Optional[str] = None
-    previous_page_selector: Optional[str] = None
     regex: Optional[str] = None
+    extra_llm_instructions: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -229,10 +212,19 @@ class DetailPageExtractionConfig(BaseModel):
     Pydantic model for detail page extraction configuration.
     """
 
-    schema: Dict[str, Any]
-
+    schema: Optional[Dict[str, Any]] = None
+    extra_llm_instructions: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
+class SitemapExtractionConfig(BaseModel):
+    """
+    Pydantic model for sitemap extraction configuration.
+    """
+
+    schema: Optional[Dict[str, Any]] = None
+    regex: Optional[str] = None
+    extra_llm_instructions: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
 
 class NavigationConfig(BaseModel):
     """
@@ -267,6 +259,7 @@ class LoginConfig(BaseModel):
     success_check_url_path: Optional[str] = None
     expected_url_path: str
     success_indicator_selector: Optional[str] = None
+    validate_login: bool = True
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -278,8 +271,9 @@ class StrategyConfig(BaseModel):
 
     navigation_config: NavigationConfig
     filtering_config: Optional[FilteringConfig] = None
-    gallery_extraction_config: GalleryExtractionConfig
+    gallery_extraction_config: Optional[GalleryExtractionConfig] = None
     detail_page_extraction_config: Optional[DetailPageExtractionConfig] = None
+    sitemap_extraction_config: Optional[SitemapExtractionConfig] = None
     login_config: Optional[LoginConfig] = None
 
     model_config = ConfigDict(from_attributes=True)

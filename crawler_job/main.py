@@ -1,6 +1,7 @@
 import asyncio
 import argparse
 import os
+from crawl4ai import AsyncWebCrawler, BrowserConfig
 from dotenv import load_dotenv
 import sys
 from typing import Dict, Any, List
@@ -50,6 +51,24 @@ async def run_crawler_async(
         Dict[str, Any]: Results of the crawling process
     """
     try:
+        browser_config = BrowserConfig(
+            headless=not debug_mode,
+            verbose=debug_mode,
+            use_managed_browser=True,
+            user_data_dir="./browser_data/general",
+            extra_args=[
+                "--no-sandbox",
+                "--disable-gpu",
+                "--disable-dev-shm-usage",
+                "--remote-debugging-address=0.0.0.0",
+                "--remote-debugging-port=9222",
+            ],
+        )
+
+        crawler = AsyncWebCrawler(
+            config=browser_config,
+        )
+
         db_session = get_db_session()
         notification_service = NotificationService(
             notifications_on=notifications_enabled
@@ -71,33 +90,45 @@ async def run_crawler_async(
             return True
 
         json_config_repo = JsonConfigRepository(db_session)
-        factory = ScraperFactory(json_config_repo, debug_mode)
+        factory = ScraperFactory(json_config_repo, crawler, debug_mode)
         results: List[Dict[str, Any]] = []
 
-        for website_name in websites:
-            # if website_name == "vesteda":
-            #     continue
+        try:
+            await crawler.start()
 
-            scraper = await factory.get_scraper_async(
-                website_name, notification_service
-            )
+            for website_name in websites:
+                if website_name == "vesteda":
+                    continue
 
-            logger.info(f"Starting crawl for website: {website_name}")
-            try:
-                
-                result = await scraper.run_async()
-                results.append(result)
-                if result["success"]:
-                    logger.info(f"Crawl completed successfully for website: {website_name}")
-                    logger.info(f"Total houses found: {result['total_houses_count']}")
-                    logger.info(f"New houses: {result['new_houses_count']}")
-                    logger.info(f"Updated houses: {result['updated_houses_count']}")
-                else:
-                    logger.error(
-                        f"Crawl failed for website: {website_name}. Error: {result.get('error', 'Unknown error')}"
-                    )
-            except Exception as e:
-                logger.error(f"Error running crawler: {str(e)}")
+                scraper = await factory.get_scraper_async(
+                    website_name, notification_service
+                )
+
+                logger.info(f"Starting crawl for website: {website_name}")
+                try:
+                    result = await scraper.run_async()
+                    results.append(result)
+                    if result["success"]:
+                        logger.info(
+                            f"Crawl completed successfully for website: {website_name}"
+                        )
+                        logger.info(
+                            f"Total houses found: {result['total_houses_count']}"
+                        )
+                        logger.info(f"New houses: {result['new_houses_count']}")
+                        logger.info(f"Updated houses: {result['updated_houses_count']}")
+                    else:
+                        logger.error(
+                            f"Crawl failed for website: {website_name}. Error: {result.get('error', 'Unknown error')}"
+                        )
+                except Exception as e:
+                    logger.error(f"Error running crawler: {str(e)}")
+
+        except Exception as e:
+            logger.error(f"Error starting crawler: {str(e)}")
+            return False
+        finally:
+            await crawler.close()
 
         success = all(result["success"] for result in results)
 

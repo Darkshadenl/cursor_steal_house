@@ -31,33 +31,13 @@ class VestedaScraper(BaseWebsiteScraper):
         self,
         config: WebsiteConfig,
         session_id: str,
+        crawler: AsyncWebCrawler,
         notification_service: Optional[NotificationService] = None,
         debug_mode: bool = False,
     ):
-        super().__init__(config, session_id, notification_service, debug_mode)
+        super().__init__(config, session_id, crawler, notification_service, debug_mode)
 
         logger.info(f"Vesteda scraper initialized...")
-
-    def _build_crawler(self) -> AsyncWebCrawler:
-        self.browser_config = BrowserConfig(
-            headless=not self.debug_mode,
-            verbose=self.debug_mode,
-            use_managed_browser=True,
-            user_data_dir="./browser_data/vesteda",
-            extra_args=[
-                "--no-sandbox",
-                "--disable-gpu",
-                "--disable-dev-shm-usage",
-                "--remote-debugging-address=0.0.0.0",
-                "--remote-debugging-port=9222",
-            ],
-        )
-
-        self.crawler = AsyncWebCrawler(
-            config=self.browser_config,
-        )
-
-        return self.crawler
 
     async def _accept_cookies(self, current_url: str) -> bool:
         if not self.config.accept_cookies:

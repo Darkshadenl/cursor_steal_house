@@ -31,18 +31,19 @@ class HuisSleutelScraper(BaseWebsiteScraper):
         self,
         config: WebsiteConfig,
         session_id: str,
+        crawler: AsyncWebCrawler,
         notification_service: Optional[NotificationService] = None,
         debug_mode: bool = False,
     ):
-        super().__init__(config, session_id, notification_service, debug_mode)
+        super().__init__(config, session_id, crawler, notification_service, debug_mode)
 
         logger.info(f"HuisSleutel scraper initialized...")
 
     async def navigate_to_gallery_async(self) -> None:
         pass
-    
+
     def validate_sitemap_data(self):
-        pass 
+        pass
 
     async def validate_login(self) -> bool:  # type: ignore
         pass
@@ -52,24 +53,3 @@ class HuisSleutelScraper(BaseWebsiteScraper):
 
     async def apply_filters_async(self) -> None:
         pass
-
-    def _build_crawler(self) -> AsyncWebCrawler:
-        self.browser_config = BrowserConfig(
-            headless=not self.debug_mode,
-            verbose=self.debug_mode,
-            use_managed_browser=True,
-            user_data_dir="./browser_data/huis_sleutel",
-            extra_args=[
-                "--no-sandbox",
-                "--disable-gpu",
-                "--disable-dev-shm-usage",
-                "--remote-debugging-address=0.0.0.0",
-                "--remote-debugging-port=9222",
-            ],
-        )
-
-        self.crawler = AsyncWebCrawler(
-            config=self.browser_config,
-        )
-
-        return self.crawler

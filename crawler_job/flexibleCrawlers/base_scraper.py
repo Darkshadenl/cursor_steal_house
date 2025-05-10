@@ -10,10 +10,19 @@ from crawl4ai import (
     AsyncWebCrawler,
     CacheMode,
     CrawlResult,
+    CrawlerMonitor,
     CrawlerRunConfig,
     JsonCssExtractionStrategy,
+    RateLimiter,
+    SemaphoreDispatcher,
 )
-from crawler_job.models.db_config_models import WebsiteConfig
+from crawler_job.models.db_config_models import (
+    DetailPageExtractionConfig,
+    GalleryExtractionConfig,
+    LoginConfig,
+    SitemapExtractionConfig,
+    WebsiteConfig,
+)
 from crawler_job.models.house_models import House, FetchedPage
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.services import llm_service
@@ -31,6 +40,7 @@ class BaseWebsiteScraper(ABC):
         self,
         config: WebsiteConfig,
         session_id: str,
+        crawler: AsyncWebCrawler,
         notification_service: Optional[NotificationService] = None,
         debug_mode: bool = False,
     ):
@@ -44,8 +54,18 @@ class BaseWebsiteScraper(ABC):
         self.config = config
         self.notification_service = notification_service
         self.debug_mode = debug_mode
-        if self.config.strategy_config.login_config:
-            self.login_config = self.config.strategy_config.login_config
+
+        self.login_config: LoginConfig = self.config.strategy_config.login_config  # type: ignore
+        self.detail_page_extraction_config: DetailPageExtractionConfig = (
+            self.config.strategy_config.detail_page_extraction_config
+        )  # type: ignore
+
+        self.gallery_extraction_config: GalleryExtractionConfig = (
+            self.config.strategy_config.gallery_extraction_config
+        )
+        self.sitemap_extraction_config: SitemapExtractionConfig = (
+            self.config.strategy_config.sitemap_extraction_config
+        )  # type: ignore
 
         self.session_id = session_id
 
@@ -60,7 +80,7 @@ class BaseWebsiteScraper(ABC):
             user_agent_mode="random",
         )
 
-        self.crawler: Optional[AsyncWebCrawler] = None
+        self.crawler: AsyncWebCrawler = crawler
         self.accepted_cookies = False
         self.navigated_to_gallery = False
         self.navigated_to_sitemap = False
@@ -173,7 +193,9 @@ class BaseWebsiteScraper(ABC):
 
     async def navigate_to_sitemap_async(self) -> str:
         if self.navigated_to_sitemap:
-            raise Exception("Already navigated to sitemap. How? Something must be wrong.")
+            raise Exception(
+                "Already navigated to sitemap. How? Something must be wrong."
+            )
 
         if not self.crawler:
             raise Exception("Crawler not initialized")
@@ -199,6 +221,7 @@ class BaseWebsiteScraper(ABC):
         else:
             self.navigated_to_sitemap = False
             raise Exception(f"Failed to navigate to sitemap: {result.error_message}")
+
     async def navigate_to_gallery_async(self) -> None:
         """Navigate to the listings/gallery page."""
         if self.navigated_to_gallery:
@@ -244,16 +267,29 @@ class BaseWebsiteScraper(ABC):
         Returns:
             List[House]: List of extracted House objects from the sitemap.
         """
-        regex = self.config.strategy_config.gallery_extraction_config.regex
-        schema = self.config.strategy_config.gallery_extraction_config.schema
-        
+        regex = self.sitemap_extraction_config.regex
+        schema = self.sitemap_extraction_config.schema
+        llm_instructions = self.sitemap_extraction_config.extra_llm_instructions
+
         if not regex or not schema:
             raise Exception("No regex or schema provided for sitemap extraction")
 
         logger.info(f"Extracting sitemap with regex: {regex}")
-        
-        links = re.findall(regex, sitemap_html)
-        gallery_config = CrawlerRunConfig(
+
+        urls = re.findall(regex, sitemap_html)
+        logger.info("Done with regex. Let's extract the data!")
+        dispatcher = SemaphoreDispatcher(
+            semaphore_count=1,
+            max_session_permit=1,
+            monitor=CrawlerMonitor(urls_total=10, enable_ui=False),
+            rate_limiter=RateLimiter(
+                base_delay=(3.0, 5.0),
+                max_delay=30.0,
+                max_retries=3,
+                rate_limit_codes=[429, 503],
+            ),
+        )
+        config = CrawlerRunConfig(
             extraction_strategy=JsonCssExtractionStrategy(schema),
             cache_mode=CacheMode.BYPASS,
             session_id=self.session_id,
@@ -264,42 +300,59 @@ class BaseWebsiteScraper(ABC):
             exclude_social_media_links=True,
         )
 
-        houses = []
+        houses: List[House] = []
         schema = House.model_json_schema()
         llm_service = LLMService()
-        
-        for link in links:
-            result: CrawlResult = await self.crawler.arun(url=link, config=gallery_config)  # type: ignore
-            
-            if not result.success:
-                raise Exception(
-                    f"Failed to extract property listings: {result.error_message}"
-                )
-            if not result.extracted_content:
-                raise Exception("No extracted content")
-            
-            try:
+
+        try:
+            logger.info("Running the crawler...")
+            results: List[CrawlResult] = await self.crawler.arun_many(
+                urls=urls, config=config, dispatcher=dispatcher
+            )  # type: ignore
+
+            for result in results:
+                if not result.success:
+                    raise Exception(
+                        f"Failed to extract property listings: {result.error_message}"
+                    )
+                if not result.extracted_content:
+                    raise Exception("No extracted content")
+
                 data = json.loads(result.extracted_content)
                 data_str = json.dumps(data, indent=2, ensure_ascii=False)
-                extracted_data: Optional[Dict[str, Any]] = await llm_service.extract(
-                    data_str, schema, LLMProvider.GEMINI
+                logger.info(
+                    f"Extracting data from the crawler using LLM for {result.url}..."
                 )
-                print(extracted_data)
-            except Exception as e:
-                logger.warning(f"Error extracting data for {link}: {str(e)}")
-                continue
+                extra_instructions = (
+                    f"The detail url is: {result.url}\n {llm_instructions}"
+                )
+                extracted_data: Optional[Dict[str, Any]] = await llm_service.extract(
+                    data_str,
+                    schema,
+                    LLMProvider.GEMINI,
+                    extra_instructions=extra_instructions,
+                )
+                logger.info(
+                    f"Done extracting data from the crawler using LLM for {result.url}."
+                )
+                if extracted_data is None:
+                    logger.warning(f"No data extracted for {result.url}")
+                    continue
+                json_data = json.loads(extracted_data)  # type: ignore
+                house = House.from_dict(json_data)
+                houses.append(house)
 
-            raw_data = json.loads(result.extracted_content)
-            houses.append(raw_data)
+        except Exception as e:
+            raise e
 
         logger.info(f"Extracted {len(houses)} houses from sitemap using regex.")
-        
+
         self.validate_sitemap_data(houses)
-        
+
         return houses
-    
+
     def validate_sitemap_data(self, houses):
-        pass 
+        pass
 
     async def extract_gallery_async(self) -> List[House]:
         """Extract data from the gallery/listings page.
@@ -331,10 +384,6 @@ class BaseWebsiteScraper(ABC):
         raise NotImplementedError(
             "Implementing detail page extraction configuration in derived class!"
         )
-
-    @abstractmethod
-    def _build_crawler(self) -> AsyncWebCrawler:
-        pass
 
     async def _accept_cookies(self, current_url: str) -> bool:
         if not self.config.accept_cookies:
@@ -424,7 +473,8 @@ class BaseWebsiteScraper(ABC):
         return houses
 
     async def validate_login(self) -> bool:
-        if self.navigated_to_gallery:
+        if not self.login_config.validate_login or self.navigated_to_gallery:
+            logger.info(f"Skipping login validation for {self.config.website_name}")
             return True
 
         await asyncio.sleep(2)
@@ -441,7 +491,7 @@ class BaseWebsiteScraper(ABC):
     async def run_gallery_scrape(self) -> Dict[str, Any]:
         await self.navigate_to_gallery_async()
         await self.login_async()
-        
+
         if not await self.validate_login():
             logger.error("Login failed, aborting scrape")
             return self.default_results
@@ -450,11 +500,11 @@ class BaseWebsiteScraper(ABC):
         await self.apply_filters_async()
         houses = await self.extract_gallery_async()
         new_houses = await self._check_if_houses_exist(houses)
-        
+
         if not new_houses or len(new_houses) == 0:
-                logger.info("No new houses found, we're done here!")
-                self.default_results["success"] = True
-                return self.default_results
+            logger.info("No new houses found, we're done here!")
+            self.default_results["success"] = True
+            return self.default_results
 
         fetched_pages = await self.extract_details_async(new_houses)
         detailed_houses = await self.execute_llm_extraction(
@@ -479,6 +529,7 @@ class BaseWebsiteScraper(ABC):
 
     async def run_sitemap_scrape(self) -> Dict[str, Any]:
         await self.login_async()
+
         if not await self.validate_login():
             logger.error("Login failed, aborting scrape")
             return self.default_results
@@ -486,36 +537,23 @@ class BaseWebsiteScraper(ABC):
         sitemap_html = await self.navigate_to_sitemap_async()
         await self.apply_filters_async()
         houses = await self.extract_sitemap_async(sitemap_html)
-        
+
     async def run_async(self) -> Dict[str, Any]:
         """Run the complete scraping process.
 
         Returns:
             List[Dict[str, Any]]: The collected data from all listings.
         """
-        logger.info(f"Building crawler...")
-        self.crawler = self._build_crawler()
         strategy = self.config.scrape_strategy
 
-        try:
-            logger.info(f"Starting crawler...")
-            await self.crawler.start()
-            
-            if strategy == ScrapeStrategy.GALLERY.value:
-                return await self.run_gallery_scrape()
-            elif strategy == ScrapeStrategy.SITEMAP.value:
-                return await self.run_sitemap_scrape()
-            else:
-                raise Exception(f"Invalid scrape strategy: {strategy}")
-            
-        except Exception as e:
-            logger.error(f"Error during scraping: {e}")
-            while True:
-                # wait for 10 seconds
-                await asyncio.sleep(10)
-            raise e
-        finally:
-            await self.crawler.close()
+        logger.info(f"Choosing strategy {strategy} for {self.config.website_name}")
+
+        if strategy == ScrapeStrategy.GALLERY.value:
+            return await self.run_gallery_scrape()
+        elif strategy == ScrapeStrategy.SITEMAP.value:
+            return await self.run_sitemap_scrape()
+        else:
+            raise Exception(f"Invalid scrape strategy: {strategy}")
 
 
 class ScrapeStrategy(Enum):
