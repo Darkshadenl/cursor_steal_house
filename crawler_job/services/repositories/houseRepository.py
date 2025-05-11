@@ -147,3 +147,33 @@ class HouseRepository:
         await self.session.flush()
         logger.info(f"Deleted house with ID: {house_id}")
         return True
+
+    async def get_by_detail_url(self, detail_url: str) -> Optional[DbHouse]:
+        """Get a house by its detail_url
+
+        Args:
+            detail_url: The detail URL of the house
+
+        Returns:
+            Optional[DbHouse]: The house if found, None otherwise
+        """
+        result = await self.session.execute(
+            select(DbHouse).where(DbHouse.detail_url == detail_url)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_detail_urls(self, detail_urls: List[str]) -> List[DbHouse]:
+        """Get houses by a list of detail_urls
+
+        Args:
+            detail_urls: List of detail URLs to check
+
+        Returns:
+            List[DbHouse]: List of houses found with those URLs
+        """
+        if not detail_urls:
+            return []
+        result = await self.session.execute(
+            select(DbHouse).where(DbHouse.detail_url.in_(detail_urls))
+        )
+        return result.scalars().all()
