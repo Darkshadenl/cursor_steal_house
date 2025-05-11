@@ -276,3 +276,23 @@ class HouseService:
         async with get_repository(self.session) as repo:
             db_houses = await repo.get_all()
             return await db_houses_to_pydantic_async(db_houses)
+
+    async def get_houses_by_detail_url_async(
+        self, detail_urls: Union[str, List[str]]
+    ) -> List[House]:
+        """
+        Check if a house or houses exist in the database by their detail_url(s).
+
+        Args:
+            detail_urls: A single detail URL (str) or a list of detail URLs (List[str])
+
+        Returns:
+            List[House]: List of found House models
+        """
+        if isinstance(detail_urls, str):
+            detail_urls = [detail_urls]
+        if not detail_urls:
+            return []
+        async with get_repository(self.session) as repo:
+            db_houses = await repo.get_by_detail_urls(detail_urls)
+            return await db_houses_to_pydantic_async(db_houses)

@@ -277,7 +277,19 @@ class BaseWebsiteScraper(ABC):
         logger.info(f"Extracting sitemap with regex: {regex}")
 
         urls = re.findall(regex, sitemap_html)
-        logger.info("Done with regex. Let's extract the data!")
+        logger.info(
+            "Done with regex. Let's check if it already exists in the database!"
+        )
+
+        async with HouseService(
+            notification_service=self.notification_service
+        ) as house_service:
+            existing_houses = await house_service.get_houses_by_detail_url_async(urls)
+            logger.info(f"Found {len(existing_houses)} existing houses")
+            if existing_houses:
+                existing_urls = {house.detail_url for house in existing_houses}
+                urls = [url for url in urls if url not in existing_urls]
+
         dispatcher = SemaphoreDispatcher(
             semaphore_count=1,
             max_session_permit=1,
@@ -305,7 +317,7 @@ class BaseWebsiteScraper(ABC):
         llm_service = LLMService()
 
         try:
-            logger.info("Running the crawler...")
+            logger.info(f"Running the crawler for {len(urls)} URLs...")
             results: List[CrawlResult] = await self.crawler.arun_many(
                 urls=urls, config=config, dispatcher=dispatcher
             )  # type: ignore
@@ -323,9 +335,7 @@ class BaseWebsiteScraper(ABC):
                 logger.info(
                     f"Extracting data from the crawler using LLM for {result.url}..."
                 )
-                extra_instructions = (
-                    f"Determine for yourself if the property is a parking spot and fill in is_parkingspot based on that. \n The detail url is: {result.url}\n {llm_instructions}"
-                )
+                extra_instructions = f"Determine for yourself if the property is a parking spot and fill in is_parkingspot based on that. \n The detail url is: {result.url}\n {llm_instructions}"
                 extracted_data: Optional[Dict[str, Any]] = await llm_service.extract(
                     data_str,
                     schema,
