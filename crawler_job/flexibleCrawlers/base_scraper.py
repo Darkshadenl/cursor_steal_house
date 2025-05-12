@@ -12,8 +12,10 @@ from crawl4ai import (
     CrawlResult,
     CrawlerMonitor,
     CrawlerRunConfig,
+    DefaultMarkdownGenerator,
     JsonCssExtractionStrategy,
     JsonXPathExtractionStrategy,
+    PruningContentFilter,
     RateLimiter,
     SemaphoreDispatcher,
 )
@@ -423,7 +425,8 @@ class BaseWebsiteScraper(ABC):
             cache_mode=CacheMode.BYPASS,
             session_id=self.session_id,
             magic=False,
-            css_selector=self.gallery_extraction_config.gallery_container_selector or "",
+            css_selector=self.gallery_extraction_config.gallery_container_selector
+            or "",
             user_agent_mode="random",
             log_console=self.debug_mode,
             exclude_all_images=True,
@@ -466,7 +469,9 @@ class BaseWebsiteScraper(ABC):
                         processed_data["square_meters"] = int(area_str)
                 elif "square_meters" in house_data and house_data["square_meters"]:
                     # Strip "m²" and convert to int
-                    area_str = house_data.get("square_meters", "").replace("m2", "").strip()
+                    area_str = (
+                        house_data.get("square_meters", "").replace("m2", "").strip()
+                    )
                     if area_str:
                         processed_data["square_meters"] = int(area_str)
             except ValueError:
@@ -511,21 +516,110 @@ class BaseWebsiteScraper(ABC):
     #         "Implementing gallery extraction configuration in derived class!"
     #     )
 
-    async def extract_details_async(self, houses: List[House]) -> List[FetchedPage]:
-        """Extract data from a detail page.
+    async def extract_fetched_pages_async(
+        self, houses: List[House]
+    ) -> List[FetchedPage]:
+        """
+        Extract detailed property information for the given houses
 
         Args:
-            houses: The list of houses to scrape.
+            houses: List of House objects with basic info
 
         Returns:
-            List[FetchedPage]: The list of fetched pages.
+            List[FetchedPage]: List of fetched detail pages
         """
-        if not self.config.strategy_config.detail_page_extraction_config:
-            raise Exception("No detail page extraction configuration provided.")
+        extraction_type = self.detail_page_extraction_config.schema_type
+        if not self.crawler:
+            raise Exception("Crawler not initialized")
+        if extraction_type not in ["llm"]:
+            raise Exception("Invalid extraction type")
 
-        raise NotImplementedError(
-            "Implementing detail page extraction configuration in derived class!"
+        logger.info("Starting detailed property extraction...")
+
+        prune_filter = PruningContentFilter(
+            # Lower → more content retained, higher → more content pruned
+            threshold=0.45,
+            threshold_type="dynamic",
+            min_word_threshold=3,
         )
+        config = CrawlerRunConfig(
+            log_console=self.debug_mode,
+            exclude_domains=self.detail_page_extraction_config.ignore_domains or [],
+            mean_delay=1,
+            markdown_generator=DefaultMarkdownGenerator(
+                content_filter=prune_filter,
+            ),
+            cache_mode=CacheMode.BYPASS,
+            session_id=self.session_id,
+            js_only=False,
+            magic=True,
+            user_agent_mode="random",
+            exclude_all_images=True,
+            exclude_social_media_links=True,
+        )
+
+        dispatcher = SemaphoreDispatcher(
+            semaphore_count=1,
+            max_session_permit=1,
+            monitor=CrawlerMonitor(urls_total=10, enable_ui=True),
+            rate_limiter=RateLimiter(
+                base_delay=(3.0, 5.0),
+                max_delay=30.0,
+                max_retries=3,
+                rate_limit_codes=[429, 503],
+            ),
+        )
+
+        urls = []
+        for house in houses:
+            if house.detail_url:
+                url = f"{self.config.base_url}{house.detail_url}"
+                urls.append(url)
+
+        logger.info(f"Starting fetch for {len(urls)} properties...")
+
+        try:
+            results: List[CrawlResult] = await self.crawler.arun_many(
+                urls=urls, config=config, dispatcher=dispatcher
+            )  # type: ignore
+
+            fetched_pages = []
+            for result in results:
+                if result.success and extraction_type in ["llm"]:
+                    fetched_pages.append(
+                        FetchedPage(
+                            url=result.url,
+                            markdown=result.markdown.raw_markdown,  # type: ignore
+                            success=True,
+                        )
+                    )
+                elif result.success and extraction_type in ["xpath", "css"]:
+
+                    pass
+                else:
+                    error_msg = (
+                        result.error_message
+                        if hasattr(result, "error_message")
+                        else "Unknown error"
+                    )
+                    logger.error(f"Error fetching property: {error_msg}")
+                    fetched_pages.append(
+                        FetchedPage(url=result.url, markdown="", success=False)
+                    )
+
+            logger.info(
+                f"Completed fetching property pages. Successfully fetched {sum(1 for page in fetched_pages if page.success)} out of {len(urls)} properties."
+            )
+            return fetched_pages
+        except Exception as e:
+            logger.error(
+                f"Critical error during detailed property extraction: {str(e)}"
+            )
+            return [FetchedPage(url=url, markdown="", success=False) for url in urls]
+
+    async def process_details_xpath_css(self, houses: List[House]) -> List[House]:
+        logger.info(f"Processing details with xpath/css for {len(houses)} houses...")
+        return []
 
     async def _accept_cookies(self, current_url: str) -> bool:
         if not self.config.accept_cookies:
@@ -694,17 +788,21 @@ class BaseWebsiteScraper(ABC):
         await self.navigate_to_gallery_async(force_navigation=True)
         await self.apply_filters_async()
         houses = await self.extract_gallery_async()
-        new_houses = await self._check_if_houses_exist(houses)
+        new_houses: List[House] = await self._check_if_houses_exist(houses)
 
         if not new_houses or len(new_houses) == 0:
             logger.info("No new houses found, we're done here!")
             self.default_results["success"] = True
             return self.default_results
 
-        fetched_pages = await self.extract_details_async(new_houses)
-        detailed_houses = await self.execute_llm_extraction(
-            fetched_pages, provider=LLMProvider.GEMINI
-        )
+        detailed_houses = []
+        if self.detail_page_extraction_config.schema_type in ["xpath", "css"]:
+            detailed_houses = await self.process_details_xpath_css(new_houses)
+        elif self.detail_page_extraction_config.schema_type == "llm":
+            fetched_pages = await self.extract_fetched_pages_async(new_houses)
+            detailed_houses = await self.execute_llm_extraction(
+                fetched_pages, provider=LLMProvider.GEMINI
+            )
 
         if not detailed_houses:
             logger.info("No detailed houses found. Exiting...")
