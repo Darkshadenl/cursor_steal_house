@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import Sequence, select
 from typing import List, Optional
 import logging
 
@@ -60,7 +60,7 @@ class HouseRepository:
             List[DbHouse]: All houses in the database
         """
         result = await self.session.execute(select(DbHouse))
-        return result.scalars().all()
+        return result.scalars().all()  # type: ignore
 
     async def create(self, house: House) -> DbHouse:
         """Create a new house
@@ -121,8 +121,10 @@ class HouseRepository:
 
         existing = await self.get_by_address(house.address, house.city)
         if existing:
+
             if existing.has_changes(house.to_db_model()):
-                return await self.update(existing.id, house)
+                return await self.update(existing.id, house)  # type: ignore
+
             return existing
 
         return await self.create(house)
@@ -176,4 +178,4 @@ class HouseRepository:
         result = await self.session.execute(
             select(DbHouse).where(DbHouse.detail_url.in_(detail_urls))
         )
-        return result.scalars().all()
+        return result.scalars().all()  # type: ignore
