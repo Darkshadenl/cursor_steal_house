@@ -203,11 +203,12 @@ class GalleryExtractionConfig(BaseModel):
     correct_urls_paths: Optional[List[str]] = None
     gallery_container_selector: Optional[str] = None
     schema: Optional[Dict[str, Any]] = None
-    schema_type: Optional[str] = 'xpath' or 'css'
+    schema_type: Optional[str] = "xpath" or "css"
     regex: Optional[str] = None
     extra_llm_instructions: Optional[str] = None
     next_page_selector: Optional[str] = None
     next_page_xpath: Optional[str] = None
+    ignore_domains: Optional[List[str]] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -216,12 +217,13 @@ class DetailPageExtractionConfig(BaseModel):
     """
     Pydantic model for detail page extraction configuration.
     """
-
-    schema_type: Optional[str] = 'xpath' or 'css'
+    
+    schema_type: str = "xpath" or "css" or "llm"
     schema: Optional[Dict[str, Any]] = None
-    detail_page_container_selector: Optional[str] = None
+    detail_container_selector: Optional[str] = None
     extra_llm_instructions: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
+    ignore_domains: Optional[List[str]] = None
 
 
 class SitemapExtractionConfig(BaseModel):
@@ -275,12 +277,14 @@ class LoginConfig(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class CookiesConfig(BaseModel):
     """
     Pydantic model for cookies configuration.
     """
 
     accept_cookies_selector: Optional[str] = None
+
 
 class StrategyConfig(BaseModel):
     """

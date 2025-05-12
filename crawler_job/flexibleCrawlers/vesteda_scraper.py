@@ -204,7 +204,9 @@ class VestedaScraper(BaseWebsiteScraper):
         logger.info(f"Successfully extracted {len(houses)} properties")
         return houses
 
-    async def extract_details_async(self, houses: List[House]) -> List[FetchedPage]:
+    async def extract_fetched_pages_async(
+        self, houses: List[House]
+    ) -> List[FetchedPage]:
         """
         Extract detailed property information for the given houses
 
