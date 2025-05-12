@@ -194,15 +194,20 @@ class DbFieldMapping(Base):
 
 # Pydantic models for configuration data
 
+
 class GalleryExtractionConfig(BaseModel):
     """
     Pydantic model for gallery extraction configuration.
     """
 
     correct_urls_paths: Optional[List[str]] = None
+    gallery_container_selector: Optional[str] = None
     schema: Optional[Dict[str, Any]] = None
+    schema_type: Optional[str] = 'xpath' or 'css'
     regex: Optional[str] = None
     extra_llm_instructions: Optional[str] = None
+    next_page_selector: Optional[str] = None
+    next_page_xpath: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -212,9 +217,12 @@ class DetailPageExtractionConfig(BaseModel):
     Pydantic model for detail page extraction configuration.
     """
 
+    schema_type: Optional[str] = 'xpath' or 'css'
     schema: Optional[Dict[str, Any]] = None
+    detail_page_container_selector: Optional[str] = None
     extra_llm_instructions: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
+
 
 class SitemapExtractionConfig(BaseModel):
     """
@@ -225,6 +233,7 @@ class SitemapExtractionConfig(BaseModel):
     regex: Optional[str] = None
     extra_llm_instructions: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
+
 
 class NavigationConfig(BaseModel):
     """
@@ -253,16 +262,25 @@ class LoginConfig(BaseModel):
     """
 
     login_url_path: Optional[str] = None
+    login_url: Optional[str] = None
     username_selector: str
     password_selector: str
     submit_selector: str
     success_check_url_path: Optional[str] = None
-    expected_url_path: str
+    expected_url_path: Optional[str] = None
+    expected_url: Optional[str] = None
     success_indicator_selector: Optional[str] = None
     validate_login: bool = True
+    login_required: bool = True
 
     model_config = ConfigDict(from_attributes=True)
 
+class CookiesConfig(BaseModel):
+    """
+    Pydantic model for cookies configuration.
+    """
+
+    accept_cookies_selector: Optional[str] = None
 
 class StrategyConfig(BaseModel):
     """
@@ -270,6 +288,7 @@ class StrategyConfig(BaseModel):
     """
 
     navigation_config: NavigationConfig
+    cookies_config: Optional[CookiesConfig] = None
     filtering_config: Optional[FilteringConfig] = None
     gallery_extraction_config: Optional[GalleryExtractionConfig] = None
     detail_page_extraction_config: Optional[DetailPageExtractionConfig] = None
@@ -361,7 +380,6 @@ __all__ = [
     "NavigationConfig",
     "ExtractionConfig",
     "FieldMapping",
-    "FieldConfig",
     "GalleryExtractionConfig",
     "DetailPageExtractionConfig",
     "FilteringConfig",

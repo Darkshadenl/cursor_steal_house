@@ -97,8 +97,8 @@ async def run_crawler_async(
             await crawler.start()
 
             for website_name in websites:
-                # if website_name == "vesteda":
-                #     continue
+                if website_name != "nmg_wonen":
+                    continue
 
                 scraper = await factory.get_scraper_async(
                     website_name, notification_service
@@ -118,7 +118,7 @@ async def run_crawler_async(
             await crawler.close()
 
         success = all(result["success"] for result in results)
-        
+
         if len(results) > 0:
             logger.info(
                 f"Crawl completed successfully for websites: {', '.join(websites)}"
@@ -126,10 +126,18 @@ async def run_crawler_async(
             logger.info(
                 f"Total houses found: {sum(result['total_houses_count'] for result in results)}"
             )
-            logger.info(f"New houses: {sum(result['new_houses_count'] for result in results)}")
-            logger.info(f"Updated houses: {sum(result['updated_houses_count'] for result in results)}")
+            logger.info(
+                f"New houses: {sum(result['new_houses_count'] for result in results)}"
+            )
+            logger.info(
+                f"Updated houses: {sum(result['updated_houses_count'] for result in results)}"
+            )
         else:
-            failed_websites = [website for website in websites if not any(result["success"] for result in results)]
+            failed_websites = [
+                website
+                for website in websites
+                if not any(result["success"] for result in results)
+            ]
             logger.error(
                 f"Crawl failed for websites: {', '.join(failed_websites)}. Error: {result.get('error', 'Unknown error')}"
             )

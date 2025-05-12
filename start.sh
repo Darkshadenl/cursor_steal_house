@@ -8,4 +8,4 @@
 # ls -lR "$PLAYWRIGHT_BROWSERS_PATH" || echo "Browser path not found or empty."
 
 echo "Starting crawler..."
-python -m crawler_job.main
+python -m crawler_job.main --notifications-enabled

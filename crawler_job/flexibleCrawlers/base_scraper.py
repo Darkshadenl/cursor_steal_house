@@ -13,6 +13,7 @@ from crawl4ai import (
     CrawlerMonitor,
     CrawlerRunConfig,
     JsonCssExtractionStrategy,
+    JsonXPathExtractionStrategy,
     RateLimiter,
     SemaphoreDispatcher,
 )
@@ -51,7 +52,7 @@ class BaseWebsiteScraper(ABC):
             config: The validated website configuration.
             notification_service: The notification service to use.
         """
-        self.config = config
+        self.config: WebsiteConfig = config
         self.notification_service = notification_service
         self.debug_mode = debug_mode
 
@@ -62,7 +63,8 @@ class BaseWebsiteScraper(ABC):
 
         self.gallery_extraction_config: GalleryExtractionConfig = (
             self.config.strategy_config.gallery_extraction_config
-        )
+        )  # type: ignore
+
         self.sitemap_extraction_config: SitemapExtractionConfig = (
             self.config.strategy_config.sitemap_extraction_config
         )  # type: ignore
@@ -138,7 +140,10 @@ class BaseWebsiteScraper(ABC):
         Returns:
             bool: True if login was successful or not required, False if login failed.
         """
-        if not self.login_config or self.navigated_to_gallery:
+        if not self.login_config or (
+            self.navigated_to_gallery and not self.login_config.login_required
+        ):
+            logger.info(f"Skipping login for {self.config.website_name}")
             return True
 
         if not self.crawler:
@@ -149,9 +154,14 @@ class BaseWebsiteScraper(ABC):
 
         try:
             base_url = self.config.base_url
-            login_url = self.login_config.login_url_path
+            full_login_url = ""
 
-            full_login_url = f"{base_url}{login_url}"
+            if self.login_config.login_url:
+                full_login_url = self.login_config.login_url
+            else:
+                login_url_path = self.login_config.login_url_path
+                full_login_url = f"{base_url}{login_url_path}"
+
             logger.info(
                 f"Navigating to login page of {self.config.website_name} and logging in.\nUrl: {full_login_url}"
             )
@@ -180,9 +190,19 @@ class BaseWebsiteScraper(ABC):
             )  # type: ignore
 
             if not login_result.success:
-                raise Exception(
-                    f"Login form submission failed: {login_result.error_message}"
-                )
+                if (
+                    login_result.error_message
+                    and "Page.content: Unable to retrieve content because the page is navigating and changing the content"
+                    in login_result.error_message
+                ):
+                    logger.info(
+                        f"Already logged in probably? Skipping login for {self.config.website_name}. Error: {login_result.error_message}"
+                    )
+                    return True
+                else:
+                    raise Exception(
+                        f"Login form submission failed: {login_result.error_message}"
+                    )
 
             self.current_url = login_result.url
             return True
@@ -222,9 +242,9 @@ class BaseWebsiteScraper(ABC):
             self.navigated_to_sitemap = False
             raise Exception(f"Failed to navigate to sitemap: {result.error_message}")
 
-    async def navigate_to_gallery_async(self) -> None:
+    async def navigate_to_gallery_async(self, force_navigation: bool = False) -> None:
         """Navigate to the listings/gallery page."""
-        if self.navigated_to_gallery:
+        if self.navigated_to_gallery and not force_navigation:
             return
 
         if not self.crawler:
@@ -360,19 +380,136 @@ class BaseWebsiteScraper(ABC):
         return houses
 
     async def extract_gallery_async(self) -> List[House]:
-        """Extract data from the gallery/listings page.
+        if not self.navigated_to_gallery:
+            raise Exception("Not navigated to gallery")
 
-        Returns:
-            List[House]: Extracted data for each listing item.
-        """
         if not self.config.strategy_config.gallery_extraction_config:
-            logger.info("No gallery extraction configuration provided.")
             raise Exception("No gallery extraction configuration provided.")
 
-        logger.error("Implementing gallery extraction configuration in derived class!")
-        raise NotImplementedError(
-            "Implementing gallery extraction configuration in derived class!"
+        if not self.crawler:
+            raise Exception("Crawler not initialized")
+
+        logger.info(
+            f"Extracting property listings of {self.config.website_name} step..."
         )
+        gallery_extraction_config = (
+            self.config.strategy_config.gallery_extraction_config
+        )
+
+        if not gallery_extraction_config.correct_urls_paths:
+            raise Exception("No correct URLs provided")
+
+        correct_urls = [
+            f"{self.config.base_url}{path}"
+            for path in gallery_extraction_config.correct_urls_paths
+        ]
+
+        if self.current_url not in correct_urls:
+            raise Exception(f"Invalid URL: {self.current_url}")
+
+        schema = gallery_extraction_config.schema
+
+        if not schema:
+            raise Exception("No schema provided")
+
+        extraction_strategy = None
+        if self.gallery_extraction_config.schema_type == "xpath":
+            extraction_strategy = JsonXPathExtractionStrategy(schema)
+        else:
+            extraction_strategy = JsonCssExtractionStrategy(schema)
+
+        gallery_config = CrawlerRunConfig(
+            extraction_strategy=extraction_strategy,
+            cache_mode=CacheMode.BYPASS,
+            session_id=self.session_id,
+            magic=False,
+            css_selector=self.gallery_extraction_config.gallery_container_selector or "",
+            user_agent_mode="random",
+            log_console=self.debug_mode,
+            exclude_all_images=True,
+            exclude_social_media_links=True,
+        )
+
+        result: CrawlResult = await self.crawler.arun(url=self.current_url, config=gallery_config)  # type: ignore
+
+        if not result.success:
+            raise Exception(
+                f"Failed to extract property listings: {result.error_message}"
+            )
+
+        if not result.extracted_content:
+            raise Exception("No extracted content")
+
+        raw_data = json.loads(result.extracted_content)
+        houses = []
+
+        for house_data in raw_data:
+            # Pre-process the data before passing to from_dict
+            processed_data = house_data.copy()
+
+            # Process bedrooms field
+            try:
+                if "bedrooms" in house_data and house_data["bedrooms"]:
+                    processed_data["bedrooms"] = int(house_data["bedrooms"])
+            except ValueError:
+                logger.warning(
+                    f"Could not convert bedrooms to int: {house_data.get('bedrooms')}"
+                )
+                processed_data["bedrooms"] = None
+
+            # Process area field to square_meters
+            try:
+                if "area" in house_data and house_data["area"]:
+                    # Strip "m²" and convert to int
+                    area_str = house_data.get("area", "").replace("m2", "").strip()
+                    if area_str:
+                        processed_data["square_meters"] = int(area_str)
+                elif "square_meters" in house_data and house_data["square_meters"]:
+                    # Strip "m²" and convert to int
+                    area_str = house_data.get("square_meters", "").replace("m2", "").strip()
+                    if area_str:
+                        processed_data["square_meters"] = int(area_str)
+            except ValueError:
+                logger.warning(
+                    f"Could not convert area to int: {house_data.get('area')}"
+                )
+                processed_data["square_meters"] = None
+
+            # Rename price to rental_price
+            if "price" in processed_data:
+                processed_data["rental_price"] = processed_data.pop("price")
+
+            # Check if demand message indicates high demand
+            demand_message = processed_data.get("demand_message")
+            high_demand = False
+            if demand_message and any(
+                keyword in demand_message.lower()
+                for keyword in ["hoge interesse", "veel interesse", "popular"]
+            ):
+                high_demand = True
+            processed_data["high_demand"] = high_demand
+
+            # Create House object using from_dict
+            house = House.from_dict(processed_data)
+            houses.append(house)
+
+        logger.info(f"Successfully extracted {len(houses)} properties")
+        return houses
+
+    # async def extract_gallery_async(self) -> List[House]:
+    #     """Extract data from the gallery/listings page.
+
+    #     Returns:
+    #         List[House]: Extracted data for each listing item.
+    #     """
+    #     if not self.config.strategy_config.gallery_extraction_config:
+    #         logger.info("No gallery extraction configuration provided.")
+    #         raise Exception("No gallery extraction configuration provided.")
+
+    #     logger.error("Implementing gallery extraction configuration in derived class!")
+    #     raise NotImplementedError(
+    #         "Implementing gallery extraction configuration in derived class!"
+    #     )
 
     async def extract_details_async(self, houses: List[House]) -> List[FetchedPage]:
         """Extract data from a detail page.
@@ -394,7 +531,60 @@ class BaseWebsiteScraper(ABC):
         if not self.config.accept_cookies:
             logger.info("Accepting cookies not required/enabled.")
             return True
-        return False
+        if not self.crawler:
+            raise Exception("Crawler not initialized")
+        if self.accepted_cookies:
+            logger.info("Cookies already accepted.")
+            return self.accepted_cookies
+
+        logger.info(f"Accepting cookies for {self.config.website_name}...")
+
+        cookie_config = CrawlerRunConfig(
+            cache_mode=CacheMode.BYPASS,
+            js_only=True,
+            magic=True,
+            session_id=self.session_id,
+            log_console=self.debug_mode,
+            js_code="""
+                (async () => {
+                    const cookieButton = document.querySelector('${self.config.cookies_config.accept_cookies_selector}');
+                    
+                    if (cookieButton) {
+                        cookieButton.click();
+                        console.log("Cookie button clicked");
+                    } else {
+                        console.log("Cookie button not found");
+                        return true;
+                    }
+                    
+                    while (true) {
+                        await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
+                        const cookieButton = document.querySelector('a[href="javascript:Cookiebot.submitCustomConsent(false, true, false); Cookiebot.hide()"]');
+                        if (cookieButton) {
+                            cookieButton.click();
+                            console.log("Cookie button clicked");
+                            return true;
+                        }
+                    }
+                })();
+                """,
+        )
+
+        result: CrawlResult = await self.crawler.arun(
+            url=current_url, config=cookie_config
+        )  # type: ignore
+
+        if not result.success:
+            logger.error("Cookie check failed:", result.error_message)
+            return False
+        elif result.success:
+            logger.info(f"Cookies successfully accepted. Current URL: {result.url}")
+            self.accepted_cookies = True
+            return self.accepted_cookies
+        else:
+            logger.info("Cookie popup not found or already accepted")
+            self.accepted_cookies = True
+            return self.accepted_cookies
 
     async def _check_if_houses_exist(self, houses: List[House]) -> List[House]:
         async with HouseService(
@@ -501,7 +691,7 @@ class BaseWebsiteScraper(ABC):
             logger.error("Login failed, aborting scrape")
             return self.default_results
 
-        await self.navigate_to_gallery_async()
+        await self.navigate_to_gallery_async(force_navigation=True)
         await self.apply_filters_async()
         houses = await self.extract_gallery_async()
         new_houses = await self._check_if_houses_exist(houses)
