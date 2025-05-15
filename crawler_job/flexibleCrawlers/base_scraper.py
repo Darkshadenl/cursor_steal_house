@@ -84,6 +84,18 @@ class BaseWebsiteScraper(ABC):
             user_agent_mode="random",
         )
 
+        self.standard_dispatcher = SemaphoreDispatcher(
+            semaphore_count=1,
+            max_session_permit=1,
+            monitor=CrawlerMonitor(urls_total=10, enable_ui=True),
+            rate_limiter=RateLimiter(
+                base_delay=(3.0, 5.0),
+                max_delay=30.0,
+                max_retries=3,
+                rate_limit_codes=[429, 503],
+            ),
+        )
+
         self.crawler: AsyncWebCrawler = crawler
         self.accepted_cookies = False
         self.navigated_to_gallery = False
@@ -165,7 +177,7 @@ class BaseWebsiteScraper(ABC):
                 full_login_url = f"{base_url}{login_url_path}"
 
             logger.info(
-                f"Navigating to login page of {self.config.website_name} and logging in.\nUrl: {full_login_url}"
+                f"Navigating to login page of {self.config.website_name} and logging in."
             )
             email = os.getenv(self.config.website_identifier.upper() + "_EMAIL")
             password = os.getenv(self.config.website_identifier.upper() + "_PASSWORD")
@@ -198,7 +210,7 @@ class BaseWebsiteScraper(ABC):
                     in login_result.error_message
                 ):
                     logger.info(
-                        f"Already logged in probably? Skipping login for {self.config.website_name}. Error: {login_result.error_message}"
+                        f"Already logged in probably? Skipping login for {self.config.website_name}."
                     )
                     return True
                 else:
@@ -260,7 +272,7 @@ class BaseWebsiteScraper(ABC):
             config=self.standard_run_config,
         )  # type: ignore
 
-        full_login_url = f"{self.config.base_url}{self.login_config.login_url_path}"
+        full_login_url = f"{self.config.base_url}{self.login_config.login_url_path or ''}"
 
         if result and result.success and result.redirected_url != full_login_url:
             logger.info(f"Navigating to gallery successful: {result.url}")
@@ -415,7 +427,7 @@ class BaseWebsiteScraper(ABC):
             raise Exception("No schema provided")
 
         extraction_strategy = None
-        if self.gallery_extraction_config.schema_type == "xpath":
+        if self.gallery_extraction_config.schema_type == SchemaType.XPATH.value:
             extraction_strategy = JsonXPathExtractionStrategy(schema)
         else:
             extraction_strategy = JsonCssExtractionStrategy(schema)
@@ -501,21 +513,6 @@ class BaseWebsiteScraper(ABC):
         logger.info(f"Successfully extracted {len(houses)} properties")
         return houses
 
-    # async def extract_gallery_async(self) -> List[House]:
-    #     """Extract data from the gallery/listings page.
-
-    #     Returns:
-    #         List[House]: Extracted data for each listing item.
-    #     """
-    #     if not self.config.strategy_config.gallery_extraction_config:
-    #         logger.info("No gallery extraction configuration provided.")
-    #         raise Exception("No gallery extraction configuration provided.")
-
-    #     logger.error("Implementing gallery extraction configuration in derived class!")
-    #     raise NotImplementedError(
-    #         "Implementing gallery extraction configuration in derived class!"
-    #     )
-
     async def extract_fetched_pages_async(
         self, houses: List[House]
     ) -> List[FetchedPage]:
@@ -585,7 +582,7 @@ class BaseWebsiteScraper(ABC):
 
             fetched_pages = []
             for result in results:
-                if result.success and extraction_type in ["llm"]:
+                if result.success:
                     fetched_pages.append(
                         FetchedPage(
                             url=result.url,
@@ -593,9 +590,6 @@ class BaseWebsiteScraper(ABC):
                             success=True,
                         )
                     )
-                elif result.success and extraction_type in ["xpath", "css"]:
-
-                    pass
                 else:
                     error_msg = (
                         result.error_message
@@ -619,6 +613,45 @@ class BaseWebsiteScraper(ABC):
 
     async def process_details_xpath_css(self, houses: List[House]) -> List[House]:
         logger.info(f"Processing details with xpath/css for {len(houses)} houses...")
+
+        config = self.standard_run_config
+        schema = self.detail_page_extraction_config.schema
+        dispatcher = self.standard_dispatcher
+        dispatcher.semaphore_count = 10
+
+        extraction_strategy = None
+        if self.gallery_extraction_config.schema_type == SchemaType.XPATH.value:
+            extraction_strategy = JsonXPathExtractionStrategy(schema)  # type: ignore
+        else:
+            extraction_strategy = JsonCssExtractionStrategy(schema)  # type: ignore
+
+        config.extraction_strategy = extraction_strategy
+        config.css_selector = (
+            self.detail_page_extraction_config.detail_container_selector or ""
+        )
+
+        all_detail_urls = [house.detail_url for house in houses]
+
+        results: List[CrawlResult] = await self.crawler.arun_many(
+            urls=all_detail_urls, config=config, dispatcher=self.standard_dispatcher  # type: ignore
+        )
+
+        for result in results:
+            if not result.success:
+                logger.error(f"Error fetching property: {result.error_message}")
+                continue
+            if not result.extracted_content:
+                logger.error(f"No extracted content for {result.url}")
+                continue
+            raw_data = json.loads(result.extracted_content)
+            house = next((h for h in houses if h.detail_url == result.url), None)
+            
+            if house:
+                house.from_dict(raw_data)
+                print(house)
+
+            print()
+
         return []
 
     async def _accept_cookies(self, current_url: str) -> bool:
@@ -861,3 +894,9 @@ class BaseWebsiteScraper(ABC):
 class ScrapeStrategy(Enum):
     GALLERY = "gallery"
     SITEMAP = "sitemap"
+
+
+class SchemaType(Enum):
+    XPATH = "xpath"
+    CSS = "css"
+    LLM = "llm"
