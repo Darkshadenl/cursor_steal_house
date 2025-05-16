@@ -157,14 +157,14 @@ class BaseWebsiteScraper(ABC):
         if not self.login_config or (
             self.navigated_to_gallery and not self.login_config.login_required
         ):
-            logger.info(f"Skipping login for {self.config.website_name}")
+            logger.warn(f"Skipping login for {self.config.website_name}")
             return True
 
         if not self.crawler:
             raise Exception("Crawler not initialized")
 
         if not self.accepted_cookies:
-            await self._accept_cookies(self.current_url)  # type: ignore
+            await self._accept_cookies(self.current_url or self.config.base_url)  # type: ignore
 
         try:
             base_url = self.config.base_url
@@ -272,7 +272,9 @@ class BaseWebsiteScraper(ABC):
             config=self.standard_run_config,
         )  # type: ignore
 
-        full_login_url = f"{self.config.base_url}{self.login_config.login_url_path or ''}"
+        full_login_url = (
+            f"{self.config.base_url}{self.login_config.login_url_path or ''}"
+        )
 
         if result and result.success and result.redirected_url != full_login_url:
             logger.info(f"Navigating to gallery successful: {result.url}")
@@ -437,13 +439,16 @@ class BaseWebsiteScraper(ABC):
             cache_mode=CacheMode.BYPASS,
             session_id=self.session_id,
             magic=False,
-            css_selector=self.gallery_extraction_config.gallery_container_selector
-            or "",
             user_agent_mode="random",
             log_console=self.debug_mode,
             exclude_all_images=True,
             exclude_social_media_links=True,
         )
+
+        if self.gallery_extraction_config.gallery_container_selector:
+            gallery_config.css_selector = (
+                self.gallery_extraction_config.gallery_container_selector
+            )
 
         result: CrawlResult = await self.crawler.arun(url=self.current_url, config=gallery_config)  # type: ignore
 
@@ -459,55 +464,7 @@ class BaseWebsiteScraper(ABC):
         houses = []
 
         for house_data in raw_data:
-            # Pre-process the data before passing to from_dict
-            processed_data = house_data.copy()
-
-            # Process bedrooms field
-            try:
-                if "bedrooms" in house_data and house_data["bedrooms"]:
-                    processed_data["bedrooms"] = int(house_data["bedrooms"])
-            except ValueError:
-                logger.warning(
-                    f"Could not convert bedrooms to int: {house_data.get('bedrooms')}"
-                )
-                processed_data["bedrooms"] = None
-
-            # Process area field to square_meters
-            try:
-                if "area" in house_data and house_data["area"]:
-                    # Strip "m²" and convert to int
-                    area_str = house_data.get("area", "").replace("m2", "").strip()
-                    if area_str:
-                        processed_data["square_meters"] = int(area_str)
-                elif "square_meters" in house_data and house_data["square_meters"]:
-                    # Strip "m²" and convert to int
-                    area_str = (
-                        house_data.get("square_meters", "").replace("m2", "").strip()
-                    )
-                    if area_str:
-                        processed_data["square_meters"] = int(area_str)
-            except ValueError:
-                logger.warning(
-                    f"Could not convert area to int: {house_data.get('area')}"
-                )
-                processed_data["square_meters"] = None
-
-            # Rename price to rental_price
-            if "price" in processed_data:
-                processed_data["rental_price"] = processed_data.pop("price")
-
-            # Check if demand message indicates high demand
-            demand_message = processed_data.get("demand_message")
-            high_demand = False
-            if demand_message and any(
-                keyword in demand_message.lower()
-                for keyword in ["hoge interesse", "veel interesse", "popular"]
-            ):
-                high_demand = True
-            processed_data["high_demand"] = high_demand
-
-            # Create House object using from_dict
-            house = House.from_dict(processed_data)
+            house = House.from_dict(house_data)
             houses.append(house)
 
         logger.info(f"Successfully extracted {len(houses)} properties")
@@ -617,7 +574,7 @@ class BaseWebsiteScraper(ABC):
         config = self.standard_run_config
         schema = self.detail_page_extraction_config.schema
         dispatcher = self.standard_dispatcher
-        dispatcher.semaphore_count = 10
+        dispatcher.semaphore_count = 1
 
         extraction_strategy = None
         if self.gallery_extraction_config.schema_type == SchemaType.XPATH.value:
@@ -635,6 +592,7 @@ class BaseWebsiteScraper(ABC):
         results: List[CrawlResult] = await self.crawler.arun_many(
             urls=all_detail_urls, config=config, dispatcher=self.standard_dispatcher  # type: ignore
         )
+        done_houses: List[House] = []
 
         for result in results:
             if not result.success:
@@ -645,14 +603,20 @@ class BaseWebsiteScraper(ABC):
                 continue
             raw_data = json.loads(result.extracted_content)
             house = next((h for h in houses if h.detail_url == result.url), None)
-            
+
             if house:
-                house.from_dict(raw_data)
-                print(house)
+                detailed_house = house.from_dict(raw_data[0])
 
-            print()
+                for field, detailed_value in detailed_house.model_dump().items():
+                    house_value = getattr(house, field, None)
+                    if (
+                        house_value is None or house_value == ""
+                    ) and detailed_value not in (None, ""):
+                        setattr(house, field, detailed_value)
 
-        return []
+                done_houses.append(house)
+
+        return done_houses
 
     async def _accept_cookies(self, current_url: str) -> bool:
         if not self.config.accept_cookies:
