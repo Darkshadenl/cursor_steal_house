@@ -253,7 +253,9 @@ class FilteringConfig(BaseModel):
     Pydantic model for filtering configuration.
     """
 
-    steps: List[Dict[str, Any]]
+    filters_container_selector: Optional[str] = None
+    js_code: Optional[str] = None
+    filter_url_suffix: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

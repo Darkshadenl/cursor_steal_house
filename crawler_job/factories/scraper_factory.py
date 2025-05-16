@@ -3,6 +3,7 @@ from typing import Dict, Optional, Type
 from crawl4ai import AsyncWebCrawler
 
 from crawler_job.flexibleCrawlers.huis_sleutel_scraper import HuisSleutelScraper
+from crawler_job.flexibleCrawlers.nmg_wonen_scraper import NmgWonenScraper
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.services.logger_service import setup_logger
 
@@ -16,6 +17,7 @@ from crawler_job.services.repositories.json_config_repository import (
 SCRAPER_CLASSES: Dict[str, Type[BaseWebsiteScraper]] = {
     "vesteda": VestedaScraper,
     "de_huis_sleutel": HuisSleutelScraper,
+    "nmg_wonen": NmgWonenScraper,
 }
 
 
