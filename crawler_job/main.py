@@ -97,9 +97,6 @@ async def run_crawler_async(
             await crawler.start()
 
             for website_name in websites:
-                if website_name != "nmg_wonen":
-                    continue
-
                 scraper = await factory.get_scraper_async(
                     website_name, notification_service
                 )
