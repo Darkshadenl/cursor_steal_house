@@ -314,7 +314,6 @@ class WebsiteConfig(BaseModel):
     scrape_strategy: str = "gallery" or "sitemap"
     strategy_config: StrategyConfig
     session_id: str
-    accept_cookies: bool
 
     model_config = ConfigDict(from_attributes=True)
 

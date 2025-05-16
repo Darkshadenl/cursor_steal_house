@@ -40,7 +40,7 @@ class VestedaScraper(BaseWebsiteScraper):
         logger.info(f"Vesteda scraper initialized...")
 
     async def _accept_cookies(self, current_url: str) -> bool:
-        if not self.config.accept_cookies:
+        if not self.website_config.accept_cookies:
             logger.info("Accepting cookies not required/enabled.")
             return True
 
@@ -105,7 +105,7 @@ class VestedaScraper(BaseWebsiteScraper):
         if not self.navigated_to_gallery:
             raise Exception("Not navigated to gallery")
 
-        if not self.config.strategy_config.gallery_extraction_config:
+        if not self.website_config.strategy_config.gallery_extraction_config:
             raise Exception("No gallery extraction configuration provided.")
 
         if not self.crawler:
@@ -113,14 +113,14 @@ class VestedaScraper(BaseWebsiteScraper):
 
         logger.info("Extracting property listings of Vesteda step...")
         gallery_extraction_config = (
-            self.config.strategy_config.gallery_extraction_config
+            self.website_config.strategy_config.gallery_extraction_config
         )
 
         if not gallery_extraction_config.correct_urls_paths:
             raise Exception("No correct URLs provided")
 
         correct_urls = [
-            f"{self.config.base_url}{path}"
+            f"{self.website_config.base_url}{path}"
             for path in gallery_extraction_config.correct_urls_paths
         ]
 
@@ -258,7 +258,7 @@ class VestedaScraper(BaseWebsiteScraper):
         urls = []
         for house in houses:
             if house.detail_url:
-                url = f"{self.config.base_url}{house.detail_url}"
+                url = f"{self.website_config.base_url}{house.detail_url}"
                 urls.append(url)
 
         logger.info(f"Starting fetch for {len(urls)} properties...")

@@ -2,7 +2,7 @@ from enum import Enum
 import json
 from typing import Dict, Any, List, Optional
 import os
-from abc import ABC, abstractmethod
+from abc import ABC
 import asyncio
 import re
 
@@ -20,7 +20,9 @@ from crawl4ai import (
     SemaphoreDispatcher,
 )
 from crawler_job.models.db_config_models import (
+    CookiesConfig,
     DetailPageExtractionConfig,
+    FilteringConfig,
     GalleryExtractionConfig,
     LoginConfig,
     SitemapExtractionConfig,
@@ -54,21 +56,30 @@ class BaseWebsiteScraper(ABC):
             config: The validated website configuration.
             notification_service: The notification service to use.
         """
-        self.config: WebsiteConfig = config
+        self.website_config: WebsiteConfig = config
         self.notification_service = notification_service
         self.debug_mode = debug_mode
 
-        self.login_config: LoginConfig = self.config.strategy_config.login_config  # type: ignore
+        self.login_config: LoginConfig = self.website_config.strategy_config.login_config  # type: ignore
+
         self.detail_page_extraction_config: DetailPageExtractionConfig = (
-            self.config.strategy_config.detail_page_extraction_config
+            self.website_config.strategy_config.detail_page_extraction_config
         )  # type: ignore
 
         self.gallery_extraction_config: GalleryExtractionConfig = (
-            self.config.strategy_config.gallery_extraction_config
+            self.website_config.strategy_config.gallery_extraction_config
         )  # type: ignore
 
         self.sitemap_extraction_config: SitemapExtractionConfig = (
-            self.config.strategy_config.sitemap_extraction_config
+            self.website_config.strategy_config.sitemap_extraction_config
+        )  # type: ignore
+
+        self.filtering_config: FilteringConfig = (
+            self.website_config.strategy_config.filtering_config
+        )  # type: ignore
+
+        self.cookies_config: CookiesConfig = (
+            self.website_config.strategy_config.cookies_config
         )  # type: ignore
 
         self.session_id = session_id
@@ -157,17 +168,17 @@ class BaseWebsiteScraper(ABC):
         if not self.login_config or (
             self.navigated_to_gallery and not self.login_config.login_required
         ):
-            logger.warn(f"Skipping login for {self.config.website_name}")
+            logger.warn(f"Skipping login for {self.website_config.website_name}")
             return True
 
         if not self.crawler:
             raise Exception("Crawler not initialized")
 
         if not self.accepted_cookies:
-            await self._accept_cookies(self.current_url or self.config.base_url)  # type: ignore
+            await self._accept_cookies(self.current_url or self.website_config.base_url)  # type: ignore
 
         try:
-            base_url = self.config.base_url
+            base_url = self.website_config.base_url
             full_login_url = ""
 
             if self.login_config.login_url:
@@ -177,10 +188,12 @@ class BaseWebsiteScraper(ABC):
                 full_login_url = f"{base_url}{login_url_path}"
 
             logger.info(
-                f"Navigating to login page of {self.config.website_name} and logging in."
+                f"Navigating to login page of {self.website_config.website_name} and logging in."
             )
-            email = os.getenv(self.config.website_identifier.upper() + "_EMAIL")
-            password = os.getenv(self.config.website_identifier.upper() + "_PASSWORD")
+            email = os.getenv(self.website_config.website_identifier.upper() + "_EMAIL")
+            password = os.getenv(
+                self.website_config.website_identifier.upper() + "_PASSWORD"
+            )
 
             js_code = [
                 f"document.querySelector('{self.login_config.username_selector}').value = '{email}';",
@@ -210,7 +223,7 @@ class BaseWebsiteScraper(ABC):
                     in login_result.error_message
                 ):
                     logger.info(
-                        f"Already logged in probably? Skipping login for {self.config.website_name}."
+                        f"Already logged in probably? Skipping login for {self.website_config.website_name}."
                     )
                     return True
                 else:
@@ -235,7 +248,7 @@ class BaseWebsiteScraper(ABC):
             raise Exception("Crawler not initialized")
 
         logger.info(f"Navigating to and extracting sitemap...")
-        url = f"{self.config.base_url}{self.config.strategy_config.navigation_config.sitemap}"
+        url = f"{self.website_config.base_url}{self.website_config.strategy_config.navigation_config.sitemap}"
 
         result: CrawlResult = await self.crawler.arun(
             url,
@@ -245,7 +258,7 @@ class BaseWebsiteScraper(ABC):
         if not result.success:
             raise Exception(f"Failed to navigate to sitemap: {result.error_message}")
 
-        full_sitemap_url = f"{self.config.base_url}{self.config.strategy_config.navigation_config.sitemap}"
+        full_sitemap_url = f"{self.website_config.base_url}{self.website_config.strategy_config.navigation_config.sitemap}"
 
         if result.redirected_url == full_sitemap_url or result.url == full_sitemap_url:
             self.navigated_to_sitemap = True
@@ -265,7 +278,7 @@ class BaseWebsiteScraper(ABC):
             raise Exception("Crawler not initialized")
 
         logger.info(f"Navigating to gallery...")
-        url = f"{self.config.base_url}{self.config.strategy_config.navigation_config.gallery}"
+        url = f"{self.website_config.base_url}{self.website_config.strategy_config.navigation_config.gallery}"
 
         result: CrawlResult = await self.crawler.arun(
             url,
@@ -273,7 +286,7 @@ class BaseWebsiteScraper(ABC):
         )  # type: ignore
 
         full_login_url = (
-            f"{self.config.base_url}{self.login_config.login_url_path or ''}"
+            f"{self.website_config.base_url}{self.login_config.login_url_path or ''}"
         )
 
         if result and result.success and result.redirected_url != full_login_url:
@@ -287,7 +300,7 @@ class BaseWebsiteScraper(ABC):
 
     async def apply_filters_async(self) -> None:
         """Apply filters if filtering configuration is provided."""
-        if not self.config.strategy_config.filtering_config:
+        if not self.filtering_config:
             logger.info("No filtering configuration provided.")
             return
 
@@ -399,24 +412,24 @@ class BaseWebsiteScraper(ABC):
         if not self.navigated_to_gallery:
             raise Exception("Not navigated to gallery")
 
-        if not self.config.strategy_config.gallery_extraction_config:
+        if not self.website_config.strategy_config.gallery_extraction_config:
             raise Exception("No gallery extraction configuration provided.")
 
         if not self.crawler:
             raise Exception("Crawler not initialized")
 
         logger.info(
-            f"Extracting property listings of {self.config.website_name} step..."
+            f"Extracting property listings of {self.website_config.website_name} step..."
         )
         gallery_extraction_config = (
-            self.config.strategy_config.gallery_extraction_config
+            self.website_config.strategy_config.gallery_extraction_config
         )
 
         if not gallery_extraction_config.correct_urls_paths:
             raise Exception("No correct URLs provided")
 
         correct_urls = [
-            f"{self.config.base_url}{path}"
+            f"{self.website_config.base_url}{path}"
             for path in gallery_extraction_config.correct_urls_paths
         ]
 
@@ -527,7 +540,7 @@ class BaseWebsiteScraper(ABC):
         urls = []
         for house in houses:
             if house.detail_url:
-                url = f"{self.config.base_url}{house.detail_url}"
+                url = f"{self.website_config.base_url}{house.detail_url}"
                 urls.append(url)
 
         logger.info(f"Starting fetch for {len(urls)} properties...")
@@ -619,8 +632,8 @@ class BaseWebsiteScraper(ABC):
         return done_houses
 
     async def _accept_cookies(self, current_url: str) -> bool:
-        if not self.config.accept_cookies:
-            logger.info("Accepting cookies not required/enabled.")
+        if not self.cookies_config:
+            logger.info("Accepting cookies not required.")
             return True
         if not self.crawler:
             raise Exception("Crawler not initialized")
@@ -628,7 +641,7 @@ class BaseWebsiteScraper(ABC):
             logger.info("Cookies already accepted.")
             return self.accepted_cookies
 
-        logger.info(f"Accepting cookies for {self.config.website_name}...")
+        logger.info(f"Accepting cookies for {self.website_config.website_name}...")
 
         cookie_config = CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS,
@@ -760,15 +773,17 @@ class BaseWebsiteScraper(ABC):
 
     async def validate_login(self) -> bool:
         if not self.login_config.validate_login or self.navigated_to_gallery:
-            logger.info(f"Skipping login validation for {self.config.website_name}")
+            logger.info(
+                f"Skipping login validation for {self.website_config.website_name}"
+            )
             return True
 
         await asyncio.sleep(2)
-        logger.info(f"Validating login success of {self.config.website_name}")
+        logger.info(f"Validating login success of {self.website_config.website_name}")
 
         valid: bool = await self.validate_current_page(
-            f"{self.config.base_url}{self.login_config.expected_url_path}",
-            f"{self.config.base_url}{self.login_config.success_check_url_path}",
+            f"{self.website_config.base_url}{self.login_config.expected_url_path}",
+            f"{self.website_config.base_url}{self.login_config.success_check_url_path}",
         )
         self.current_url = self.login_config.expected_url_path
 
@@ -843,9 +858,11 @@ class BaseWebsiteScraper(ABC):
         Returns:
             List[Dict[str, Any]]: The collected data from all listings.
         """
-        strategy = self.config.scrape_strategy
+        strategy = self.website_config.scrape_strategy
 
-        logger.info(f"Choosing strategy {strategy} for {self.config.website_name}")
+        logger.info(
+            f"Choosing strategy {strategy} for {self.website_config.website_name}"
+        )
 
         if strategy == ScrapeStrategy.GALLERY.value:
             return await self.run_gallery_scrape()
