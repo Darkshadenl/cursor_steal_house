@@ -303,11 +303,59 @@ class BaseWebsiteScraper(ABC):
         if not self.filtering_config:
             logger.info("No filtering configuration provided.")
             return
+        
+        js = """
+(async () => {
+    try {
+        const searchContainer = await new Promise((resolve, reject) => {
+            const timeout = 5000;
+            const interval = 100;
+            const startTime = Date.now();
+            
+            const check = () => {
+                const element = document.querySelector('.search-default');
+                if (element) {
+                    resolve(element);
+                    return;
+                }
+                
+                if (Date.now() - startTime >= timeout) {
+                    reject(new Error('Search container not found within 5s'));
+                    return;
+                }
+                
+                setTimeout(check, interval);
+            };
+            
+            check();
+        });
 
-        logger.error("Implementing filtering configuration in derived class!")
-        raise NotImplementedError(
-            "Implementing filtering configuration in derived class!"
+        const addressInput = searchContainer.querySelector('.search-field--adres input');
+        addressInput.value = 'Tilburg';
+        
+        const searchButton = searchContainer.querySelector('.search-field--button button');
+        searchButton.click();
+        
+    } catch (error) {
+        console.error('Fout bij zoeken:', error);
+    }
+})();
+
+        """
+        
+        cookie_config = self.standard_run_config.clone()
+        cookie_config.js_code = js
+        cookie_config.log_console = True
+        cookie_config.js_only = True
+        if self.filtering_config.filters_container_selector:
+            cookie_config.css_selector = self.filtering_config.filters_container_selector
+
+        result = await self.crawler.arun(
+            url=self.current_url, # type: ignore
+            config=cookie_config,
         )
+        
+        logger.info("Applied filters")
 
     async def extract_sitemap_async(self, sitemap_html: str) -> List[House]:
         """
@@ -433,7 +481,7 @@ class BaseWebsiteScraper(ABC):
             for path in gallery_extraction_config.correct_urls_paths
         ]
 
-        if self.current_url not in correct_urls:
+        if not any(correct_url in self.current_url for correct_url in correct_urls): # type: ignore
             raise Exception(f"Invalid URL: {self.current_url}")
 
         schema = gallery_extraction_config.schema
