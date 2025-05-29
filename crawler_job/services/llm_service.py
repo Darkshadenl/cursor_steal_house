@@ -102,10 +102,11 @@ Rules:
                     {schema}
                     If you can't find the data, return a simple string 'null'.
                     **IMPORTANT**
-                    DO NOT USE NEWLINE CHARACTERS (\\n) IN THE RETURNED JSON.
-                    DO NOT USE MARKDOWN BLOCK SYNTAX (```json) IN THE RETURNED JSON.
-                    THIS WILL CAUSE THE JSON.PARSE TO FAIL.
-                    USE DOUBLE QUOTES FOR KEYS AND VALUES.
+                    - DO NOT USE NEWLINE CHARACTERS (\\n) IN THE RETURNED JSON.
+                    - DO NOT USE MARKDOWN BLOCK SYNTAX (```json) IN THE RETURNED JSON.
+                    - THIS WILL CAUSE THE JSON.PARSE TO FAIL.
+                    - USE DOUBLE QUOTES FOR KEYS AND VALUES.
+                    
                     
                     Extra instructions, if any:
                     {extra_instructions}
@@ -147,9 +148,10 @@ Don't make up any information, just use the information provided.
 ▸ **Personal Metrics**  
    - Budget: €1500/month
    - Location Priorities: Niet te ver uit de buurt van het centrum van Tilburg. Idealiter 10 minuten, maar als het iets langer is wil ik het ook weten. Een half uur is ECHT het maximum en heb ik liever niet.
+   HET MOET WEL ECHT IN TILBURG ZIJN. Uden is bijv. geen Tilburg. Wat wel deel is van Tilburg, als een reminder: De gemeente Tilburg omvat naast de stad zelf de dorpen Berkel-Enschot, Udenhout en Biezenmortel. 
    - Space Requirements: We hebben nu 40m2, en we willen er dus wel boven gaan zitten! Maar we willen vooral een plek die niet super heet of koud wordt. Bovenste verdieping van een flat is dan niet ideaal, tenzij het hele goede isolatie heeft. Vaak is dit niet af te lezen uit de gegeven huisgegevens helaas... 
-   - Must-Have Features: Meer dan 40m2. Beschikbaar voor twee personen. Huur niet meer dan 1600
-   - Nice-to-Have Features: Huisdieren toegestaan, vaatwasser
+   - Must-Have Features: Meer dan 40m2. Beschikbaar voor twee personen. Huur niet meer dan 1600. In Tilburg.
+   - Nice-to-Have Features: Huisdieren toegestaan, vaatwasser, airco. 
 
 **Analysis Framework**
 
