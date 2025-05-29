@@ -1,5 +1,4 @@
 FROM crawl4ai-base-arm64
-# FROM unclecode/crawl4ai:latest
 
 # Set working directory
 WORKDIR /app

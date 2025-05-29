@@ -10,7 +10,7 @@ load_dotenv()
 
 name = "test_gallery_schema"
 html = open(f"{name}.html", "r").read()
-if 'gallery' in name:
+if "gallery" in name:
     query_text = """ 
     In de gegeven html staat maar een deel van de gehele pagina.
     Het is een pagina met een gallerij van huurwoningen.

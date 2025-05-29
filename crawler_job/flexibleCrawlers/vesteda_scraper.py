@@ -40,7 +40,7 @@ class VestedaScraper(BaseWebsiteScraper):
         logger.info(f"Vesteda scraper initialized...")
 
     async def _accept_cookies(self, current_url: str) -> bool:
-        if not self.website_config.accept_cookies:
+        if not self.cookies_config:
             logger.info("Accepting cookies not required/enabled.")
             return True
 

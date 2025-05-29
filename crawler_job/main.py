@@ -38,6 +38,7 @@ async def run_crawler_async(
     notifications_enabled: bool,
     test_notifications_only: bool,
     debug_mode: bool,
+    headless: bool,
 ) -> bool:
     """
     Run the crawler for the specified website.
@@ -52,7 +53,7 @@ async def run_crawler_async(
     """
     try:
         browser_config = BrowserConfig(
-            headless=not debug_mode,
+            headless=headless,
             verbose=debug_mode,
             use_managed_browser=True,
             user_data_dir="./browser_data/general",
@@ -95,6 +96,8 @@ async def run_crawler_async(
 
         try:
             await crawler.start()
+
+            logger.info(f"Running for websites: {websites}")
 
             for website_name in websites:
                 scraper = await factory.get_scraper_async(
@@ -176,6 +179,12 @@ def parse_args():
         help="Enable debug mode",
         default=os.getenv("DEBUG_MODE", "false").lower() == "true",
     )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Run the browser in headless mode",
+        default=os.getenv("HEADLESS", "false").lower() == "true",
+    )
     return parser.parse_args()
 
 
@@ -185,6 +194,8 @@ if __name__ == "__main__":
     test_notifications_only: bool = args.test_notifications_only
     notifications_enabled: bool = args.notifications_enabled
     debug_mode: bool = args.debug_mode
+    headless: bool = args.headless
+
     try:
         result = asyncio.run(
             run_crawler_async(
@@ -192,6 +203,7 @@ if __name__ == "__main__":
                 notifications_enabled,
                 test_notifications_only,
                 debug_mode,
+                headless,
             )
         )
 

@@ -30,7 +30,7 @@ class House(BaseModel):
 
     # Detailed link
     detail_url: Optional[str] = Field(
-        None, description="URL to the detail page of the house"
+        None, description="URL to the detail page of the house. Should be the FULL url. Not just the relative path."
     )
 
     # Financial information
@@ -186,13 +186,25 @@ class House(BaseModel):
         
     @classmethod
     def _pre_process_data(cls, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Pre-process the input data dictionary to ensure correct types and values for House fields.
+
+        Args:
+            data (Dict[str, Any]): Raw house data.
+
+        Returns:
+            Dict[str, Any]: Processed house data with correct types.
+        """
         processed_data = data.copy()
 
         # Process bedrooms field
         try:
-            if "bedrooms" in data and data["bedrooms"]:
-                processed_data["bedrooms"] = int(data["bedrooms"])
-        except ValueError:
+            if "bedrooms" in data and data["bedrooms"] is not None and data["bedrooms"] != "":
+                if not isinstance(data["bedrooms"], int):
+                    processed_data["bedrooms"] = int(str(data["bedrooms"]).strip())
+                else:
+                    processed_data["bedrooms"] = data["bedrooms"]
+        except (ValueError, TypeError):
             logger.warning(
                 f"Could not convert bedrooms to int: {data.get('bedrooms')}"
             )
@@ -200,37 +212,42 @@ class House(BaseModel):
 
         # Process area field to square_meters
         try:
-            if "area" in data and data["area"]:
-                # Strip "m²" and convert to int
-                area_str = data.get("area", "").replace("m2", "").strip()
-                if area_str:
-                    processed_data["square_meters"] = int(area_str)
-            elif "square_meters" in data and data["square_meters"]:
-                # Strip "m²" and convert to int
-                area_str = (
-                    data.get("square_meters", "").replace("m2", "").strip()
-                )
-                if area_str:
-                    processed_data["square_meters"] = int(area_str)
-        except ValueError:
+            area_value = None
+            if "area" in data and data["area"] is not None and data["area"] != "":
+                if isinstance(data["area"], int):
+                    area_value = data["area"]
+                else:
+                    area_str = str(data.get("area", "")).replace("m2", "").replace("m²", "").strip()
+                    if area_str:
+                        area_value = int(area_str)
+            elif "square_meters" in data and data["square_meters"] is not None and data["square_meters"] != "":
+                if isinstance(data["square_meters"], int):
+                    area_value = data["square_meters"]
+                else:
+                    area_str = str(data.get("square_meters", "")).replace("m2", "").replace("m²", "").strip()
+                    if area_str:
+                        area_value = int(area_str)
+            if area_value is not None:
+                processed_data["square_meters"] = area_value
+        except (ValueError, TypeError):
             logger.warning(
-                f"Could not convert area to int: {data.get('area')}"
+                f"Could not convert area to int: {data.get('area') or data.get('square_meters')}"
             )
             processed_data["square_meters"] = None
 
-            # Rename price to rental_price
-            if "price" in processed_data:
-                processed_data["rental_price"] = processed_data.pop("price")
+        # Rename price to rental_price if present
+        if "price" in processed_data:
+            processed_data["rental_price"] = processed_data.pop("price")
 
-            # Check if demand message indicates high demand
-            demand_message = processed_data.get("demand_message")
-            high_demand = False
-            if demand_message and any(
-                keyword in demand_message.lower()
-                for keyword in ["hoge interesse", "veel interesse", "popular"]
-            ):
-                high_demand = True
-            processed_data["high_demand"] = high_demand
+        # Check if demand message indicates high demand
+        demand_message = processed_data.get("demand_message")
+        high_demand = False
+        if demand_message and isinstance(demand_message, str) and any(
+            keyword in demand_message.lower()
+            for keyword in ["hoge interesse", "veel interesse", "popular"]
+        ):
+            high_demand = True
+        processed_data["high_demand"] = high_demand
 
         return processed_data
   

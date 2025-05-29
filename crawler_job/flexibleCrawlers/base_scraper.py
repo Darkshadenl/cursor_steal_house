@@ -495,22 +495,16 @@ class BaseWebsiteScraper(ABC):
         else:
             extraction_strategy = JsonCssExtractionStrategy(schema)
 
-        gallery_config = CrawlerRunConfig(
-            extraction_strategy=extraction_strategy,
-            cache_mode=CacheMode.BYPASS,
-            session_id=self.session_id,
-            magic=False,
-            user_agent_mode="random",
-            log_console=self.debug_mode,
-            exclude_all_images=True,
-            exclude_social_media_links=True,
-        )
+        config = self.standard_run_config.clone()
+        config.extraction_strategy = extraction_strategy
+        config.wait_for = "domcontentloaded"
 
         if self.gallery_extraction_config.gallery_container_selector:
-            gallery_config.css_selector = (
+            config.css_selector = (
                 self.gallery_extraction_config.gallery_container_selector
             )
 
+        logger.debug(f"Extracting gallery from url: {self.current_url}")
         result: CrawlResult = await self.crawler.arun(url=self.current_url, config=gallery_config)  # type: ignore
 
         if not result.success:
@@ -711,7 +705,7 @@ class BaseWebsiteScraper(ABC):
                     
                     while (true) {
                         await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
-                        const cookieButton = document.querySelector('a[href="javascript:Cookiebot.submitCustomConsent(false, true, false); Cookiebot.hide()"]');
+                        const cookieButton = document.querySelector('${self.config.cookies_config.accept_cookies_selector}');
                         if (cookieButton) {
                             cookieButton.click();
                             console.log("Cookie button clicked");
@@ -911,13 +905,16 @@ class BaseWebsiteScraper(ABC):
         logger.info(
             f"Choosing strategy {strategy} for {self.website_config.website_name}"
         )
+        result = None
 
         if strategy == ScrapeStrategy.GALLERY.value:
-            return await self.run_gallery_scrape()
+            result = await self.run_gallery_scrape()
         elif strategy == ScrapeStrategy.SITEMAP.value:
-            return await self.run_sitemap_scrape()
+            result = await self.run_sitemap_scrape()
         else:
             raise Exception(f"Invalid scrape strategy: {strategy}")
+        
+        return result
 
 
 class ScrapeStrategy(Enum):
