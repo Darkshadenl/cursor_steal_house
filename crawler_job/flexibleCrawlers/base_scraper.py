@@ -201,6 +201,22 @@ class BaseWebsiteScraper(ABC):
                 f"document.querySelector('{self.login_config.submit_selector}').click();",
             ]
 
+            # Configure wait condition based on login config
+            wait_for_condition = None
+            if self.login_config.success_indicator_selector:
+                wait_for_condition = (
+                    f"css:{self.login_config.success_indicator_selector}"
+                )
+            elif self.login_config.expected_url:
+                # Wait for URL change or a reasonable delay
+                wait_for_condition = (
+                    "js:() => window.location.pathname !== '"
+                    + (self.login_config.login_url_path or "")
+                    + "'"
+                )
+            else:
+                wait_for_condition = ""
+
             run_config = CrawlerRunConfig(
                 session_id=self.session_id,
                 exclude_all_images=True,
@@ -209,6 +225,8 @@ class BaseWebsiteScraper(ABC):
                 js_only=False,
                 magic=False,
                 js_code=js_code,
+                wait_for=wait_for_condition,
+                page_timeout=10000,  # 10 seconds timeout
                 log_console=self.debug_mode,
             )
 
@@ -223,9 +241,36 @@ class BaseWebsiteScraper(ABC):
                     in login_result.error_message
                 ):
                     logger.info(
-                        f"Already logged in probably? Skipping login for {self.website_config.website_name}."
+                        f"Navigation in progress detected. Waiting for page to stabilize for {self.website_config.website_name}."
                     )
-                    return True
+
+                    # Try again with a different wait strategy
+                    stabilize_config = CrawlerRunConfig(
+                        session_id=self.session_id,
+                        cache_mode=CacheMode.BYPASS,
+                        js_only=True,
+                        wait_for="domcontentloaded",
+                        page_timeout=15000,
+                        log_console=self.debug_mode,
+                    )
+
+                    stabilize_result: CrawlResult = await self.crawler.arun(
+                        self.current_url or full_login_url, config=stabilize_config
+                    )  # type: ignore
+
+                    if stabilize_result.success:
+                        logger.info(
+                            f"Page stabilized successfully for {self.website_config.website_name}"
+                        )
+                        self.current_url = stabilize_result.url
+                        return True
+                    else:
+                        logger.warning(
+                            f"Page stabilization attempt failed: {stabilize_result.error_message}"
+                        )
+                        return (
+                            True  # Assume login succeeded despite stabilization issues
+                        )
                 else:
                     raise Exception(
                         f"Login form submission failed: {login_result.error_message}"
@@ -235,7 +280,7 @@ class BaseWebsiteScraper(ABC):
             return True
 
         except Exception as e:
-            print(f"Login failed: {str(e)}")
+            logger.error(f"Login failed: {str(e)}")
             return False
 
     async def navigate_to_sitemap_async(self) -> str:
@@ -303,7 +348,7 @@ class BaseWebsiteScraper(ABC):
         if not self.filtering_config:
             logger.info("No filtering configuration provided.")
             return
-        
+
         js = """
 (async () => {
     try {
@@ -342,19 +387,21 @@ class BaseWebsiteScraper(ABC):
 })();
 
         """
-        
+
         cookie_config = self.standard_run_config.clone()
         cookie_config.js_code = js
         cookie_config.log_console = True
         cookie_config.js_only = True
         if self.filtering_config.filters_container_selector:
-            cookie_config.css_selector = self.filtering_config.filters_container_selector
+            cookie_config.css_selector = (
+                self.filtering_config.filters_container_selector
+            )
 
         result = await self.crawler.arun(
-            url=self.current_url, # type: ignore
+            url=self.current_url,  # type: ignore
             config=cookie_config,
         )
-        
+
         logger.info("Applied filters")
 
     async def extract_sitemap_async(self, sitemap_html: str) -> List[House]:
@@ -481,7 +528,7 @@ class BaseWebsiteScraper(ABC):
             for path in gallery_extraction_config.correct_urls_paths
         ]
 
-        if not any(correct_url in self.current_url for correct_url in correct_urls): # type: ignore
+        if not any(correct_url in self.current_url for correct_url in correct_urls):  # type: ignore
             raise Exception(f"Invalid URL: {self.current_url}")
 
         schema = gallery_extraction_config.schema
@@ -684,6 +731,30 @@ class BaseWebsiteScraper(ABC):
             return self.accepted_cookies
 
         logger.info(f"Accepting cookies for {self.website_config.website_name}...")
+        
+        js = f"""
+            (async () => {{
+                const cookieButton = document.querySelector('{self.cookies_config.accept_cookies_selector}');
+                
+                if (cookieButton) {{
+                    cookieButton.click();
+                    console.log("Cookie button clicked");
+                }} else {{
+                    console.log("Cookie button not found");
+                    return true;
+                }}
+                
+                while (true) {{
+                    await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
+                    const cookieButton = document.querySelector('{self.cookies_config.accept_cookies_selector}');
+                    if (cookieButton) {{
+                        cookieButton.click();
+                        console.log("Cookie button clicked");
+                        return true;
+                    }}
+                }}
+            }})();
+            """
 
         cookie_config = CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS,
@@ -691,29 +762,7 @@ class BaseWebsiteScraper(ABC):
             magic=True,
             session_id=self.session_id,
             log_console=self.debug_mode,
-            js_code="""
-                (async () => {
-                    const cookieButton = document.querySelector('${self.config.cookies_config.accept_cookies_selector}');
-                    
-                    if (cookieButton) {
-                        cookieButton.click();
-                        console.log("Cookie button clicked");
-                    } else {
-                        console.log("Cookie button not found");
-                        return true;
-                    }
-                    
-                    while (true) {
-                        await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
-                        const cookieButton = document.querySelector('${self.config.cookies_config.accept_cookies_selector}');
-                        if (cookieButton) {
-                            cookieButton.click();
-                            console.log("Cookie button clicked");
-                            return true;
-                        }
-                    }
-                })();
-                """,
+            js_code=js,
         )
 
         result: CrawlResult = await self.crawler.arun(
@@ -913,7 +962,7 @@ class BaseWebsiteScraper(ABC):
             result = await self.run_sitemap_scrape()
         else:
             raise Exception(f"Invalid scrape strategy: {strategy}")
-        
+
         return result
 
 
