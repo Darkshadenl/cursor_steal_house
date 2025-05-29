@@ -2,7 +2,6 @@ import os
 from typing import Optional
 from crawl4ai import AsyncWebCrawler, CacheMode, CrawlResult, CrawlerRunConfig
 from crawler_job.flexibleCrawlers.base_scraper import BaseWebsiteScraper
-from crawler_job.helpers.custom_crawl_result import CustomCrawlResult
 from crawler_job.helpers.utils import save_screenshot_from_crawl_result
 from crawler_job.models.db_config_models import WebsiteConfig
 from crawler_job.notifications.notification_service import NotificationService
@@ -34,35 +33,21 @@ class NmgWonenScraper(BaseWebsiteScraper):
         if not self.crawler:
             raise Exception("Crawler not initialized")
 
-        logger.info(f"Navigating to gallery via navigation menu...")
-        url = f"{self.website_config.base_url}"
-
-        js = """
-        (async () => {
-            try {
-                const nav = await window.stealhouse.waitForElement('.navigation', 10000);
-                if (!nav) throw new Error('Navigation bar not found');
-                const menuItem = document.querySelector('.menu-width > ul:nth-child(1) > li:nth-child(6)');
-                if (!menuItem) throw new Error('Menu item not found');
-                menuItem.click();
-                return { success: true };
-            } catch (error) {
-                return { success: false, error: error.message };
-            }
-        })();
-        """
+        # logger.info(f"Navigating to gallery via navigation menu...")
+        url = f"{self.website_config.base_url}/huur"
 
         config = self.standard_run_config.clone()
-        config.js_code = js
         config.log_console = True
         config.delay_before_return_html = 5
         config.exclude_all_images = False
         config.exclude_social_media_links = False
+        config.screenshot = True
 
         result: CrawlResult = await self.crawler.arun(
             url,
             config=config,
         )  # type: ignore
+        save_screenshot_from_crawl_result(result, "navigate_to_gallery")
 
         if (
             result
@@ -264,6 +249,7 @@ class NmgWonenScraper(BaseWebsiteScraper):
                 cache_mode=CacheMode.BYPASS,
                 js_only=False,
                 magic=False,
+                screenshot=True,
                 js_code=js_code,
                 wait_for=wait_for_condition,
                 page_timeout=10000,  # 10 seconds timeout
@@ -273,6 +259,7 @@ class NmgWonenScraper(BaseWebsiteScraper):
             login_result: CrawlResult = await self.crawler.arun(
                 full_login_url, config=run_config
             )  # type: ignore
+            save_screenshot_from_crawl_result(login_result, "login")
 
             if not login_result.success:
                 if (
@@ -284,11 +271,62 @@ class NmgWonenScraper(BaseWebsiteScraper):
                         f"Navigation in progress detected. Waiting for page to stabilize for {self.website_config.website_name}."
                     )
 
+                    # JavaScript code to check for the jconfirm-holder and click the "Weigeren" button if present,
+                    # then check if the URL is the expected one.
+                    js = """
+                    (() => {
+                        try {
+                            console.log("Searching for button with 'Weiger' text...");
+                            
+                            // Find all buttons on the page
+                            const allButtons = document.querySelectorAll('button');
+                            console.log(`Found ${allButtons.length} buttons on the page`);
+                            
+                            // Search for button containing "Weiger" text
+                            let weigerButton = null;
+                            for (const button of allButtons) {
+                                if (button.textContent && button.textContent.includes('Weiger')) {
+                                    weigerButton = button;
+                                    break;
+                                }
+                            }
+                            
+                            if (weigerButton) {
+                                console.log('Button with "Weiger" found:');
+                                console.log('Button outerHTML:', weigerButton.outerHTML);
+                                console.log('Button textContent:', weigerButton.textContent);
+                                console.log('Button classList:', Array.from(weigerButton.classList));
+                                console.log('Button parent element:', weigerButton.parentElement ? weigerButton.parentElement.outerHTML : 'No parent');
+                                
+                                // Click the button
+                                weigerButton.click();
+                                console.log('Button clicked');
+                            } else {
+                                console.log('No button with "Weiger" text found');
+                            }
+                            
+                            // Now check if the URL is the expected one
+                            console.log("Current URL:", window.location.href);
+                            if (window.location.href === "https://nmgwonen.mijnklantdossier.nl/dossier/RelatieDossier.aspx") {
+                                console.log("URL matches expected.");
+                                return { success: true };
+                            } else {
+                                console.log("URL does not match expected.");
+                                return { success: false, reason: "URL does not match" };
+                            }
+                        } catch (e) {
+                            console.log("Error occurred:", e.message);
+                            return { success: false, error: e.message };
+                        }
+                    })()
+                    """
+
                     # Try again with a different wait strategy
                     stabilize_config = CrawlerRunConfig(
                         session_id=self.session_id,
                         cache_mode=CacheMode.BYPASS,
                         js_only=True,
+                        js_code=js,
                         page_timeout=15000,
                         log_console=self.debug_mode,
                         screenshot=True,
@@ -297,8 +335,6 @@ class NmgWonenScraper(BaseWebsiteScraper):
                     stabilize_result: CrawlResult = await self.crawler.arun(
                         self.current_url or full_login_url, config=stabilize_config
                     )  # type: ignore
-
-                    save_screenshot_from_crawl_result(stabilize_result, 'stabilize_screenshot')
 
                     if stabilize_result.success:
                         logger.info(
