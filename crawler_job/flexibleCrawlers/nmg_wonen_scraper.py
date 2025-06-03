@@ -37,17 +37,21 @@ class NmgWonenScraper(BaseWebsiteScraper):
         url = f"{self.website_config.base_url}/huur"
 
         config = self.standard_run_config.clone()
-        config.log_console = True
-        config.delay_before_return_html = 5
+        # config.delay_before_return_html = 5
         config.exclude_all_images = False
         config.exclude_social_media_links = False
-        config.screenshot = True
+
+        if self.debug_mode:
+            config.screenshot = True
+            config.log_console = True
 
         result: CrawlResult = await self.crawler.arun(
             url,
             config=config,
         )  # type: ignore
-        save_screenshot_from_crawl_result(result, "navigate_to_gallery")
+
+        if self.debug_mode:
+            save_screenshot_from_crawl_result(result, "navigate_to_gallery")
 
         if (
             result
