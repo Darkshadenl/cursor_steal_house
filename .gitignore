@@ -6,6 +6,9 @@
 .env.production.local
 .env*
 
+recipients_docker.txt
+
+
 # Virtual Environment
 venv/
 env/
