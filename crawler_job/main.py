@@ -181,9 +181,10 @@ def parse_args():
     )
     parser.add_argument(
         "--headless",
-        action="store_true",
-        help="Run the browser in headless mode",
-        default=os.getenv("HEADLESS", "false").lower() == "true",
+        type=str,
+        choices=["true", "false"],
+        help="Run the browser in headless mode (true/false)",
+        default=os.getenv("HEADLESS", "false").lower(),
     )
     return parser.parse_args()
 

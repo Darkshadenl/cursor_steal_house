@@ -1,0 +1,33 @@
+{
+    "website_identifier": "example_multi_city",
+    "website_name": "Example Multi City Site",
+    "base_url": "https://example.com",
+    "is_active": true,
+    "scrape_strategy": "gallery",
+    "strategy_config": {
+        "navigation_config": {
+            "gallery": "/listings"
+        },
+        "filtering_config": {
+            "filters_container_selector": ".search-default",
+            "cities": ["Amsterdam", "Rotterdam", "Utrecht", "Tilburg"]
+        },
+        "gallery_extraction_config": {
+            "listing_item_selector": "article.property-card",
+            "fields": [
+                {
+                    "target_field": "title",
+                    "selector": "h3.property-title",
+                    "extraction_type": "text",
+                    "is_required": true
+                },
+                {
+                    "target_field": "price_text",
+                    "selector": ".price-tag",
+                    "extraction_type": "text"
+                }
+            ]
+        }
+    },
+    "session_id": "example_session"
+} 

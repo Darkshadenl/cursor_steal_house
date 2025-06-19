@@ -217,7 +217,7 @@ class DetailPageExtractionConfig(BaseModel):
     """
     Pydantic model for detail page extraction configuration.
     """
-    
+
     schema_type: str = "xpath" or "css" or "llm"
     schema: Optional[Dict[str, Any]] = None
     detail_container_selector: Optional[str] = None
@@ -256,6 +256,7 @@ class FilteringConfig(BaseModel):
     filters_container_selector: Optional[str] = None
     js_code: Optional[str] = None
     filter_url_suffix: Optional[str] = None
+    cities: Optional[List[str]] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -119,6 +119,21 @@ class BaseWebsiteScraper(ABC):
             "updated_houses_count": 0,
         }
 
+    def _get_search_city(self) -> str:
+        """
+        Get the search city from filtering configuration.
+
+        Returns:
+            str: The city to use for searching. Falls back to "Tilburg" for backwards compatibility.
+        """
+        if (
+            self.filtering_config
+            and self.filtering_config.cities
+            and len(self.filtering_config.cities) > 0
+        ):
+            return self.filtering_config.cities[0]
+        return "Tilburg"
+
     async def validate_current_page(self, expected_url: str, check_url: str) -> bool:
         """Validate if the current page is the expected page.
 
@@ -349,42 +364,45 @@ class BaseWebsiteScraper(ABC):
             logger.info("No filtering configuration provided.")
             return
 
-        js = """
-(async () => {
-    try {
-        const searchContainer = await new Promise((resolve, reject) => {
+        search_city = self._get_search_city()
+        logger.info(f"Applying filters with search city: {search_city}")
+
+        js = f"""
+(async () => {{
+    try {{
+        const searchContainer = await new Promise((resolve, reject) => {{
             const timeout = 5000;
             const interval = 100;
             const startTime = Date.now();
             
-            const check = () => {
+            const check = () => {{
                 const element = document.querySelector('.search-default');
-                if (element) {
+                if (element) {{
                     resolve(element);
                     return;
-                }
+                }}
                 
-                if (Date.now() - startTime >= timeout) {
+                if (Date.now() - startTime >= timeout) {{
                     reject(new Error('Search container not found within 5s'));
                     return;
-                }
+                }}
                 
                 setTimeout(check, interval);
-            };
+            }};
             
             check();
-        });
+        }});
 
         const addressInput = searchContainer.querySelector('.search-field--adres input');
-        addressInput.value = 'Tilburg';
+        addressInput.value = '{search_city}';
         
         const searchButton = searchContainer.querySelector('.search-field--button button');
         searchButton.click();
         
-    } catch (error) {
+    }} catch (error) {{
         console.error('Fout bij zoeken:', error);
-    }
-})();
+    }}
+}})();
 
         """
 
@@ -731,7 +749,7 @@ class BaseWebsiteScraper(ABC):
             return self.accepted_cookies
 
         logger.info(f"Accepting cookies for {self.website_config.website_name}...")
-        
+
         js = f"""
             (async () => {{
                 const cookieButton = document.querySelector('{self.cookies_config.accept_cookies_selector}');
