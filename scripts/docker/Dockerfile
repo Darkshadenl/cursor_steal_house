@@ -9,6 +9,7 @@ USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     postgresql-client \
+    bzip2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements-docker.txt first for better caching
