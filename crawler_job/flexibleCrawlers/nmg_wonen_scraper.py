@@ -83,21 +83,24 @@ class NmgWonenScraper(BaseWebsiteScraper):
         submit_button = (
             "/html/body/div[2]/div[6]/div[2]/div/form/div[1]/div/div[1]/div[6]/button"
         )
-        js = """
-        (async () => {
-    try {
+        search_city = self._get_search_city()
+        logger.info(f"Applying filters with search city: {search_city}")
+
+        js = f"""
+        (async () => {{
+    try {{
         const searchContainer = document.querySelector('.search-default');
 
         const addressInput = searchContainer.querySelector('.search-field--adres input');
-        addressInput.value = 'Tilburg';
+        addressInput.value = '{search_city}';
         
         const searchButton = searchContainer.querySelector('.search-field--button button');
         searchButton.click();
         console.log('Filters applied');
-    } catch (error) {
+    }} catch (error) {{
         console.error('Fout bij zoeken:', error);
-    }
-})();
+    }}
+}})();
 
         """
 
