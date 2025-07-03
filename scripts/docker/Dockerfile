@@ -13,16 +13,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements-docker.txt first for better caching
-COPY requirements-docker.txt .
+COPY requirements_docker.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements-docker.txt
+RUN pip install --no-cache-dir -r requirements_docker.txt
 
 # Copy crawler code
 COPY crawler_job /app/crawler_job
 
 # Copy recipients file to the container
-COPY recipients.txt /app/recipients.txt
+COPY recipients_docker.txt /app/recipients_docker.txt
 
 # Set environment variables
 ENV PYTHONPATH=/app
