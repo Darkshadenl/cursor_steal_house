@@ -1,4 +1,4 @@
-FROM crawl4ai-base-arm64
+FROM crawl4ai:arm64
 
 # Set working directory
 WORKDIR /app
@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir -r requirements_docker.txt
 COPY crawler_job /app/crawler_job
 
 # Copy recipients file to the container
-COPY recipients_docker.txt /app/recipients_docker.txt
+COPY recipients_docker.json /app/recipients_docker.json
 
 # Set environment variables
 ENV PYTHONPATH=/app
@@ -35,13 +35,18 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/home/appuser/.cache/ms-playwright
 RUN mkdir -p /app/logs \
     && mkdir -p /app/browser_data/vesteda \
     && chown -R appuser:appuser /app \
-    && chown -R appuser:appuser /home/appuser 
+    && chown -R appuser:appuser /home/appuser
 
 # Create start script to launch Chrome browser and crawler
 COPY start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
 USER appuser
+
+# Create .crawl4ai directory and chromium.path for crawl4ai
+RUN mkdir -p /home/appuser/.crawl4ai \
+    && printf "/home/appuser/.cache/ms-playwright/chromium-1179/chrome-linux/chrome" > /home/appuser/.crawl4ai/chromium.path \
+    && chmod 444 /home/appuser/.crawl4ai/chromium.path
 
 # Default command to run the start script
 CMD ["/app/start.sh"]

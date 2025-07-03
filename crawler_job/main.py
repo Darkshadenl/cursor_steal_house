@@ -1,6 +1,7 @@
 import asyncio
 import argparse
 import os
+import time
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 from dotenv import load_dotenv
 import sys
@@ -51,30 +52,28 @@ async def run_crawler_async(
     Returns:
         Dict[str, Any]: Results of the crawling process
     """
+    browser_config = BrowserConfig(
+        headless=headless,
+        verbose=debug_mode,
+        use_managed_browser=True,
+        user_data_dir="./browser_data/general",
+        extra_args=[
+            "--no-sandbox",
+            "--disable-gpu",
+            "--disable-dev-shm-usage",
+            "--remote-debugging-address=0.0.0.0",
+            "--remote-debugging-port=9222",
+        ],
+    )
+
+    crawler = AsyncWebCrawler(
+        config=browser_config,
+    )
+
+    db_session = get_db_session()
+    notification_service = NotificationService(notifications_on=notifications_enabled)
+
     try:
-        browser_config = BrowserConfig(
-            headless=headless,
-            verbose=debug_mode,
-            use_managed_browser=True,
-            user_data_dir="./browser_data/general",
-            extra_args=[
-                "--no-sandbox",
-                "--disable-gpu",
-                "--disable-dev-shm-usage",
-                "--remote-debugging-address=0.0.0.0",
-                "--remote-debugging-port=9222",
-            ],
-        )
-
-        crawler = AsyncWebCrawler(
-            config=browser_config,
-        )
-
-        db_session = get_db_session()
-        notification_service = NotificationService(
-            notifications_on=notifications_enabled
-        )
-
         if test_notifications_only:
             logger.info("Running in test notifications only mode")
             successful_channels = await notification_service.send_test_notification()
@@ -143,10 +142,6 @@ async def run_crawler_async(
             )
 
         return success
-
-    except Exception as e:
-        logger.error(f"Error running crawler: {str(e)}")
-        return False
     finally:
         if "db_session" in locals():
             await db_session.close()
@@ -208,10 +203,25 @@ if __name__ == "__main__":
             )
         )
 
-        sys.exit(0 if result else 1)
+        if result == True:
+            sys.exit(0)
+        else:
+            if debug_mode:
+                logger.info(
+                    "Debug mode enabled - keeping application running after crash"
+                )
+                while True:
+                    time.sleep(10)  # Keep process alive
+            else:
+                sys.exit(1)
     except KeyboardInterrupt:
         logger.info("Crawl interrupted by user.")
         sys.exit(130)
     except Exception as e:
         logger.error(f"Unhandled exception: {str(e)}")
-        sys.exit(1)
+        if debug_mode:
+            logger.info("Debug mode enabled - keeping application running after crash")
+            while True:
+                time.sleep(10)  # Keep process alive
+        else:
+            sys.exit(1)

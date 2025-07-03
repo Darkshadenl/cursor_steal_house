@@ -34,10 +34,15 @@ class LLMService:
         # Then remove any remaining newlines
         return markdown.replace("\n", "")
 
-    async def analyse_house(self, house: House) -> str:
+    async def analyse_house(
+        self, house: House, personal_metrics: Optional[str] = None
+    ) -> str:
         """Analyse a house using the LLM"""
 
-        prompt = prompt_template.format(HOUSE_DETAILS=house.to_readable_string())
+        prompt = prompt_template.format(
+            HOUSE_DETAILS=house.to_readable_string(),
+            PERSONAL_METRICS=personal_metrics or "No personal metrics provided.",
+        )
 
         try:
             response = await acompletion(
@@ -136,83 +141,102 @@ Rules:
 
 prompt_template = """
 **House Rental Relevance Analyzer**  
-*(A Decision-Making Framework for Individual Property Evaluation)*  
-
+_(A Decision-Making Framework for Individual Property Evaluation)_  
+  
 **Objective**  
 Evaluate whether a specific rentable house meets personalized criteria through a systematic 4-phase analysis:  
 `① Metric Alignment → ② Trade-off Analysis → ③ Risk Assessment → ④ Action Recommendation`
 ONLY BASE YOUR ANALYSIS ON THE USER-PROVIDED INFORMATION (PROPERTY PROFILE).
-Don't make up any information, just use the information provided.
 
 **Input Requirements**  
-*(User-Provided Information)*  
 ▸ **Property Profile**  
-   {HOUSE_DETAILS}
+{HOUSE_DETAILS}
 
 ▸ **Personal Metrics**  
-   - Budget: €1500/month
-   - Location Priorities: Niet te ver uit de buurt van het centrum van Tilburg. Idealiter 10 minuten, maar als het iets langer is wil ik het ook weten. Een half uur is ECHT het maximum en heb ik liever niet.
-   HET MOET WEL ECHT IN TILBURG ZIJN. Uden is bijv. geen Tilburg. Wat wel deel is van Tilburg, als een reminder: De gemeente Tilburg omvat naast de stad zelf de dorpen Berkel-Enschot, Udenhout en Biezenmortel. 
-   - Space Requirements: We hebben nu 40m2, en we willen er dus wel boven gaan zitten! Maar we willen vooral een plek die niet super heet of koud wordt. Bovenste verdieping van een flat is dan niet ideaal, tenzij het hele goede isolatie heeft. Vaak is dit niet af te lezen uit de gegeven huisgegevens helaas... 
-   - Must-Have Features: Meer dan 40m2. Beschikbaar voor twee personen. Huur niet meer dan 1600. In Tilburg.
-   - Nice-to-Have Features: Huisdieren toegestaan, vaatwasser, airco. 
+{PERSONAL_METRICS}
 
-**Analysis Framework**
-
-**1. Metric Compliance Check** 
+**Analysis Framework**  
+**1. Metric Compliance Check**
 | Criterion       | Property Value | Your Requirement | Match? | Notes          |  
 |-----------------|----------------|------------------|--------|----------------|  
 | Monthly Rent    | [$$$]          | [$$$]            | ✔/✘    | [% over/under] |  
 | Location Score  | [8/10]         | [≥7/10]          | ✔/✘    | [Crime rate/schools] |  
 | ...             | ...            | ...              | ...    | ...            |  
-
-**2. Value-For-Money Assessment**  
-```  
-[Property Price] vs. Local Market Average: [+15%/-10%]  
-Key Differentiators:  
-✓ Premium Features: [Hardwood floors, smart home system]  
+  
+**2. Value-For-Money Assessment** 
+[Property Price] vs. Local Market Average: [+15%/-10%]
+Key Differentiators:
+✓ Premium Features: [Hardwood floors, smart home system]
 ✗ Missing Standards: [No in-unit laundry, shared utilities]  
-```
 
 **3. Risk Evaluation Matrix**  
 ⚠️ Potential Issues:  
 - [Older HVAC system (12 years)] → Maintenance risk: ▲▲△  
 - [Street parking only] → Winter inconvenience: ▲△△  
-
+  
 **4. Final Recommendation**  
 ◉ Relevance Score: 82/100  
 
 **Output Format**  
-```markdown  
-# [Property] Analysis Report  
+Generate complete HTML following this structure, filling in ALL placeholder values with actual data:
 
-## Executive Summary  
-[TL;DR verdict with key highlights]  
+```html
+<div style="font-family: Arial, sans-serif; max-width: 800px; margin: auto;">
+  <!-- REPLY RECOMMENDATION -->
+  <div style="background-color: [USE #e8f5e9 for positive, #ffebee for negative]; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+    <h3>Advies: [Wel reageren/Niet reageren]</h3>
+    <p><strong>Reden:</strong> [Brief reason]</p>
+  </div>
 
-## Detailed Breakdown  
-### Core Requirements Match  
-- [Metric 1]: ✔/✘ with [explanation]  
-- [Metric 2]: ✔/✘ with [comparison]  
+  <h2 style="color: #2c3e50;">Woninganalyse: [PROPERTY PROFILE ADDRESS]</h2>
+  
+  <!-- SCORE & CORE METRICS -->
+  <div style="border: 1px solid #eee; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+    <h3 style="color: #34495e;">Relevantiescore: [ACTUAL SCORE]/100</h3>
+    
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr style="background-color: #f8f9fa;">
+        <th style="padding: 10px; text-align: left;">Criteria</th>
+        <th style="padding: 10px; text-align: left;">Woning</th>
+        <th style="padding: 10px; text-align: left;">Eis</th>
+        <th style="padding: 10px; text-align: left;">Status</th>
+      </tr>
+      [USE THE PERSONAL METRICS TO GENERATE THE ROWS]
+    </table>
+  </div>
 
-### Value Proposition  
-✅ Advantages:  
-- [Unique benefit 1]  
-- [Cost-saving feature 2]  
+  <!-- RISK ANALYSIS -->
+  <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+    <h4 style="color: #856404;">⛔ Aandachtspunten ([ACTUAL COUNT]):</h4>
+    <ul style="padding-left: 20px;">
+      [USE THE PERSONAL METRICS TO GENERATE THE RISK ITEMS]
+    </ul>
+  </div>
 
-⚠️ Limitations:  
-- [Missing requirement 1]  
-- [Premium pricing justification]  
+  <!-- ACTION STEPS -->
+  <div style="background-color: #d4edda; padding: 15px; border-radius: 5px;">
+    <h4 style="color: #155724;">✅ Actiepunten:</h4>
+    <ol style="padding-left: 20px;">
+      [USE THE PERSONAL METRICS TO GENERATE THE ACTION STEPS]
+    </ol>
+  </div>
 
-### Action Plan  
-1. Immediate Next Steps:  
-   - [Contact landlord about X]  
-   - [Verify Y documentation]  
-2. Contingency Options:  
-   - If [issue Z]: [Alternative solution]  
+  <!-- AUTOMATIC DISCLAIMER -->
+  <p style="font-size: 0.8em; color: #6c757d; margin-top: 20px;">
+  Altijd officiële documentatie verifiëren
+  </p>
+</div>
 ```
 
-DON'T FORGET:
-EVENTHOUGH WE'VE USED MARKDOWN SYNTAX, YOU MUST RETURN THE OUTPUT IN HTML.
-ALSO, BEFORE THE ANALYSIS REPORT, YOU MUST RECOMMEND TO REPLY OR NOT REPLY TO THE RENTAL HOUSE
-BECAUSE IT'S IMPORTANT TO BE THE FIRST TO SHOW INTEREST IN THE RENTAL HOUSE.
+Strict Generation Rules: 
+     Gebruik ALLEEN de gegeven house details, verzin geen extra informatie
+     Vul alle placeholder waarden in met echte data
+     Houd kleurcodes consistent:
+         Aanbeveling groen (#e8f5e9) bij "Wel reageren", rood (#ffebee) bij "Niet reageren"
+         Risico's in geel (#fff3cd), acties in groen (#d4edda)
+         
+     Gebruik emoji's alleen waar aangegeven (✅⛔)
+     Behoud alle CSS styling inline voor email compatibiliteit
+     Zorg dat tabellen dynamisch schalen (width: 100%)
+     Gebruik Nederlandse terminologie conform de input-vereisten
 """

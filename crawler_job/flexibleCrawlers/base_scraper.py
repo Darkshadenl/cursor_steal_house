@@ -861,16 +861,32 @@ class BaseWebsiteScraper(ABC):
             if not page.success:
                 continue
 
+            if not page.markdown:
+                logger.warning(f"No markdown for {page.url}")
+                continue
+
             try:
                 extracted_data: Optional[Dict[str, Any]] = await llm_service.extract(
                     page.markdown, schema, provider
                 )
 
-                if extracted_data is None:
-                    logger.warning(f"No data extracted for {page.url}")
+                if extracted_data is None or len(extracted_data) == 0:
+                    logger.warning(
+                        f"No data extracted for {page.url}. extracted_data is None or empty"
+                    )
                     continue
 
                 json_data = json.loads(extracted_data)  # type: ignore
+
+                if json_data is None:
+                    logger.warning(
+                        f"No data extracted for {page.url}. json_data is None"
+                    )
+                    logger.debug(
+                        f"Page.markdown: {page.markdown}, Extracted data: {extracted_data}"
+                    )
+                    continue
+
                 house = House.from_dict(json_data)
                 houses.append(house)
                 logger.info(f"Successfully extracted data for {page.url}")

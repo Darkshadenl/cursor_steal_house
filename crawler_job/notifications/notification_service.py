@@ -1,5 +1,6 @@
 import os
 from typing import List, Optional
+import asyncio
 
 from crawler_job.models.house_models import House
 from crawler_job.services.llm_service import LLMProvider, LLMService
@@ -56,6 +57,8 @@ class NotificationService:
             channel_names: List of channel names to initialize
             email_recipients_file: Path to file containing email recipients (one per line)
         """
+        llm_service = LLMService(provider=LLMProvider.GEMINI)
+
         for channel_name in channel_names:
             try:
                 if channel_name == "email":
@@ -66,7 +69,7 @@ class NotificationService:
                         continue
 
                     self.active_channels.append(
-                        EmailNotificationChannel(email_recipients_file)
+                        EmailNotificationChannel(email_recipients_file, llm_service)
                     )
                     logger.info(
                         f"Email notification channel initialized with recipients from {email_recipients_file}"
@@ -106,40 +109,24 @@ class NotificationService:
             logger.info("No active notification channels, skipping notification")
             return
 
-        subject = f"New House Available: {house.address}, {house.city}"
+        # Run all channel notifications in parallel
+        tasks = [channel.send_notification(house) for channel in self.active_channels]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        llm_service = LLMService(provider=LLMProvider.GEMINI)
-        analysis = await llm_service.analyse_house(house)
-        main_url = "https://hurenbij.vesteda.com"
-
-        if house.detail_url and house.detail_url.startswith("/object/"):
-            house.detail_url = f"{main_url}{house.detail_url}"
-
-        # Format the message with details about the house
-        message = (
-            f"A new property is available at {house.address}, {house.city}.\n\n"
-            f"Status: {house.status}\n"
-            f"View details: {house.detail_url}\n\n"
-            f"{analysis}\n\n"
-            f"Full details: {house.to_readable_string()}"
-        )
-
-        # Send the notification to each active channel
-        for channel in self.active_channels:
-            try:
-                success = await channel.send_notification(subject, message)
-                if success:
-                    logger.info(
-                        f"Notification for {house.address} sent successfully via {channel.__class__.__name__}"
-                    )
-                else:
-                    logger.warning(
-                        f"Failed to send notification for {house.address} via {channel.__class__.__name__}"
-                    )
-            except Exception as e:
+        for channel, result in zip(self.active_channels, results):
+            channel_name = channel.__class__.__name__
+            if isinstance(result, Exception):
                 logger.error(
-                    f"Error sending notification via {channel.__class__.__name__}: {str(e)}",
-                    exc_info=True,
+                    f"Error sending notification via {channel_name}: {str(result)}",
+                    exc_info=result,
+                )
+            elif result:
+                logger.info(
+                    f"Notification for {house.address} sent successfully via {channel_name}"
+                )
+            else:
+                logger.warning(
+                    f"Failed to send notification for {house.address} via {channel_name}"
                 )
 
     async def send_updated_house_notification(
@@ -158,34 +145,27 @@ class NotificationService:
             logger.info("No active notification channels, skipping notification")
             return
 
-        subject = f"Updated House: {house.address}, {house.city}"
+        # Run all channel update notifications in parallel
+        tasks = [
+            channel.send_notification(house, old_status=old_status)
+            for channel in self.active_channels
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        subject = f"House Status Updated: {house.address}, {house.city}"
-
-        # Format the message with details about the house
-        message = (
-            f"The status of a property at {house.address}, {house.city} has changed.\n\n"
-            f"Previous status: {old_status}\n"
-            f"New status: {house.status}\n"
-            f"View details: {house.detail_url}"
-        )
-
-        # Send the notification to each active channel
-        for channel in self.active_channels:
-            try:
-                success = await channel.send_notification(subject, message)
-                if success:
-                    logger.info(
-                        f"Update notification for {house.address} sent successfully via {channel.__class__.__name__}"
-                    )
-                else:
-                    logger.warning(
-                        f"Failed to send update notification for {house.address} via {channel.__class__.__name__}"
-                    )
-            except Exception as e:
+        for channel, result in zip(self.active_channels, results):
+            channel_name = channel.__class__.__name__
+            if isinstance(result, Exception):
                 logger.error(
-                    f"Error sending update notification via {channel.__class__.__name__}: {str(e)}",
-                    exc_info=True,
+                    f"Error sending update notification via {channel_name}: {str(result)}",
+                    exc_info=result,
+                )
+            elif result:
+                logger.info(
+                    f"Update notification for {house.address} sent successfully via {channel_name}"
+                )
+            else:
+                logger.warning(
+                    f"Failed to send update notification for {house.address} via {channel_name}"
                 )
 
     async def send_test_notification(self) -> List[str]:
@@ -206,24 +186,26 @@ class NotificationService:
 
         successful_channels = []
 
-        # Send the notification to each active channel
-        for channel in self.active_channels:
+        # Run all test notifications in parallel
+        tasks = [
+            channel.send_notification(
+                house=None, subject=subject, message=message, is_test=True
+            )
+            for channel in self.active_channels
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for channel, result in zip(self.active_channels, results):
             channel_name = channel.__class__.__name__.replace("NotificationChannel", "")
-            try:
-                success = await channel.send_notification(subject, message)
-                if success:
-                    logger.info(
-                        f"Test notification sent successfully via {channel_name}"
-                    )
-                    successful_channels.append(channel_name)
-                else:
-                    logger.warning(
-                        f"Failed to send test notification via {channel_name}"
-                    )
-            except Exception as e:
+            if isinstance(result, Exception):
                 logger.error(
-                    f"Error sending test notification via {channel_name}: {str(e)}",
-                    exc_info=True,
+                    f"Error sending test notification via {channel_name}: {str(result)}",
+                    exc_info=result,
                 )
+            elif result:
+                logger.info(f"Test notification sent successfully via {channel_name}")
+                successful_channels.append(channel_name)
+            else:
+                logger.warning(f"Failed to send test notification via {channel_name}")
 
         return successful_channels
