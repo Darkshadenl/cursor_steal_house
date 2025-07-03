@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from crawler_job.models.house_models import House
+
 
 class AbstractNotificationChannel(ABC):
     """Base abstract class for all notification channels.
@@ -9,12 +11,11 @@ class AbstractNotificationChannel(ABC):
     """
 
     @abstractmethod
-    async def send_notification(self, subject: str, message: str) -> bool:
-        """Send a notification with the given subject and message.
+    async def send_notification(self, house: Optional[House], **kwargs) -> bool:
+        """Send a notification.
 
         Args:
-            subject: The subject or title of the notification
-            message: The body of the notification
+            house: The house object to send a notification for. Can be None for general notifications.
 
         Returns:
             bool: True if the notification was sent successfully, False otherwise
