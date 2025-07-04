@@ -6,7 +6,9 @@
 .env.production.local
 .env*
 
-recipients_docker.txt
+recipients_docker.json
+recipients.json
+debug_screenshots/
 
 
 # Virtual Environment

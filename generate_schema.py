@@ -1,7 +1,6 @@
 import os
 from crawl4ai.extraction_strategy import (
     JsonCssExtractionStrategy,
-    JsonXPathExtractionStrategy,
 )
 from crawl4ai import LLMConfig
 from dotenv import load_dotenv

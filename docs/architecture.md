@@ -1,12 +1,8 @@
-Oké, ik heb de repository bestudeerd, inclusief de `implementation_plan.md` en de code in `crawler_job/flexibleCrawlers`, `crawler_job/factories`, en de bijbehorende modellen en repositories.
-
-Hier is een bijgewerkte versie van `architecture.md`, opgesplitst in het "Nieuwe Systeem" (Hybride JSON Configuratie) en het "Oude Systeem" (Hardcoded/Table-Based), met een focus op de huidige staat en de gevraagde "kaart" van componenten.
-
-```markdown
 # StealHouse Project Documentatie
 
 **Versie:** 2.0 (Hybride Configuratie Update)
-**Datum:** 2024-10-29
+**Datum:** 202
+**Last Update:** 04-07-2025 09:40
 
 ## Inhoudsopgave
 
@@ -20,7 +16,7 @@ Hier is een bijgewerkte versie van `architecture.md`, opgesplitst in het "Nieuwe
     - [Componenten](#componenten)
     - [Data Flow (Huidige Systeem)](#data-flow-huidige-systeem)
     - [Technologie Stack](#technologie-stack)
-  - [3. Code Structuur & Componenten Kaart](#3-code-structuur--componenten-kaart)
+  - [3. Code Structuur \& Componenten Kaart](#3-code-structuur--componenten-kaart)
     - [Project Structuur](#project-structuur)
     - [Belangrijkste Componenten (`crawler_job`)](#belangrijkste-componenten-crawler_job)
     - [Klasse Relaties (Vereenvoudigd UML)](#klasse-relaties-vereenvoudigd-uml)
@@ -45,7 +41,7 @@ Hier is een bijgewerkte versie van `architecture.md`, opgesplitst in het "Nieuwe
       - [Kenmerken](#kenmerken)
   - [6. Installatie Gids](#6-installatie-gids)
     - [Vereisten](#vereisten)
-    - [Backend & Database Setup (Lokale Ontwikkeling)](#backend--database-setup-lokale-ontwikkeling)
+    - [Backend \& Database Setup (Lokale Ontwikkeling)](#backend--database-setup-lokale-ontwikkeling)
     - [Frontend Setup (Lokale Ontwikkeling)](#frontend-setup-lokale-ontwikkeling)
     - [Draaien met Docker Compose (Ontwikkeling)](#draaien-met-docker-compose-ontwikkeling)
   - [7. Gebruik](#7-gebruik)
@@ -70,7 +66,7 @@ StealHouse is een softwareproject ontworpen om huurwoninginformatie van diverse 
 ### Scope
 
 Het project omvat:
-1.  **Python Web Scraper:** Haalt data op van doelwebsites (momenteel Vesteda ondersteund via de nieuwe methode). Gebruikt `crawl4ai` en potentieel LLMs.
+1.  **Python Web Scraper:** Haalt data op van doelwebsites (momenteel Vesteda, NMG Wonen en De Huis Sleutel ondersteund via de nieuwe methode). Gebruikt `crawl4ai` en potentieel LLMs.
 2.  **Backend Services:** Python code die de scraper logica, database interactie, configuratie laden, en notificaties beheert.
 3.  **PostgreSQL Database:** Slaat gestructureerde informatie op over huurwoningen en scraper configuraties.
 4.  **Notificatiesysteem:** Verstuurt alerts via Email, Pushover, Telegram.
@@ -189,7 +185,9 @@ graph LR
 │   ├── flexibleCrawlers/       # Scrapers volgens het NIEUWE hybride model
 │   │   ├── __init__.py
 │   │   ├── base_scraper.py     # Abstracte basisklasse voor scrapers
-│   │   └── vesteda_scraper.py  # Specifieke implementatie voor Vesteda
+│   │   ├── vesteda_scraper.py  # Specifieke implementatie voor Vesteda
+│   │   ├── nmg_wonen_scraper.py # Specifieke implementatie voor NMG Wonen
+│   │   └── huis_sleutel_scraper.py # Specifieke implementatie voor De Huis Sleutel
 │   ├── crawlers/               # OUDE scraper implementaties (LEGACY)
 │   │   ├── __init__.py
 │   │   └── vesteda/            # Oude Vesteda scraper
@@ -201,7 +199,7 @@ graph LR
 │   │   └── transformers.py     # Conversie tussen Pydantic/SQLAlchemy modellen
 │   ├── models/                 # Data modellen
 │   │   ├── __init__.py
-│   │   ├── db_models.py        # SQLAlchemy modellen (o.a. DbHouse, DbWebsiteScrapeConfig)
+│   │   ├── db_models.py        # SQLAlchemy modellen (o.a. DbHouse)
 │   │   ├── house_models.py     # Pydantic modellen (o.a. House)
 │   │   ├── db_config_models.py # SQLAlchemy & Pydantic modellen voor configuratie (incl. LEGACY tabellen)
 │   │   └── crawl4ai/           # Pydantic-achtige klassen voor Crawl4AI API (indien gebruikt)
@@ -214,11 +212,9 @@ graph LR
 │   │   ├── db_connection.py    # Database connectie setup (Async)
 │   │   ├── house_service.py    # Service voor interactie met 'houses' data
 │   │   ├── llm_service.py      # Service voor LLM interacties
-│   │   ├── crawl4ai_repository.py # Repository voor Crawl4AI API (indien gebruikt)
 │   │   └── repositories/       # Data Access Object (DAO) / Repository laag
 │   │       ├── __init__.py
 │   │       ├── houseRepository.py # DAO voor DbHouse
-│   │       ├── config_repository.py # DAO voor LEGACY config tabellen
 │   │       └── json_config_repository.py # DAO voor NIEUWE DbWebsiteScrapeConfig
 │   └── tests/                  # Test bestanden
 ├── database_migrations/      # Alembic migratie bestanden
@@ -271,21 +267,20 @@ classDiagram
     class ScraperFactory {
         +crawler: AsyncWebCrawler
         +json_config_repo: JsonConfigRepository
-        +get_scraper_async(identifier: int) BaseWebsiteScraper
+        +get_scraper_async(website_name: str) BaseWebsiteScraper
     }
 
     class JsonConfigRepository {
         +session: AsyncSession
-        +get_config_by_website_id_async(website_id: int) WebsiteConfig
+        +get_config_by_website_name_async(website_name: str) WebsiteConfig
     }
 
     class WebsiteConfig {
         <<Pydantic>>
-        +website_info: WebsiteInfo
-        +login_config: LoginConfig
-        +navigation_config: NavigationConfig
-        +gallery_extraction_config: ExtractionConfig
-        +detail_extraction_config: ExtractionConfig
+        +website_identifier: str
+        +website_name: str
+        +base_url: str
+        +strategy_config: StrategyConfig
     }
 
     class BaseWebsiteScraper {
@@ -297,17 +292,12 @@ classDiagram
         +navigate_to_gallery_async()
         +apply_filters_async()
         +extract_gallery_async()
-        +extract_details_async()
-        +run_async() List~Dict~
+        +run_async() Dict
     }
 
-    class VestedaScraper {
-        <<Concrete>>
-        +filter_config: CrawlerRunConfig
-        +detail_config: CrawlerRunConfig
-        +apply_filters_async()
-        +extract_details_async()
-    }
+    class VestedaScraper
+    class NmgWonenScraper
+    class HuisSleutelScraper
 
     class HouseService {
         +session: AsyncSession
@@ -347,7 +337,7 @@ classDiagram
 
     class AbstractNotificationChannel {
         <<Abstract>>
-        +send_notification(subject, message) bool
+        +send_notification(house: House) bool
     }
     class EmailNotificationChannel
     class PushoverNotificationChannel
@@ -356,14 +346,18 @@ classDiagram
     main --> ScraperFactory : uses
     main --> JsonConfigRepository : uses
     main --> NotificationService : uses
-    main --> HouseService : uses (indirectly via scraper result handling)
+    main --> HouseService : uses (indirectly)
     ScraperFactory --> JsonConfigRepository : uses
     ScraperFactory --> BaseWebsiteScraper : creates
     ScraperFactory --> VestedaScraper : creates
+    ScraperFactory --> NmgWonenScraper : creates
+    ScraperFactory --> HuisSleutelScraper : creates
     JsonConfigRepository --> WebsiteConfig : returns
     BaseWebsiteScraper "1" *-- "1" WebsiteConfig : uses
     VestedaScraper --|> BaseWebsiteScraper : inherits
-    BaseWebsiteScraper --> HouseService : uses (for results)
+    NmgWonenScraper --|> BaseWebsiteScraper : inherits
+    HuisSleutelScraper --|> BaseWebsiteScraper : inherits
+    BaseWebsiteScraper --> HouseService : uses
     HouseService --> HouseRepository : uses
     HouseService --> NotificationService : uses
     HouseRepository --> DbHouse : operates on
@@ -562,16 +556,16 @@ Dit is de **huidige, actieve en aanbevolen** benadering.
 
 #### Voorbeeld Flow (Nieuw)
 
-1.  `main.py` roept `ScraperFactory.get_scraper_async(website_id)` aan.
+1.  `main.py` roept `ScraperFactory.get_scraper_async(website_name)` aan.
 2.  Factory laadt JSON config via `JsonConfigRepository`.
-3.  Factory instantieert `VestedaScraper(crawler, config)`.
-4.  `main.py` roept `vesteda_scraper.run_async()` aan.
+3.  Factory instantieert `SiteSpecifiekeScraper(crawler, config)`.
+4.  `main.py` roept `site_specifieke_scraper.run_async()` aan.
 5.  `run_async` (uit `BaseWebsiteScraper` of overridden) orchestreert stappen:
-    *   `login_async()`: Gebruikt `config.strategy_config.login_config` (uit JSON) en `self.standard_run_config` (of een aangepaste `CrawlerRunConfig` uit `VestedaScraper`).
+    *   `login_async()`: Gebruikt `config.strategy_config.login_config` (uit JSON) en `self.standard_run_config` (of een aangepaste `CrawlerRunConfig` uit de specifieke scraper).
     *   `navigate_to_gallery_async()`: Gebruikt `config.strategy_config.navigation_config`.
-    *   `apply_filters_async()`: Gebruikt `config.strategy_config.filtering_config` en mogelijk een aangepaste `CrawlerRunConfig` (zoals in `VestedaScraper`).
+    *   `apply_filters_async()`: Gebruikt `config.strategy_config.filtering_config` en mogelijk een aangepaste `CrawlerRunConfig`.
     *   `extract_gallery_async()`: Gebruikt `config.strategy_config.gallery_extraction_config`.
-    *   `extract_details_async()`: Gebruikt `config.strategy_config.detail_page_extraction_config` en mogelijk een aangepaste `CrawlerRunConfig` (zoals in `VestedaScraper`).
+    *   `extract_details_async()`: Gebruikt `config.strategy_config.detail_page_extraction_config` en mogelijk een aangepaste `CrawlerRunConfig`.
 6.  Resultaten worden verzameld en via `HouseService` opgeslagen.
 
 ### Oude Benadering (Vesteda Voorbeeld - Legacy)
@@ -746,24 +740,3 @@ De Flask backend API is momenteel in een beginfase. Het biedt basis endpoints vo
     ```
 
 ---
-```
-
-**Belangrijkste wijzigingen en toevoegingen:**
-
-1.  **Duidelijk Onderscheid:** Expliciet benoemd wat het "Nieuwe Systeem" (Hybride JSON) en het "Oude Systeem" (Legacy) is, zowel in de architectuur, database schema, als scraping benaderingen.
-2.  **Focus op Nieuw Systeem:** De beschrijvingen zijn gericht op hoe de *huidige* architectuur werkt met de JSON configuratie en `flexibleCrawlers`.
-3.  **Componenten Kaart:** Sectie 3 (`Code Structuur & Componenten Kaart`) toegevoegd met:
-    *   Gedetailleerde project structuur.
-    *   Lijst van belangrijkste componenten en hun functie.
-    *   Een vereenvoudigd UML klassendiagram (Mermaid) om de relaties te visualiseren.
-4.  **Database Schema Update:**
-    *   Opgesplitst in "Huidig Systeem" en "Legacy Systeem".
-    *   Gedetailleerde beschrijvingen en ER diagram voor de *actief gebruikte* tabellen (`websites`, `website_scrape_configs`, `houses`).
-    *   Expliciet benoemd welke tabellen legacy zijn en *niet* gebruikt worden door het nieuwe systeem.
-5.  **Data Flow Update:** Mermaid diagram aangepast om de flow via de `ScraperFactory` en `JsonConfigRepository` te tonen.
-6.  **Scraping Benaderingen:** Sectie toegevoegd die beide methodes uitlegt en hun componenten beschrijft.
-7.  **Gebruik (`main.py`):** Aangepast om uit te leggen hoe het nieuwe systeem via `main.py` wordt aangeroepen.
-8.  **Toekomstplannen Verwijderd:** Sectie 8 (Future Developments) is verwijderd zoals gevraagd.
-9.  **Consistentie:** Gecontroleerd of de beschrijvingen overeenkomen met de code in `flexibleCrawlers`, `factories`, `repositories`, en `main.py`.
-
-Dit document zou nu een veel accurater beeld moeten geven van de huidige staat van het project, met een duidelijke focus op de nieuwe architectuur en een handige "kaart" om door de codebase te navigeren.
