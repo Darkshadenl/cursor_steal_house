@@ -1,20 +1,8 @@
-import json
-from typing import Dict, Any, List, Optional
+from typing import Optional
 from crawl4ai import (
     AsyncWebCrawler,
-    BrowserConfig,
-    CacheMode,
-    CrawlResult,
-    CrawlerMonitor,
-    CrawlerRunConfig,
-    DefaultMarkdownGenerator,
-    JsonCssExtractionStrategy,
-    PruningContentFilter,
-    RateLimiter,
-    SemaphoreDispatcher,
 )
 
-from crawler_job.models.house_models import FetchedPage, House
 from crawler_job.notifications.notification_service import NotificationService
 
 from ..models.db_config_models import WebsiteConfig
@@ -37,15 +25,12 @@ class HuisSleutelScraper(BaseWebsiteScraper):
     ):
         super().__init__(config, session_id, crawler, notification_service, debug_mode)
 
-        logger.info(f"HuisSleutel scraper initialized...")
+        logger.info("HuisSleutel scraper initialized...")
 
     async def navigate_to_gallery_async(self) -> None:
         pass
 
     def validate_sitemap_data(self):
-        pass
-
-    async def validate_login(self) -> bool:  # type: ignore
         pass
 
     async def validate_login(self) -> bool:  # type: ignore

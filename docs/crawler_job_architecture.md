@@ -37,11 +37,11 @@ De applicatie volgt een gelaagde structuur:
     *   Roept de `run_async` methode van de scraper aan.
     *   Logt de resultaten.
     *   Zorgt voor resource cleanup (DB sessie, browser).
-3.  **Scraper Core (`crawlers` package):**
-    *   `ScraperFactory`: Creëert scraper instanties.
-    *   `AbstractWebsiteScraper`: Definieert het scraper interface.
-    *   `ConfigurableWebsiteScraper`: Implementeert de scraper logica op basis van databaseconfiguratie, gebruikmakend van `crawl4ai` en services.
-    *   `vesteda` (sub-package): Lijkt een oudere, specifiekere implementatie te bevatten, mogelijk als proof-of-concept of voor een complexere site. Deze gebruikt ook `crawl4ai` maar met meer hardcoded stappen.
+3.  **Scraper Core (`flexibleCrawlers` en `crawlers` packages):**
+    *   `ScraperFactory`: Creëert scraper instanties op basis van de website naam.
+    *   `flexibleCrawlers/base_scraper.py`: Bevat `BaseWebsiteScraper`, de abstracte basisklasse die de generieke scrape-flow implementeert.
+    *   `flexibleCrawlers/*_scraper.py`: Specifieke scraper-implementaties (bv. `VestedaScraper`, `NmgWonenScraper`) die erven van `BaseWebsiteScraper` en site-specifieke logica kunnen overschrijven.
+    *   `crawlers` (package): Bevat een **oudere, legacy** implementatie voor Vesteda en wordt niet meer actief gebruikt.
 4.  **Services (`services` package):** Bevat de business logica:
     *   `HouseService`: Logica voor het opslaan, ophalen en identificeren van nieuwe/gewijzigde huizen. Coördineert met `HouseRepository` en `NotificationService`.
     *   `LLMService`: Interface voor interactie met Large Language Models (Gemini, DeepSeek) voor data extractie of analyse.
@@ -64,12 +64,12 @@ De applicatie volgt een gelaagde structuur:
 
 ## 4. Key Architectural Patterns
 
-*   **Factory Pattern:** `ScraperFactory` creëert scraper objecten zonder de exacte klasse te specificeren in `main.py`.
-*   **Strategy Pattern:** `ConfigurableWebsiteScraper` gebruikt verschillende extractie methoden (CSS, XPath, LLM) gebaseerd op de configuratie. De `NotificationService` gebruikt verschillende `AbstractNotificationChannel` implementaties.
-*   **Repository Pattern:** `HouseRepository` en `WebsiteConfigRepository` scheiden de data access logica van de business logica (`HouseService`).
-*   **Abstract Base Classes (ABC):** `AbstractWebsiteScraper` en `AbstractNotificationChannel` definiëren duidelijke interfaces voor implementaties.
+*   **Factory Pattern:** `ScraperFactory` creëert scraper objecten (`BaseWebsiteScraper` subklassen) zonder dat de aanroeper (`main.py`) de exacte klasse hoeft te kennen.
+*   **Strategy Pattern:** De `BaseWebsiteScraper` definieert een algemeen scraping-algoritme, terwijl subklassen (zoals `VestedaScraper`) specifieke stappen van dat algoritme kunnen overschrijven. De `NotificationService` gebruikt ook verschillende `AbstractNotificationChannel` implementaties als strategieën.
+*   **Repository Pattern:** `HouseRepository` en `JsonConfigRepository` scheiden de data access logica van de business logica (`HouseService`).
+*   **Abstract Base Classes (ABC):** `BaseWebsiteScraper` en `AbstractNotificationChannel` definiëren duidelijke interfaces voor implementaties.
 *   **Asynchronous Programming:** `async/await` wordt gebruikt voor efficiënte I/O.
-*   **Configuration Management:** Gebruik van `.env` voor secrets en database/API configuratie, en een database voor website-specifieke scraping logica.
+*   **Configuration Management:** Gebruik van `.env` voor secrets en een database-opgeslagen JSON (`website_scrape_configs`) voor website-specifieke scraping logica.
 
 ## 5. Data Flow / Sequence Diagram (Standaard Crawl Proces)
 
@@ -80,102 +80,98 @@ sequenceDiagram
     participant User/Scheduler as User
     participant main.py as Main
     participant ScraperFactory as Factory
-    participant ConfigRepository as CfgRepo
-    participant ConfigurableScraper as Scraper
+    participant JsonConfigRepository as JsonRepo
+    participant BaseWebsiteScraper as Scraper
     participant AsyncWebCrawler as Crawler
     participant HouseService as HouseSvc
     participant HouseRepository as HouseRepo
     participant LLMService as LLMSvc
     participant NotificationService as NotifSvc
 
-    User->>Main: Start crawl (e.g., `python main.py --website Vesteda`)
+    User->>Main: Start crawl (e.g., `python -m crawler_job.main --websites Vesteda`)
     activate Main
     Main->>Main: Parse args, setup logging, load .env
-    Main->>CfgRepo: __init__(db_session)
+    Main->>JsonRepo: __init__(db_session)
+    Main->>Factory: __init__(JsonRepo, Crawler)
     Main->>NotifSvc: __init__()
-    Main->>Factory: __init__(CfgRepo, NotifSvc)
-    Main->>Factory: create_scraper_async("Vesteda")
-    activate Factory
-    Factory->>CfgRepo: get_website_id_by_name_async("Vesteda")
-    activate CfgRepo
-    CfgRepo-->>Factory: website_id
-    deactivate CfgRepo
-    Factory->>Crawler: __init__(BrowserConfig)
-    Factory->>HouseSvc: __init__(NotifSvc)
-    Factory->>LLMSvc: __init__()
-    Factory->>Scraper: __init__(Crawler, CfgRepo, HouseSvc, LLMSvc, NotifSvc)
-    Factory-->>Main: scraper_instance
-    deactivate Factory
 
-    Main->>Scraper: run_async(website_id)
-    activate Scraper
-    Scraper->>CfgRepo: get_config_async(website_id)
-    activate CfgRepo
-    CfgRepo-->>Scraper: website_config
-    deactivate CfgRepo
-    Scraper->>Scraper: load_config_async()
-    Scraper->>Scraper: login_async() # Optional, based on config
-    activate Crawler # Browser interaction starts
-    Scraper->>Crawler: arun() / aeval() for login steps
-    Crawler-->>Scraper: Login result
-    Scraper->>Scraper: navigate_to_gallery_async()
-    Scraper->>Crawler: arun() / aeval() for navigation
-    Crawler-->>Scraper: Gallery page URL/state
-    Scraper->>Scraper: extract_gallery_async()
-    Scraper->>Crawler: aeval() / _get_elements() / LLMSvc.extract()
-    Crawler-->>Scraper: Gallery data (basic house info)
-    Scraper-->>Main: List[House] (basic info)
-    deactivate Crawler # Browser interaction temporarily paused
+    loop For each website_name in websites
+        Main->>Factory: get_scraper_async(website_name, NotifSvc)
+        activate Factory
+        Factory->>JsonRepo: get_config_by_website_name_async(website_name)
+        activate JsonRepo
+        JsonRepo-->>Factory: WebsiteConfig
+        deactivate JsonRepo
+        Factory->>Scraper: __init__(config, crawler, NotifSvc)
+        Factory-->>Main: scraper_instance
+        deactivate Factory
 
-    Scraper->>HouseSvc: identify_new_houses_async(houses)
-    activate HouseSvc
-    HouseSvc->>HouseRepo: get_by_address(addr, city) # Loop
-    activate HouseRepo
-    HouseRepo-->>HouseSvc: Existing house or None
-    deactivate HouseRepo
-    HouseSvc-->>Scraper: List[House] (new_houses)
-    deactivate HouseSvc
-
-    alt New houses found
-        Scraper->>Scraper: Loop through new_houses
-        Scraper->>Scraper: extract_details_async(house)
-        activate Crawler # Browser interaction resumes
-        Scraper->>Crawler: arun(detail_url)
-        Crawler-->>Scraper: Detail page state
-        Scraper->>Crawler: aeval() / _apply_field_mappings() / LLMSvc.extract() # Detail extraction
-        Crawler-->>Scraper: Detailed house data
+        Main->>Scraper: run_async()
+        activate Scraper
+        Scraper->>Scraper: login_async() # Optional, based on config
+        activate Crawler
+        Scraper->>Crawler: arun() for login steps
+        Crawler-->>Scraper: Login result
         deactivate Crawler
-        Scraper->>Scraper: Merge details into main house list
-        Scraper->>Scraper: End loop
-    end
 
-    Scraper->>HouseSvc: store_houses_atomic_async(all_houses)
-    activate HouseSvc
-    HouseSvc->>HouseRepo: Begin transaction
-    activate HouseRepo
-    HouseSvc->>HouseRepo: get_by_address() / create() / update() # Loop
-    HouseRepo-->>HouseSvc: DB results
-    alt Notifications enabled and new/updated houses
-        HouseSvc->>NotifSvc: send_new_house_notification(house) / send_updated_house_notification(house, old_status)
-        activate NotifSvc
-        NotifSvc->>NotifSvc: Send via active channels (Email, Pushover, etc.)
-        NotifSvc-->>HouseSvc: Send results
-        deactivate NotifSvc
-    end
-    HouseSvc->>HouseRepo: Commit transaction
-    deactivate HouseRepo
-    HouseSvc-->>Scraper: Store result (counts)
-    deactivate HouseSvc
+        Scraper->>Scraper: navigate_to_gallery_async() / navigate_to_sitemap_async()
+        activate Crawler
+        Scraper->>Crawler: arun() for navigation
+        Crawler-->>Scraper: Page URL/state
+        deactivate Crawler
 
-    Scraper-->>Main: Final result dictionary
-    deactivate Scraper
+        Scraper->>Scraper: extract_gallery_async() / extract_sitemap_async()
+        activate Crawler
+        Scraper->>Crawler: arun() / arun_many() for extraction
+        Crawler-->>Scraper: Gallery/Sitemap data (basic house info)
+        deactivate Crawler
+
+        Scraper->>HouseSvc: identify_new_houses_async(houses)
+        activate HouseSvc
+        HouseSvc->>HouseRepo: get_by_address() / get_by_detail_urls()
+        activate HouseRepo
+        HouseRepo-->>HouseSvc: Existing houses or None
+        deactivate HouseRepo
+        HouseSvc-->>Scraper: List[House] (new_houses)
+        deactivate HouseSvc
+
+        alt New houses found and detail extraction is configured
+            Scraper->>Scraper: extract_fetched_pages_async(new_houses) or process_details_xpath_css(new_houses)
+            activate Crawler
+            Scraper->>Crawler: arun_many(detail_urls)
+            Crawler-->>Scraper: Detail page markdown/data
+            deactivate Crawler
+            Scraper->>LLMSvc: execute_llm_extraction(pages) # if llm
+            Scraper->>Scraper: Merge details into main house list
+        end
+
+        Scraper->>HouseSvc: store_houses_atomic_async(all_houses)
+        activate HouseSvc
+        HouseSvc->>HouseRepo: Begin transaction
+        activate HouseRepo
+        HouseSvc->>HouseRepo: get_by_address() / create() / update() # Loop
+        HouseRepo-->>HouseSvc: DB results
+        alt Notifications enabled and new/updated houses
+            HouseSvc->>NotifSvc: send_new_house_notification(house) / send_updated_house_notification(house, old_status)
+            activate NotifSvc
+            NotifSvc->>NotifSvc: Send via active channels (Email, Pushover, etc.)
+            NotifSvc-->>HouseSvc: Send results
+            deactivate NotifSvc
+        end
+        HouseSvc->>HouseRepo: Commit transaction
+        deactivate HouseRepo
+        HouseSvc-->>Scraper: Store result (counts)
+        deactivate HouseSvc
+
+        Scraper-->>Main: Final result dictionary
+        deactivate Scraper
+    end
 
     Main->>Main: Log results
-    Main->>Scraper: Close browser (scraper.crawler.close())
+    Main->>Crawler: close()
     Main->>Main: Close DB session
     Main-->>User: Exit code (0 or 1)
     deactivate Main
-
 ```
 
 ## 6. Class Diagram (Scraper Core & Dependencies)
@@ -186,49 +182,35 @@ Dit diagram toont de relaties tussen de scraper klassen en hun belangrijkste afh
 classDiagram
     direction LR
 
-    class AbstractWebsiteScraper {
+    class BaseWebsiteScraper {
         <<Abstract>>
-        +load_config_async(website_id) None
+        +config: WebsiteConfig
+        +crawler: AsyncWebCrawler
+        +notification_service: NotificationService
+        +run_async() Dict
         +login_async() bool
-        +navigate_to_gallery_async() str
+        +navigate_to_gallery_async() None
         +extract_gallery_async() List~House~
-        +extract_details_async(gallery_item) House
-        +run_async(website_id) Dict
     }
 
-    class ConfigurableWebsiteScraper {
-        -crawler: AsyncWebCrawler
-        -config_repo: WebsiteConfigRepository
-        -house_service: HouseService
-        -llm_service: LLMService
-        -notification_service: NotificationService
-        -config: WebsiteConfig
-        +load_config_async(website_id) None
-        +login_async() bool
-        +navigate_to_gallery_async() str
-        +extract_gallery_async() List~House~
-        +extract_details_async(gallery_item) House
-        +run_async(website_id) Dict
-        -_get_elements() List~ElementHandle~
-        -_apply_field_mappings() Dict
-    }
+    class VestedaScraper
+    class NmgWonenScraper
+    class HuisSleutelScraper
 
     class ScraperFactory {
-        -config_repo: WebsiteConfigRepository
-        -notification_service: NotificationService
-        +create_scraper_async(website_name) AbstractWebsiteScraper
+        -json_config_repo: JsonConfigRepository
+        -crawler: AsyncWebCrawler
+        +get_scraper_async(website_name, notification_service) BaseWebsiteScraper
     }
 
     class AsyncWebCrawler {
-        +arun(url, config) Result
-        +arun_many(urls, config) List~Result~
-        +aeval(js_code) Any
+        +arun(url, config) CrawlResult
+        +arun_many(urls, config) List~CrawlResult~
         +close() None
     }
 
-    class WebsiteConfigRepository {
-        +get_config_async(website_id) WebsiteConfig
-        +get_website_id_by_name_async(name) int
+    class JsonConfigRepository {
+        +get_config_by_website_name_async(name) WebsiteConfig
     }
 
     class HouseService {
@@ -244,29 +226,28 @@ classDiagram
     class NotificationService {
         +send_new_house_notification(house) None
         +send_updated_house_notification(house, old_status) None
-        +send_test_notification() List~str~
     }
 
-    AbstractWebsiteScraper <|-- ConfigurableWebsiteScraper : Implements
-    ScraperFactory ..> AbstractWebsiteScraper : Creates
-    ScraperFactory ..> WebsiteConfigRepository : Uses
-    ScraperFactory ..> NotificationService : Uses
-    ScraperFactory ..> HouseService : Creates/Uses
-    ScraperFactory ..> LLMService : Creates/Uses
-    ScraperFactory ..> AsyncWebCrawler : Creates/Uses
+    BaseWebsiteScraper <|-- VestedaScraper
+    BaseWebsiteScraper <|-- NmgWonenScraper
+    BaseWebsiteScraper <|-- HuisSleutelScraper
 
-    ConfigurableWebsiteScraper o--> AsyncWebCrawler : Uses
-    ConfigurableWebsiteScraper o--> WebsiteConfigRepository : Uses
-    ConfigurableWebsiteScraper o--> HouseService : Uses
-    ConfigurableWebsiteScraper o--> LLMService : Uses
-    ConfigurableWebsiteScraper o--> NotificationService : Uses
+    ScraperFactory ..> BaseWebsiteScraper : Creates
+    ScraperFactory ..> JsonConfigRepository : Uses
+    ScraperFactory ..> AsyncWebCrawler : Uses
+
+    BaseWebsiteScraper o--> AsyncWebCrawler : Uses
+    BaseWebsiteScraper o--> HouseService : Uses
+    BaseWebsiteScraper o--> LLMService : Uses
+    BaseWebsiteScraper o--> NotificationService : Uses
+    BaseWebsiteScraper o--> JsonConfigRepository : Uses (indirectly via Factory)
 
 ```
 
 ## 7. Configuratie
 
-*   **Omgevingsvariabelen (.env):** Gebruikt voor secrets (database credentials, API keys, notificatie tokens), database connectie details, en globale instellingen (bv. `NOTIFICATION_CHANNELS_ACTIVE`, `CRAWLER_WEBSITE`, `TEST_NOTIFICATIONS_ONLY`).
-*   **Database Configuratie:** De `steal_house` schema tabellen (`websites`, `login_configs`, `navigation_configs`, `extraction_configs`, `field_mappings`) definiëren de specifieke stappen en selectors voor elke website. Dit wordt geladen via `WebsiteConfigRepository` in `WebsiteConfig` Pydantic modellen.
+*   **Omgevingsvariabelen (.env):** Gebruikt voor secrets (database credentials, API keys, notificatie tokens), en globale instellingen (bv. `NOTIFICATION_CHANNELS_ACTIVE`, `CRAWLER_WEBSITES`, `DEBUG_MODE`).
+*   **Database JSON Configuratie:** De `website_scrape_configs` tabel bevat een JSON-object dat de *declaratieve* aspecten van een scraper definieert (selectors, URLs, etc.). Dit wordt geladen via `JsonConfigRepository` in `WebsiteConfig` Pydantic modellen. De *procedurele* logica en runtime configuratie (zoals `CrawlerRunConfig`) bevinden zich in de Python scraper klassen.
 
 ## 8. Error Handling & Logging
 
@@ -275,15 +256,12 @@ classDiagram
 
 ## 9. Potentiële Verbeteringen / Overwegingen
 
-*   **Test Strategie:** Er zijn geen unit- of integratietests zichtbaar. Het toevoegen hiervan (met mocks voor externe services zoals `crawl4ai`, DB, LLM, Notificaties) zou de robuustheid verhogen.
+*   **Test Strategie:** Er zijn geen unit- of integratietests zichtbaar. Het toevoegen hiervan (met mocks voor externe services zoals `crawl4ai`, DB, LLM, Notificaties) zou de robuustheid aanzienlijk verhogen.
 *   **Dependency Injection Framework:** Hoewel DI principes worden toegepast, zou een formeel framework (zoals `python-dependency-injector`) het beheer van dependencies kunnen vereenvoudigen, vooral als de applicatie groeit.
-*   **Schaalbaarheid:** Voor het scrapen van veel websites of zeer grote websites, zou de huidige aanpak (één proces per crawl) kunnen limiteren. Overwegingen:
-    *   Een job queue systeem (Celery, RQ, Dramatiq) om crawls te distribueren over meerdere workers.
-    *   Containerisatie (Docker) en orchestratie (Kubernetes) voor deployment en schaling.
+*   **Schaalbaarheid:** Voor het scrapen van veel websites tegelijk, zou de huidige aanpak (sequentieel per website in `main.py`) kunnen limiteren. Overwegingen:
+    *   Parallellisatie van de loop in `main.py` met `asyncio.gather` om meerdere scrapers tegelijk te laten draaien.
+    *   Een job queue systeem (Celery, RQ) voor distributie over meerdere workers.
 *   **Monitoring:** Implementeer monitoring (bv. met Prometheus/Grafana) om de status van crawls, error rates, en resource gebruik bij te houden.
-*   **Security:** Zorg ervoor dat secrets (API keys, wachtwoorden) veilig worden beheerd (bv. via environment variables, secrets manager) en niet in de code of configuratie database terechtkomen.
-*   **`vesteda` vs `Configurable`:** De aanwezigheid van de specifieke `vesteda` crawler naast de `ConfigurableWebsiteScraper` suggereert mogelijke redundantie of een transitiefase. Idealiter zou de `vesteda` logica volledig gemigreerd worden naar de configureerbare aanpak, tenzij er zeer specifieke, niet-generaliseerbare logica nodig is.
-*   **Synchrone Wrappers:** De synchrone wrappers in `AbstractWebsiteScraper` en `ScraperFactory` lijken bedoeld voor backward compatibility maar kunnen verwarrend zijn in een overwegend asynchrone codebase. Overweeg deze te verwijderen als ze niet strikt noodzakelijk zijn.
 
 ## 10. Conclusie
 

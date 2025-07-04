@@ -30,7 +30,6 @@ from crawler_job.models.db_config_models import (
 )
 from crawler_job.models.house_models import House, FetchedPage
 from crawler_job.notifications.notification_service import NotificationService
-from crawler_job.services import llm_service
 from crawler_job.services.house_service import HouseService
 from crawler_job.services.llm_service import LLMProvider, LLMService
 from crawler_job.services.logger_service import setup_logger
@@ -119,6 +118,38 @@ class BaseWebsiteScraper(ABC):
             "updated_houses_count": 0,
         }
 
+    def get_run_config(self, action: str) -> CrawlerRunConfig:
+        """
+        Returns a CrawlerRunConfig for a specific action, allowing subclasses to override.
+
+        Args:
+            action (str): The name of the action (e.g., "login", "navigate", "extract").
+
+        Returns:
+            CrawlerRunConfig: The configuration for the specified action.
+        """
+        return self.standard_run_config.clone()
+
+    def get_login_run_config(
+        self, full_login_url: str, js_code: list[str], wait_for_condition: str
+    ) -> CrawlerRunConfig:
+        """
+        Returns a CrawlerRunConfig for the login action, allowing easy overriding.
+
+        Args:
+            full_login_url (str): The full URL for the login page.
+            js_code (list[str]): The JavaScript code to execute for login.
+            wait_for_condition (str): The condition to wait for after login.
+
+        Returns:
+            CrawlerRunConfig: The configuration for the login action.
+        """
+        run_config = self.get_run_config("login")
+        run_config.js_code = js_code
+        run_config.wait_for = wait_for_condition
+        run_config.page_timeout = 10000  # 10 seconds timeout
+        return run_config
+
     def _get_search_city(self) -> str:
         """
         Get the search city from filtering configuration.
@@ -170,7 +201,7 @@ class BaseWebsiteScraper(ABC):
             check_result.url != expected_url
             and check_result.redirected_url != expected_url
         ):
-            raise Exception(f"Verification failed: We're not on the expected page")
+            raise Exception("Verification failed: We're not on the expected page")
 
         return True
 
@@ -232,17 +263,8 @@ class BaseWebsiteScraper(ABC):
             else:
                 wait_for_condition = ""
 
-            run_config = CrawlerRunConfig(
-                session_id=self.session_id,
-                exclude_all_images=True,
-                exclude_social_media_links=True,
-                cache_mode=CacheMode.BYPASS,
-                js_only=False,
-                magic=False,
-                js_code=js_code,
-                wait_for=wait_for_condition,
-                page_timeout=10000,  # 10 seconds timeout
-                log_console=self.debug_mode,
+            run_config = self.get_login_run_config(
+                full_login_url, js_code, wait_for_condition
             )
 
             login_result: CrawlResult = await self.crawler.arun(
@@ -307,7 +329,7 @@ class BaseWebsiteScraper(ABC):
         if not self.crawler:
             raise Exception("Crawler not initialized")
 
-        logger.info(f"Navigating to and extracting sitemap...")
+        logger.info("Navigating to and extracting sitemap...")
         url = f"{self.website_config.base_url}{self.website_config.strategy_config.navigation_config.sitemap}"
 
         result: CrawlResult = await self.crawler.arun(
@@ -337,12 +359,13 @@ class BaseWebsiteScraper(ABC):
         if not self.crawler:
             raise Exception("Crawler not initialized")
 
-        logger.info(f"Navigating to gallery...")
+        logger.info("Navigating to gallery...")
         url = f"{self.website_config.base_url}{self.website_config.strategy_config.navigation_config.gallery}"
 
+        run_config = self.get_run_config("navigate_to_gallery")
         result: CrawlResult = await self.crawler.arun(
             url,
-            config=self.standard_run_config,
+            config=run_config,
         )  # type: ignore
 
         full_login_url = (
@@ -406,18 +429,16 @@ class BaseWebsiteScraper(ABC):
 
         """
 
-        cookie_config = self.standard_run_config.clone()
-        cookie_config.js_code = js
-        cookie_config.log_console = True
-        cookie_config.js_only = True
+        run_config = self.get_run_config("apply_filters")
+        run_config.js_code = js
+        run_config.log_console = True
+        run_config.js_only = True
         if self.filtering_config.filters_container_selector:
-            cookie_config.css_selector = (
-                self.filtering_config.filters_container_selector
-            )
+            run_config.css_selector = self.filtering_config.filters_container_selector
 
-        result = await self.crawler.arun(
+        await self.crawler.arun(
             url=self.current_url,  # type: ignore
-            config=cookie_config,
+            config=run_config,
         )
 
         logger.info("Applied filters")
@@ -560,17 +581,17 @@ class BaseWebsiteScraper(ABC):
         else:
             extraction_strategy = JsonCssExtractionStrategy(schema)
 
-        config = self.standard_run_config.clone()
-        config.extraction_strategy = extraction_strategy
-        config.wait_for = "domcontentloaded"
+        run_config = self.get_run_config("extract_gallery")
+        run_config.extraction_strategy = extraction_strategy
+        run_config.wait_for = "domcontentloaded"
 
         if self.gallery_extraction_config.gallery_container_selector:
-            config.css_selector = (
+            run_config.css_selector = (
                 self.gallery_extraction_config.gallery_container_selector
             )
 
         logger.debug(f"Extracting gallery from url: {self.current_url}")
-        result: CrawlResult = await self.crawler.arun(url=self.current_url, config=gallery_config)  # type: ignore
+        result: CrawlResult = await self.crawler.arun(url=self.current_url, config=run_config)  # type: ignore
 
         if not result.success:
             raise Exception(
@@ -774,14 +795,10 @@ class BaseWebsiteScraper(ABC):
             }})();
             """
 
-        cookie_config = CrawlerRunConfig(
-            cache_mode=CacheMode.BYPASS,
-            js_only=True,
-            magic=True,
-            session_id=self.session_id,
-            log_console=self.debug_mode,
-            js_code=js,
-        )
+        cookie_config = self.get_run_config("accept_cookies")
+        cookie_config.js_only = True
+        cookie_config.magic = True
+        cookie_config.js_code = js
 
         result: CrawlResult = await self.crawler.arun(
             url=current_url, config=cookie_config

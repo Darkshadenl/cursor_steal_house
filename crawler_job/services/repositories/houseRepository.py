@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import Sequence, select
+from sqlalchemy import select
 from typing import List, Optional
 import logging
 

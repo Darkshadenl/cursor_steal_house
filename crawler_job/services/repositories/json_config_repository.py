@@ -1,4 +1,4 @@
-from typing import Optional, Union, Tuple
+from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -84,7 +84,7 @@ class JsonConfigRepository:
             # Query the database for the configuration
             query = select(DbWebsiteScrapeConfig).where(
                 DbWebsiteScrapeConfig.website_identifier == website.id,
-                DbWebsiteScrapeConfig.is_enabled == True,
+                DbWebsiteScrapeConfig.is_enabled,
             )
             result = await self.session.execute(query)
             config_record = result.scalar_one_or_none()

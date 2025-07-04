@@ -2,7 +2,6 @@ import json
 from typing import List, Optional
 from crawl4ai import (
     AsyncWebCrawler,
-    BrowserConfig,
     CacheMode,
     CrawlResult,
     CrawlerMonitor,
@@ -37,7 +36,7 @@ class VestedaScraper(BaseWebsiteScraper):
     ):
         super().__init__(config, session_id, crawler, notification_service, debug_mode)
 
-        logger.info(f"Vesteda scraper initialized...")
+        logger.info("Vesteda scraper initialized...")
 
     async def _accept_cookies(self, current_url: str) -> bool:
         if not self.cookies_config:

@@ -1,4 +1,4 @@
-from typing import AsyncGenerator, Dict, Any, List, Optional, Union, Tuple
+from typing import AsyncGenerator, Dict, List, Optional, Union, Tuple
 import logging
 from crawler_job.models.house_models import (
     House,

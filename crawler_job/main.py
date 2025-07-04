@@ -203,7 +203,7 @@ if __name__ == "__main__":
             )
         )
 
-        if result == True:
+        if result:
             sys.exit(0)
         else:
             if debug_mode:

