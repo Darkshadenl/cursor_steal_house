@@ -6,10 +6,6 @@ services:
     container_name: stealhouse-db
     env_file:
       - ../../.env_docker
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:?error}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?error}
-      POSTGRES_DB: ${POSTGRES_DB:?error}
     ports:
       - "${POSTGRES_PORT:?error}:5432"
     volumes:
@@ -25,16 +21,7 @@ services:
     env_file:
       - ../../.env_docker
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:?error}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?error}
-      POSTGRES_DB: ${POSTGRES_DB:?error}
-      POSTGRES_PORT: ${POSTGRES_PORT:?error}
       POSTGRES_HOST: db
-      VESTEDA_EMAIL: ${VESTEDA_EMAIL:?error}
-      VESTEDA_PASSWORD: ${VESTEDA_PASSWORD:?error}
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
-      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
-      CRAWLER_VERBOSE: ${CRAWLER_VERBOSE}
 
 volumes:
   postgres_data:

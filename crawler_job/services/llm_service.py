@@ -39,8 +39,10 @@ class LLMService:
     ) -> str:
         """Analyse a house using the LLM"""
 
+        house_readable_string = house.to_readable_string()
+
         prompt = prompt_template.format(
-            HOUSE_DETAILS=house.to_readable_string(),
+            HOUSE_DETAILS=house_readable_string,
             PERSONAL_METRICS=personal_metrics or "No personal metrics provided.",
         )
 
@@ -186,6 +188,14 @@ Generate complete HTML following this structure, filling in ALL placeholder valu
   <div style="background-color: [USE #e8f5e9 for positive, #ffebee for negative]; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
     <h3>Advies: [Wel reageren/Niet reageren]</h3>
     <p><strong>Reden:</strong> [Brief reason]</p>
+  </div>
+  
+  <div style="margin-bottom: 20px;">
+    <a href="[use the detail_url from the HOUSE_DETAILS]" 
+       style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;"
+       target="_blank">
+      Bekijk de woning op de website
+    </a>
   </div>
 
   <h2 style="color: #2c3e50;">Woninganalyse: [PROPERTY PROFILE ADDRESS]</h2>
