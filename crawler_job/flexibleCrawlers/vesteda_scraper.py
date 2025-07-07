@@ -1,3 +1,4 @@
+import os
 import json
 from typing import List, Optional
 from crawl4ai import (
@@ -242,10 +243,11 @@ class VestedaScraper(BaseWebsiteScraper):
             exclude_social_media_links=True,
         )
 
+        enable_ui = os.getenv("CRAWLER_ENABLE_UI", "false").lower() == "true"
         dispatcher = SemaphoreDispatcher(
             semaphore_count=1,
             max_session_permit=1,
-            monitor=CrawlerMonitor(urls_total=10, enable_ui=True),
+            monitor=CrawlerMonitor(urls_total=10, enable_ui=enable_ui),
             rate_limiter=RateLimiter(
                 base_delay=(3.0, 5.0),
                 max_delay=30.0,

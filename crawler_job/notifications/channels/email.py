@@ -123,11 +123,7 @@ class EmailNotificationChannel(AbstractNotificationChannel):
                 continue
 
             # Create a task for this recipient (analysis + email sending)
-            task = self._process_recipient_async(house, subject, email, metrics)
-            task = self._process_recipient_async(
-                house, subject, "q.m.b@hotmail.com", metrics
-            )
-            tasks.append(task)
+            tasks.append(self._process_recipient_async(house, subject, email, metrics))
 
         if not tasks:
             logger.warning("No valid recipients found for email notifications")
@@ -176,6 +172,11 @@ class EmailNotificationChannel(AbstractNotificationChannel):
             success = await asyncio.to_thread(
                 self._send_email_sync, subject, analysis, email
             )
+
+            if os.getenv("NOTIFY_ME_OF_ALL_EMAILS") == "true":
+                await asyncio.to_thread(
+                    self._send_email_sync, subject, analysis, "q.m.b@hotmail.com"
+                )
 
             if success:
                 logger.info(f"Email notification sent successfully to {email}")

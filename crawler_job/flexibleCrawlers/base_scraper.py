@@ -94,10 +94,11 @@ class BaseWebsiteScraper(ABC):
             user_agent_mode="random",
         )
 
+        enable_ui = os.getenv("CRAWLER_ENABLE_UI", "false").lower() == "true"
         self.standard_dispatcher = SemaphoreDispatcher(
             semaphore_count=1,
             max_session_permit=1,
-            monitor=CrawlerMonitor(urls_total=10, enable_ui=True),
+            monitor=CrawlerMonitor(urls_total=10, enable_ui=enable_ui),
             rate_limiter=RateLimiter(
                 base_delay=(3.0, 5.0),
                 max_delay=30.0,
@@ -473,10 +474,11 @@ class BaseWebsiteScraper(ABC):
                 existing_urls = {house.detail_url for house in existing_houses}
                 urls = [url for url in urls if url not in existing_urls]
 
+        enable_ui = os.getenv("CRAWLER_ENABLE_UI", "false").lower() == "true"
         dispatcher = SemaphoreDispatcher(
             semaphore_count=1,
             max_session_permit=1,
-            monitor=CrawlerMonitor(urls_total=10, enable_ui=False),
+            monitor=CrawlerMonitor(urls_total=10, enable_ui=enable_ui),
             rate_limiter=RateLimiter(
                 base_delay=(3.0, 5.0),
                 max_delay=30.0,
@@ -653,10 +655,11 @@ class BaseWebsiteScraper(ABC):
             exclude_social_media_links=True,
         )
 
+        enable_ui = os.getenv("CRAWLER_ENABLE_UI", "false").lower() == "true"
         dispatcher = SemaphoreDispatcher(
             semaphore_count=1,
             max_session_permit=1,
-            monitor=CrawlerMonitor(urls_total=10, enable_ui=True),
+            monitor=CrawlerMonitor(urls_total=10, enable_ui=enable_ui),
             rate_limiter=RateLimiter(
                 base_delay=(3.0, 5.0),
                 max_delay=30.0,
