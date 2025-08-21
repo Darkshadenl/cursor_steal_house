@@ -6,10 +6,10 @@ services:
     container_name: stealhouse-db
     env_file:
       - ../../.env_docker
-    ports:
-      - "${POSTGRES_PORT:?error}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
 
   crawler:
     container_name: stealhouse-crawler
