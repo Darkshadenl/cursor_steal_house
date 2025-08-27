@@ -40,32 +40,6 @@ class VestedaScraper(BaseWebsiteScraper):
 
         logger.info("Vesteda scraper initialized...")
 
-    def _validate_website_config(self) -> None:
-        """Validate all website configuration requirements upfront."""
-        if not self.website_config:
-            raise Exception("Website configuration not provided")
-
-        if not self.website_config.base_url:
-            raise Exception("Base URL not provided in website configuration")
-
-        if not self.website_config.strategy_config:
-            raise Exception("Strategy configuration not provided")
-
-        if not self.website_config.strategy_config.gallery_extraction_config:
-            raise Exception("Gallery extraction configuration not provided")
-
-        gallery_config = self.website_config.strategy_config.gallery_extraction_config
-
-        if not gallery_config.correct_urls_paths:
-            raise Exception(
-                "No correct URLs provided in gallery extraction configuration"
-            )
-
-        if not gallery_config.schema:
-            raise Exception("No schema provided in gallery extraction configuration")
-
-        logger.info("Website configuration validation completed successfully")
-
     async def _accept_cookies(self, current_url: str) -> bool:
         if not self.cookies_config:
             logger.info("Accepting cookies not required/enabled.")
