@@ -20,6 +20,7 @@ from crawler_job.notifications.notification_service import NotificationService
 from ..models.db_config_models import WebsiteConfig
 from .base_scraper import BaseWebsiteScraper
 from crawler_job.services.logger_service import setup_logger
+from crawler_job.helpers.decorators import requires_crawler_initialized
 
 logger = setup_logger(__name__)
 
@@ -101,6 +102,7 @@ class VestedaScraper(BaseWebsiteScraper):
             self.accepted_cookies = True
             return self.accepted_cookies
 
+    @requires_crawler_initialized
     async def extract_gallery_async(self) -> List[House]:
         if not self.navigated_to_gallery:
             raise Exception("Not navigated to gallery")
@@ -204,6 +206,7 @@ class VestedaScraper(BaseWebsiteScraper):
         logger.info(f"Successfully extracted {len(houses)} properties")
         return houses
 
+    @requires_crawler_initialized
     async def extract_fetched_pages_async(
         self, houses: List[House]
     ) -> List[FetchedPage]:

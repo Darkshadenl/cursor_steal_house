@@ -108,19 +108,25 @@ class EmailNotificationChannel(AbstractNotificationChannel):
             )
             return False
 
-        subject = f"New House Available: {house.address}, {house.city}"
-
         # Create tasks for all recipients in parallel
         tasks = []
         for recipient_data in self.recipients:
+            if not recipient_data.get("active"):
+                continue
+
             email = recipient_data.get("email")
-            metrics = recipient_data.get("metrics")
 
             if not email:
                 logger.warning(
                     f"Skipping recipient with missing email: {recipient_data}"
                 )
                 continue
+
+            metrics = recipient_data.get("metrics")
+            name = recipient_data.get("name")
+            subject = (
+                f"Hey {name}, er is een nieuwe listing: {house.address}, {house.city}"
+            )
 
             # Create a task for this recipient (analysis + email sending)
             tasks.append(self._process_recipient_async(house, subject, email, metrics))

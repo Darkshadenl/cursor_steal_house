@@ -6,6 +6,10 @@ from crawler_job.helpers.utils import save_screenshot_from_crawl_result
 from crawler_job.models.db_config_models import WebsiteConfig
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.services.logger_service import setup_logger
+from crawler_job.helpers.decorators import (
+    requires_crawler_initialized,
+    requires_cookies_accepted,
+)
 
 logger = setup_logger(__name__)
 
@@ -44,6 +48,7 @@ class NmgWonenScraper(BaseWebsiteScraper):
         config.screenshot = True  # Always take screenshot on login for debugging
         return config
 
+    @requires_crawler_initialized
     async def navigate_to_gallery_async(self, force_navigation: bool = False) -> None:
         """Navigate to the listings/gallery page by interacting with the navigation menu."""
         if self.navigated_to_gallery and not force_navigation:
@@ -160,6 +165,8 @@ class NmgWonenScraper(BaseWebsiteScraper):
 
         return self.accepted_cookies
 
+    @requires_crawler_initialized
+    @requires_cookies_accepted
     async def login_async(self) -> bool:
         """Perform login if login configuration is provided."""
         if not self.login_config or (
@@ -167,12 +174,6 @@ class NmgWonenScraper(BaseWebsiteScraper):
         ):
             logger.warning(f"Skipping login for {self.website_config.website_name}")
             return True
-
-        if not self.crawler:
-            raise Exception("Crawler not initialized")
-
-        if not self.accepted_cookies:
-            await self._accept_cookies(self.current_url or self.website_config.base_url)
 
         try:
             base_url = self.website_config.base_url
