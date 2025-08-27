@@ -124,6 +124,9 @@ class BaseWebsiteScraper(ABC):
             "updated_houses_count": 0,
         }
 
+        # Validate configuration at initialization
+        self._validate_website_config()
+
     def _validate_website_config(self) -> None:
         """Validate all website configuration requirements based on strategy."""
         if not self.website_config:
@@ -522,15 +525,12 @@ class BaseWebsiteScraper(ABC):
         Returns:
             List[House]: List of extracted House objects from the sitemap.
         """
-        # Validate configuration before proceeding
-        self._validate_website_config()
-
         regex = self.sitemap_extraction_config.regex
         schema = self.sitemap_extraction_config.schema
         llm_instructions = self.sitemap_extraction_config.extra_llm_instructions
 
-        if not regex or not schema:
-            raise Exception("No regex or schema provided for sitemap extraction")
+        assert regex is not None
+        assert schema is not None
 
         logger.info(f"Extracting sitemap with regex: {regex}")
 
@@ -623,22 +623,15 @@ class BaseWebsiteScraper(ABC):
         if not self.navigated_to_gallery:
             raise Exception("Not navigated to gallery")
 
-        # Validate configuration before proceeding
-        self._validate_website_config()
-
-        if not self.website_config.strategy_config.gallery_extraction_config:
-            raise Exception("No gallery extraction configuration provided.")
-
         logger.info(
             f"Extracting property listings of {self.website_config.website_name} step..."
         )
         gallery_extraction_config = (
             self.website_config.strategy_config.gallery_extraction_config
         )
+        assert gallery_extraction_config is not None
 
-        if not gallery_extraction_config.correct_urls_paths:
-            raise Exception("No correct URLs provided")
-
+        assert gallery_extraction_config.correct_urls_paths is not None
         correct_urls = [
             f"{self.website_config.base_url}{path}"
             for path in gallery_extraction_config.correct_urls_paths
@@ -648,9 +641,7 @@ class BaseWebsiteScraper(ABC):
             raise Exception(f"Invalid URL: {self.current_url}")
 
         schema = gallery_extraction_config.schema
-
-        if not schema:
-            raise Exception("No schema provided")
+        assert schema is not None
 
         extraction_strategy = None
         if self.gallery_extraction_config.schema_type == SchemaType.XPATH.value:

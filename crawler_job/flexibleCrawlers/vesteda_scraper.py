@@ -107,17 +107,12 @@ class VestedaScraper(BaseWebsiteScraper):
         if not self.navigated_to_gallery:
             raise Exception("Not navigated to gallery")
 
-        # Validate all website configuration requirements upfront
-        self._validate_website_config()
-
         logger.info("Extracting property listings of Vesteda step...")
         gallery_extraction_config = (
             self.website_config.strategy_config.gallery_extraction_config
         )
-
         assert gallery_extraction_config is not None
         assert gallery_extraction_config.correct_urls_paths is not None
-        assert gallery_extraction_config.schema is not None
 
         correct_urls = [
             f"{self.website_config.base_url}{path}"
@@ -128,6 +123,7 @@ class VestedaScraper(BaseWebsiteScraper):
             raise Exception(f"Invalid URL: {self.current_url}")
 
         schema = gallery_extraction_config.schema
+        assert schema is not None
 
         gallery_config = CrawlerRunConfig(
             extraction_strategy=JsonCssExtractionStrategy(schema),
