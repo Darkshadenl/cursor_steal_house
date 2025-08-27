@@ -1,16 +1,18 @@
-from enum import Enum
 import json
 from typing import Dict, Any, List, Optional
 import os
 from abc import ABC
-import asyncio
 import re
 
+from crawler_job.enums import ScrapeStrategy, SchemaType
 from crawler_job.helpers.decorators import (
     requires_crawler_initialized,
     requires_cookies_accepted,
     requires_login_config,
 )
+from crawler_job.helpers.config_validator import WebsiteConfigValidator
+from crawler_job.helpers.crawler_config_factory import CrawlerConfigFactory
+
 
 from crawl4ai import (
     AsyncWebCrawler,
@@ -36,7 +38,9 @@ from crawler_job.models.db_config_models import (
 )
 from crawler_job.models.house_models import House, FetchedPage
 from crawler_job.notifications.notification_service import NotificationService
+from crawler_job.services.data_processing_service import DataProcessingService
 from crawler_job.services.house_service import HouseService
+from crawler_job.services.llm_extraction_service import LlmExtractionService
 from crawler_job.services.llm_service import LLMProvider, LLMService
 from crawler_job.services.logger_service import setup_logger
 from crawler_job.services import config as global_config
@@ -63,6 +67,7 @@ class BaseWebsiteScraper(ABC):
         """
         self.website_config: WebsiteConfig = config
         self.notification_service = notification_service
+        self.logger = logger
 
         self.login_config: LoginConfig = self.website_config.strategy_config.login_config  # type: ignore
 
@@ -88,31 +93,15 @@ class BaseWebsiteScraper(ABC):
 
         self.session_id = session_id
 
-        self._standard_run_config = CrawlerRunConfig(
-            cache_mode=CacheMode.BYPASS,
-            session_id=self.session_id,
-            log_console=global_config.debug_mode,
-            js_only=False,
-            magic=False,
-            exclude_all_images=True,
-            exclude_social_media_links=True,
-            user_agent_mode="random",
+        self._standard_run_config = CrawlerConfigFactory.create_standard_run_config(
+            self.session_id, global_config.debug_mode
         )
-
-        enable_ui = os.getenv("CRAWLER_ENABLE_UI", "false").lower() == "true"
-        self.standard_dispatcher = SemaphoreDispatcher(
-            semaphore_count=1,
-            max_session_permit=1,
-            monitor=CrawlerMonitor(urls_total=10, enable_ui=enable_ui),
-            rate_limiter=RateLimiter(
-                base_delay=(3.0, 5.0),
-                max_delay=30.0,
-                max_retries=3,
-                rate_limit_codes=[429, 503],
-            ),
-        )
+        self.standard_dispatcher = CrawlerConfigFactory.create_standard_dispatcher()
 
         self.crawler: AsyncWebCrawler = crawler
+        assert self.notification_service is not None
+        self.data_processing_service = DataProcessingService(self.notification_service)
+        self.llm_extraction_service = LlmExtractionService()
         self.accepted_cookies = False
         self.navigated_to_gallery = False
         self.navigated_to_sitemap = False
@@ -125,89 +114,8 @@ class BaseWebsiteScraper(ABC):
         }
 
         # Validate configuration at initialization
-        self._validate_website_config()
-
-    def _validate_website_config(self) -> None:
-        """Validate all website configuration requirements based on strategy."""
-        if not self.website_config:
-            raise Exception("Website configuration not provided")
-
-        if not self.website_config.base_url:
-            raise Exception("Base URL not provided in website configuration")
-
-        if not self.website_config.strategy_config:
-            raise Exception("Strategy configuration not provided")
-
-        # Validate strategy-specific configuration
-        strategy = self.website_config.scrape_strategy
-
-        if strategy == ScrapeStrategy.GALLERY.value:
-            self._validate_gallery_config()
-        elif strategy == ScrapeStrategy.SITEMAP.value:
-            self._validate_sitemap_config()
-        else:
-            raise Exception(f"Unknown scrape strategy: {strategy}")
-
-        # Validate optional configurations if they are expected to be used
-        self._validate_optional_configs()
-
-        logger.info(
-            f"Website configuration validation completed successfully for {self.website_config.website_name}"
-        )
-
-    def _validate_gallery_config(self) -> None:
-        """Validate gallery extraction configuration."""
-        if not self.website_config.strategy_config.gallery_extraction_config:
-            raise Exception("Gallery extraction configuration not provided")
-
-        gallery_config = self.website_config.strategy_config.gallery_extraction_config
-
-        if not gallery_config.correct_urls_paths:
-            raise Exception(
-                "No correct URLs provided in gallery extraction configuration"
-            )
-
-        if not gallery_config.schema:
-            raise Exception("No schema provided in gallery extraction configuration")
-
-        if not gallery_config.schema_type:
-            raise Exception(
-                "No schema type provided in gallery extraction configuration"
-            )
-
-    def _validate_sitemap_config(self) -> None:
-        """Validate sitemap extraction configuration."""
-        if not self.website_config.strategy_config.sitemap_extraction_config:
-            raise Exception("Sitemap extraction configuration not provided")
-
-        sitemap_config = self.website_config.strategy_config.sitemap_extraction_config
-
-        if not sitemap_config.regex:
-            raise Exception("No regex provided in sitemap extraction configuration")
-
-        if not sitemap_config.schema:
-            raise Exception("No schema provided in sitemap extraction configuration")
-
-    def _validate_optional_configs(self) -> None:
-        """Validate optional configurations that may be required based on decorators usage."""
-        # Check if detail page extraction is configured for LLM strategy
-        if (
-            self.detail_page_extraction_config
-            and self.detail_page_extraction_config.schema_type == "llm"
-        ):
-            if not self.detail_page_extraction_config.extra_llm_instructions:
-                logger.warning(
-                    "No extra LLM instructions provided for detail page extraction"
-                )
-
-        # Check login config if login is required
-        if self.login_config and self.login_config.login_required:
-            if not self.login_config.username_selector:
-                raise Exception("Username selector not provided in login configuration")
-            if not self.login_config.password_selector:
-                raise Exception("Password selector not provided in login configuration")
-            if not self.login_config.submit_selector:
-                raise Exception("Submit selector not provided in login configuration")
+        validator = WebsiteConfigValidator(self.website_config)
+        validator.validate()
 
     def get_run_config(self) -> CrawlerRunConfig:
         if not self._standard_run_config:
@@ -228,11 +136,9 @@ class BaseWebsiteScraper(ABC):
         Returns:
             CrawlerRunConfig: The configuration for the login action.
         """
-        run_config = self.get_run_config()
-        run_config.js_code = js_code
-        run_config.wait_for = wait_for_condition
-        run_config.page_timeout = 10000  # 10 seconds timeout
-        return run_config
+        return CrawlerConfigFactory.create_login_run_config(
+            self.get_run_config(), full_login_url, js_code, wait_for_condition
+        )
 
     def _get_search_city(self) -> str:
         """
@@ -884,192 +790,16 @@ class BaseWebsiteScraper(ABC):
             self.accepted_cookies = True
             return self.accepted_cookies
 
-    async def _check_if_houses_exist(self, houses: List[House]) -> List[House]:
-        async with HouseService(
-            notification_service=self.notification_service
-        ) as house_service:
-            new_houses = await house_service.identify_new_houses_async(houses)
-
-            if not new_houses:
-                return []
-
-            logger.info(f"Fetching details for {len(new_houses)} new houses...")
-            return new_houses
-
-    def _merge_detailed_houses(
-        self, houses: List[House], detailed_houses: List[House]
-    ) -> None:
-        for detailed_house in detailed_houses:
-            for house in houses:
-                if (
-                    house.address == detailed_house.address
-                    and house.city == detailed_house.city
-                ):
-                    for field, value in detailed_house.model_dump(
-                        exclude_unset=True
-                    ).items():
-                        if value is not None and (
-                            getattr(house, field) is None
-                            or field not in ["address", "city", "status"]
-                        ):
-                            setattr(house, field, value)
-                    break
-
-    async def _store_houses(self, houses: List[House]) -> None:
-        async with HouseService(
-            notification_service=self.notification_service
-        ) as house_service:
-            await house_service.store_houses_atomic_async(
-                houses=houses,
-            )
-
-    async def execute_llm_extraction(
-        self, fetched_pages: List[FetchedPage], provider: LLMProvider
-    ) -> List[House]:
-        """
-        Extract structured data from markdown using LLM
-
-        Args:
-            fetched_pages: List of fetched detail pages
-            provider: LLM provider to use
-
-        Returns:
-            List[House]: List of House objects with extracted data
-        """
-        llm_service = LLMService()
-        schema = House.model_json_schema()
-        houses: List[House] = []
-
-        logger.info("Extracting structured data using LLM...")
-
-        for page in fetched_pages:
-            if not page.success:
-                continue
-
-            if not page.markdown:
-                logger.warning(f"No markdown for {page.url}")
-                continue
-
-            try:
-                extracted_data: Optional[Dict[str, Any]] = await llm_service.extract(
-                    page.markdown, schema, provider
-                )
-
-                if extracted_data is None or len(extracted_data) == 0:
-                    logger.warning(
-                        f"No data extracted for {page.url}. extracted_data is None or empty"
-                    )
-                    continue
-
-                json_data = json.loads(extracted_data)  # type: ignore
-
-                if json_data is None:
-                    logger.warning(
-                        f"No data extracted for {page.url}. json_data is None"
-                    )
-                    logger.debug(
-                        f"Page.markdown: {page.markdown}, Extracted data: {extracted_data}"
-                    )
-                    continue
-
-                house = House.from_dict(json_data)
-                houses.append(house)
-                logger.info(f"Successfully extracted data for {page.url}")
-            except Exception as e:
-                logger.warning(f"Error extracting data for {page.url}: {str(e)}")
-                continue
-
-        return houses
-
-    @requires_login_config
-    async def validate_login(self) -> bool:
-        if not self.login_config.validate_login or self.navigated_to_gallery:
-            logger.info(
-                f"Skipping login validation for {self.website_config.website_name}"
-            )
-            return True
-
-        await asyncio.sleep(2)
-        logger.info(f"Validating login success of {self.website_config.website_name}")
-
-        valid: bool = await self.validate_current_page(
-            f"{self.website_config.base_url}{self.login_config.expected_url_path}",
-            f"{self.website_config.base_url}{self.login_config.success_check_url_path}",
-        )
-        self.current_url = self.login_config.expected_url_path
-
-        return valid
-
-    async def run_gallery_scrape(self) -> Dict[str, Any]:
-        await self.navigate_to_gallery_async()
-        await self.login_async()
-
-        if not await self.validate_login():
-            logger.error("Login failed, aborting scrape")
-            return self.default_results
-
-        await self.navigate_to_gallery_async(force_navigation=True)
-        await self.apply_filters_async()
-        houses = await self.extract_gallery_async()
-        new_houses: List[House] = await self._check_if_houses_exist(houses)
-
-        if not new_houses or len(new_houses) == 0:
-            logger.info("No new houses found, we're done here!")
-            self.default_results["success"] = True
-            return self.default_results
-
-        detailed_houses = []
-        if self.detail_page_extraction_config.schema_type in ["xpath", "css"]:
-            detailed_houses = await self.process_details_xpath_css(new_houses)
-        elif self.detail_page_extraction_config.schema_type == "llm":
-            fetched_pages = await self.extract_fetched_pages_async(new_houses)
-            detailed_houses = await self.execute_llm_extraction(
-                fetched_pages, provider=LLMProvider.GEMINI
-            )
-
-        if not detailed_houses:
-            logger.info("No detailed houses found. Exiting...")
-            self.default_results["success"] = True
-            return self.default_results
-
-        self._merge_detailed_houses(houses, detailed_houses)
-
-        await self._store_houses(houses)
-
-        return {
-            "success": True,
-            "total_houses_count": len(houses),
-            "new_houses_count": len(new_houses),
-            "updated_houses_count": len(houses) - len(new_houses),
-        }
-
-    async def run_sitemap_scrape(self) -> Dict[str, Any]:
-        await self.login_async()
-
-        if not await self.validate_login():
-            logger.error("Login failed, aborting scrape")
-            return self.default_results
-
-        sitemap_html = await self.navigate_to_sitemap_async()
-        await self.apply_filters_async()
-        houses = await self.extract_sitemap_async(sitemap_html)
-        new_houses = await self._check_if_houses_exist(houses)
-        await self._store_houses(new_houses)
-
-        return {
-            "success": True,
-            "total_houses_count": len(houses),
-            "new_houses_count": len(new_houses),
-            "updated_houses_count": len(houses) - len(new_houses),
-        }
-
     async def run_async(self) -> Dict[str, Any]:
         """Run the complete scraping process.
 
         Returns:
             List[Dict[str, Any]]: The collected data from all listings.
         """
+        from crawler_job.helpers.strategy_executor import StrategyExecutor
+
         strategy = self.website_config.scrape_strategy
+        executor = StrategyExecutor(self)
 
         logger.info(
             f"Choosing strategy {strategy} for {self.website_config.website_name}"
@@ -1077,21 +807,10 @@ class BaseWebsiteScraper(ABC):
         result = None
 
         if strategy == ScrapeStrategy.GALLERY.value:
-            result = await self.run_gallery_scrape()
+            result = await executor.run_gallery_scrape()
         elif strategy == ScrapeStrategy.SITEMAP.value:
-            result = await self.run_sitemap_scrape()
+            result = await executor.run_sitemap_scrape()
         else:
             raise Exception(f"Invalid scrape strategy: {strategy}")
 
         return result
-
-
-class ScrapeStrategy(Enum):
-    GALLERY = "gallery"
-    SITEMAP = "sitemap"
-
-
-class SchemaType(Enum):
-    XPATH = "xpath"
-    CSS = "css"
-    LLM = "llm"
