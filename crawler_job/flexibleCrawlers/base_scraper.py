@@ -124,6 +124,88 @@ class BaseWebsiteScraper(ABC):
             "updated_houses_count": 0,
         }
 
+    def _validate_website_config(self) -> None:
+        """Validate all website configuration requirements based on strategy."""
+        if not self.website_config:
+            raise Exception("Website configuration not provided")
+
+        if not self.website_config.base_url:
+            raise Exception("Base URL not provided in website configuration")
+
+        if not self.website_config.strategy_config:
+            raise Exception("Strategy configuration not provided")
+
+        # Validate strategy-specific configuration
+        strategy = self.website_config.scrape_strategy
+
+        if strategy == ScrapeStrategy.GALLERY.value:
+            self._validate_gallery_config()
+        elif strategy == ScrapeStrategy.SITEMAP.value:
+            self._validate_sitemap_config()
+        else:
+            raise Exception(f"Unknown scrape strategy: {strategy}")
+
+        # Validate optional configurations if they are expected to be used
+        self._validate_optional_configs()
+
+        logger.info(
+            f"Website configuration validation completed successfully for {self.website_config.website_name}"
+        )
+
+    def _validate_gallery_config(self) -> None:
+        """Validate gallery extraction configuration."""
+        if not self.website_config.strategy_config.gallery_extraction_config:
+            raise Exception("Gallery extraction configuration not provided")
+
+        gallery_config = self.website_config.strategy_config.gallery_extraction_config
+
+        if not gallery_config.correct_urls_paths:
+            raise Exception(
+                "No correct URLs provided in gallery extraction configuration"
+            )
+
+        if not gallery_config.schema:
+            raise Exception("No schema provided in gallery extraction configuration")
+
+        if not gallery_config.schema_type:
+            raise Exception(
+                "No schema type provided in gallery extraction configuration"
+            )
+
+    def _validate_sitemap_config(self) -> None:
+        """Validate sitemap extraction configuration."""
+        if not self.website_config.strategy_config.sitemap_extraction_config:
+            raise Exception("Sitemap extraction configuration not provided")
+
+        sitemap_config = self.website_config.strategy_config.sitemap_extraction_config
+
+        if not sitemap_config.regex:
+            raise Exception("No regex provided in sitemap extraction configuration")
+
+        if not sitemap_config.schema:
+            raise Exception("No schema provided in sitemap extraction configuration")
+
+    def _validate_optional_configs(self) -> None:
+        """Validate optional configurations that may be required based on decorators usage."""
+        # Check if detail page extraction is configured for LLM strategy
+        if (
+            self.detail_page_extraction_config
+            and self.detail_page_extraction_config.schema_type == "llm"
+        ):
+            if not self.detail_page_extraction_config.extra_llm_instructions:
+                logger.warning(
+                    "No extra LLM instructions provided for detail page extraction"
+                )
+
+        # Check login config if login is required
+        if self.login_config and self.login_config.login_required:
+            if not self.login_config.username_selector:
+                raise Exception("Username selector not provided in login configuration")
+            if not self.login_config.password_selector:
+                raise Exception("Password selector not provided in login configuration")
+            if not self.login_config.submit_selector:
+                raise Exception("Submit selector not provided in login configuration")
+
     def get_run_config(self) -> CrawlerRunConfig:
         if not self._standard_run_config:
             raise Exception("Standard run config not initialized")
@@ -440,6 +522,9 @@ class BaseWebsiteScraper(ABC):
         Returns:
             List[House]: List of extracted House objects from the sitemap.
         """
+        # Validate configuration before proceeding
+        self._validate_website_config()
+
         regex = self.sitemap_extraction_config.regex
         schema = self.sitemap_extraction_config.schema
         llm_instructions = self.sitemap_extraction_config.extra_llm_instructions
@@ -537,6 +622,9 @@ class BaseWebsiteScraper(ABC):
     async def extract_gallery_async(self) -> List[House]:
         if not self.navigated_to_gallery:
             raise Exception("Not navigated to gallery")
+
+        # Validate configuration before proceeding
+        self._validate_website_config()
 
         if not self.website_config.strategy_config.gallery_extraction_config:
             raise Exception("No gallery extraction configuration provided.")
