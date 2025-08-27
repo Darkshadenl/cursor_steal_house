@@ -6,6 +6,12 @@ from abc import ABC
 import asyncio
 import re
 
+from crawler_job.helpers.decorators import (
+    requires_crawler_initialized,
+    requires_cookies_accepted,
+    requires_login_config,
+)
+
 from crawl4ai import (
     AsyncWebCrawler,
     CacheMode,
@@ -119,7 +125,7 @@ class BaseWebsiteScraper(ABC):
             "updated_houses_count": 0,
         }
 
-    def get_run_config(self, action: str) -> CrawlerRunConfig:
+    def get_run_config(self) -> CrawlerRunConfig:
         """
         Returns a CrawlerRunConfig for a specific action, allowing subclasses to override.
 
@@ -145,7 +151,7 @@ class BaseWebsiteScraper(ABC):
         Returns:
             CrawlerRunConfig: The configuration for the login action.
         """
-        run_config = self.get_run_config("login")
+        run_config = self.get_run_config()
         run_config.js_code = js_code
         run_config.wait_for = wait_for_condition
         run_config.page_timeout = 10000  # 10 seconds timeout
@@ -166,6 +172,7 @@ class BaseWebsiteScraper(ABC):
             return self.filtering_config.cities[0]
         return "Tilburg"
 
+    @requires_crawler_initialized
     async def validate_current_page(self, expected_url: str, check_url: str) -> bool:
         """Validate if the current page is the expected page.
 
@@ -175,9 +182,6 @@ class BaseWebsiteScraper(ABC):
         Returns:
             bool: True if the current page is the expected page, False otherwise.
         """
-        if not self.crawler:
-            raise Exception("Crawler not initialized")
-
         check_config = CrawlerRunConfig(
             session_id=self.session_id,
             cache_mode=CacheMode.BYPASS,
@@ -206,23 +210,18 @@ class BaseWebsiteScraper(ABC):
 
         return True
 
+    @requires_crawler_initialized
+    @requires_cookies_accepted
+    @requires_login_config
     async def login_async(self) -> bool:
         """Perform login if login configuration is provided.
 
         Returns:
             bool: True if login was successful or not required, False if login failed.
         """
-        if not self.login_config or (
-            self.navigated_to_gallery and not self.login_config.login_required
-        ):
+        if self.navigated_to_gallery and not self.login_config.login_required:
             logger.warn(f"Skipping login for {self.website_config.website_name}")
             return True
-
-        if not self.crawler:
-            raise Exception("Crawler not initialized")
-
-        if not self.accepted_cookies:
-            await self._accept_cookies(self.current_url or self.website_config.base_url)  # type: ignore
 
         try:
             base_url = self.website_config.base_url
@@ -321,14 +320,12 @@ class BaseWebsiteScraper(ABC):
             logger.error(f"Login failed: {str(e)}")
             return False
 
+    @requires_crawler_initialized
     async def navigate_to_sitemap_async(self) -> str:
         if self.navigated_to_sitemap:
             raise Exception(
                 "Already navigated to sitemap. How? Something must be wrong."
             )
-
-        if not self.crawler:
-            raise Exception("Crawler not initialized")
 
         logger.info("Navigating to and extracting sitemap...")
         url = f"{self.website_config.base_url}{self.website_config.strategy_config.navigation_config.sitemap}"
@@ -352,18 +349,17 @@ class BaseWebsiteScraper(ABC):
             self.navigated_to_sitemap = False
             raise Exception(f"Failed to navigate to sitemap: {result.error_message}")
 
+    @requires_crawler_initialized
+    @requires_login_config
     async def navigate_to_gallery_async(self, force_navigation: bool = False) -> None:
         """Navigate to the listings/gallery page."""
         if self.navigated_to_gallery and not force_navigation:
             return
 
-        if not self.crawler:
-            raise Exception("Crawler not initialized")
-
         logger.info("Navigating to gallery...")
         url = f"{self.website_config.base_url}{self.website_config.strategy_config.navigation_config.gallery}"
 
-        run_config = self.get_run_config("navigate_to_gallery")
+        run_config = self.get_run_config()
         result: CrawlResult = await self.crawler.arun(
             url,
             config=run_config,
@@ -382,6 +378,7 @@ class BaseWebsiteScraper(ABC):
             logger.error(f"Navigating to gallery failed: {result.error_message}")
             logger.error(f"Redirected URL: {result.redirected_url}")
 
+    @requires_crawler_initialized
     async def apply_filters_async(self) -> None:
         """Apply filters if filtering configuration is provided."""
         if not self.filtering_config:
@@ -430,7 +427,7 @@ class BaseWebsiteScraper(ABC):
 
         """
 
-        run_config = self.get_run_config("apply_filters")
+        run_config = self.get_run_config()
         run_config.js_code = js
         run_config.log_console = True
         run_config.js_only = True
@@ -544,15 +541,13 @@ class BaseWebsiteScraper(ABC):
 
         return houses
 
+    @requires_crawler_initialized
     async def extract_gallery_async(self) -> List[House]:
         if not self.navigated_to_gallery:
             raise Exception("Not navigated to gallery")
 
         if not self.website_config.strategy_config.gallery_extraction_config:
             raise Exception("No gallery extraction configuration provided.")
-
-        if not self.crawler:
-            raise Exception("Crawler not initialized")
 
         logger.info(
             f"Extracting property listings of {self.website_config.website_name} step..."
@@ -583,7 +578,7 @@ class BaseWebsiteScraper(ABC):
         else:
             extraction_strategy = JsonCssExtractionStrategy(schema)
 
-        run_config = self.get_run_config("extract_gallery")
+        run_config = self.get_run_config()
         run_config.extraction_strategy = extraction_strategy
         run_config.wait_for = "domcontentloaded"
 
@@ -613,6 +608,7 @@ class BaseWebsiteScraper(ABC):
         logger.info(f"Successfully extracted {len(houses)} properties")
         return houses
 
+    @requires_crawler_initialized
     async def extract_fetched_pages_async(
         self, houses: List[House]
     ) -> List[FetchedPage]:
@@ -626,8 +622,6 @@ class BaseWebsiteScraper(ABC):
             List[FetchedPage]: List of fetched detail pages
         """
         extraction_type = self.detail_page_extraction_config.schema_type
-        if not self.crawler:
-            raise Exception("Crawler not initialized")
         if extraction_type not in ["llm"]:
             raise Exception("Invalid extraction type")
 
@@ -712,6 +706,7 @@ class BaseWebsiteScraper(ABC):
             )
             return [FetchedPage(url=url, markdown="", success=False) for url in urls]
 
+    @requires_crawler_initialized
     async def process_details_xpath_css(self, houses: List[House]) -> List[House]:
         logger.info(f"Processing details with xpath/css for {len(houses)} houses...")
 
@@ -762,12 +757,11 @@ class BaseWebsiteScraper(ABC):
 
         return done_houses
 
+    @requires_crawler_initialized
     async def _accept_cookies(self, current_url: str) -> bool:
         if not self.cookies_config:
             logger.info("Accepting cookies not required.")
             return True
-        if not self.crawler:
-            raise Exception("Crawler not initialized")
         if self.accepted_cookies:
             logger.info("Cookies already accepted.")
             return self.accepted_cookies
@@ -798,7 +792,7 @@ class BaseWebsiteScraper(ABC):
             }})();
             """
 
-        cookie_config = self.get_run_config("accept_cookies")
+        cookie_config = self.get_run_config()
         cookie_config.js_only = True
         cookie_config.magic = True
         cookie_config.js_code = js
@@ -916,6 +910,7 @@ class BaseWebsiteScraper(ABC):
 
         return houses
 
+    @requires_login_config
     async def validate_login(self) -> bool:
         if not self.login_config.validate_login or self.navigated_to_gallery:
             logger.info(
