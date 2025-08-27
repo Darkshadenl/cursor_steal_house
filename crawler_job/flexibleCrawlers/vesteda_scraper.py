@@ -21,6 +21,7 @@ from ..models.db_config_models import WebsiteConfig
 from .base_scraper import BaseWebsiteScraper
 from crawler_job.services.logger_service import setup_logger
 from crawler_job.helpers.decorators import requires_crawler_initialized
+from crawler_job.services import config as global_config
 
 logger = setup_logger(__name__)
 
@@ -34,11 +35,36 @@ class VestedaScraper(BaseWebsiteScraper):
         session_id: str,
         crawler: AsyncWebCrawler,
         notification_service: Optional[NotificationService] = None,
-        debug_mode: bool = False,
     ):
-        super().__init__(config, session_id, crawler, notification_service, debug_mode)
+        super().__init__(config, session_id, crawler, notification_service)
 
         logger.info("Vesteda scraper initialized...")
+
+    def _validate_website_config(self) -> None:
+        """Validate all website configuration requirements upfront."""
+        if not self.website_config:
+            raise Exception("Website configuration not provided")
+
+        if not self.website_config.base_url:
+            raise Exception("Base URL not provided in website configuration")
+
+        if not self.website_config.strategy_config:
+            raise Exception("Strategy configuration not provided")
+
+        if not self.website_config.strategy_config.gallery_extraction_config:
+            raise Exception("Gallery extraction configuration not provided")
+
+        gallery_config = self.website_config.strategy_config.gallery_extraction_config
+
+        if not gallery_config.correct_urls_paths:
+            raise Exception(
+                "No correct URLs provided in gallery extraction configuration"
+            )
+
+        if not gallery_config.schema:
+            raise Exception("No schema provided in gallery extraction configuration")
+
+        logger.info("Website configuration validation completed successfully")
 
     async def _accept_cookies(self, current_url: str) -> bool:
         if not self.cookies_config:
@@ -56,12 +82,12 @@ class VestedaScraper(BaseWebsiteScraper):
             js_only=True,
             magic=True,
             session_id=self.session_id,
-            log_console=self.debug_mode,
+            log_console=global_config.debug_mode,
             js_code="""
                 (async () => {
                     Cookiebot.submitCustomConsent(false, true, false); Cookiebot.hide();
                     const cookieButton = document.querySelector('a[href="javascript:Cookiebot.submitCustomConsent(false, true, false); Cookiebot.hide()"]');
-                    
+
                     if (cookieButton) {
                         cookieButton.click();
                         console.log("Cookie button clicked");
@@ -69,7 +95,7 @@ class VestedaScraper(BaseWebsiteScraper):
                         console.log("Cookie button not found");
                         return true;
                     }
-                    
+
                     while (true) {
                         await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
                         const cookieButton = document.querySelector('a[href="javascript:Cookiebot.submitCustomConsent(false, true, false); Cookiebot.hide()"]');
@@ -107,19 +133,17 @@ class VestedaScraper(BaseWebsiteScraper):
         if not self.navigated_to_gallery:
             raise Exception("Not navigated to gallery")
 
-        if not self.website_config.strategy_config.gallery_extraction_config:
-            raise Exception("No gallery extraction configuration provided.")
-
-        if not self.crawler:
-            raise Exception("Crawler not initialized")
+        # Validate all website configuration requirements upfront
+        self._validate_website_config()
 
         logger.info("Extracting property listings of Vesteda step...")
         gallery_extraction_config = (
             self.website_config.strategy_config.gallery_extraction_config
         )
 
-        if not gallery_extraction_config.correct_urls_paths:
-            raise Exception("No correct URLs provided")
+        assert gallery_extraction_config is not None
+        assert gallery_extraction_config.correct_urls_paths is not None
+        assert gallery_extraction_config.schema is not None
 
         correct_urls = [
             f"{self.website_config.base_url}{path}"
@@ -131,16 +155,13 @@ class VestedaScraper(BaseWebsiteScraper):
 
         schema = gallery_extraction_config.schema
 
-        if not schema:
-            raise Exception("No schema provided")
-
         gallery_config = CrawlerRunConfig(
             extraction_strategy=JsonCssExtractionStrategy(schema),
             cache_mode=CacheMode.BYPASS,
             session_id=self.session_id,
             magic=False,
             user_agent_mode="random",
-            log_console=self.debug_mode,
+            log_console=global_config.debug_mode,
             exclude_all_images=True,
             exclude_social_media_links=True,
         )
@@ -210,18 +231,6 @@ class VestedaScraper(BaseWebsiteScraper):
     async def extract_fetched_pages_async(
         self, houses: List[House]
     ) -> List[FetchedPage]:
-        """
-        Extract detailed property information for the given houses
-
-        Args:
-            houses: List of House objects with basic info
-
-        Returns:
-            List[FetchedPage]: List of fetched detail pages
-        """
-        if not self.crawler:
-            raise Exception("Crawler not initialized")
-
         logger.info("Starting detailed property extraction...")
 
         prune_filter = PruningContentFilter(
@@ -231,7 +240,7 @@ class VestedaScraper(BaseWebsiteScraper):
             min_word_threshold=3,
         )
         config = CrawlerRunConfig(
-            log_console=self.debug_mode,
+            log_console=global_config.debug_mode,
             exclude_domains=["deploy.mopinion.com", "app.cobrowser.com"],
             mean_delay=1,
             markdown_generator=DefaultMarkdownGenerator(

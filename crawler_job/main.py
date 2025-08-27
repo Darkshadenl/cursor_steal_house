@@ -14,6 +14,7 @@ from crawler_job.factories import ScraperFactory
 from crawler_job.services.repositories.json_config_repository import (
     JsonConfigRepository,
 )
+from crawler_job.services import config
 
 
 logger = setup_logger(__name__)
@@ -52,24 +53,6 @@ async def run_crawler_async(
     Returns:
         Dict[str, Any]: Results of the crawling process
     """
-    browser_config = BrowserConfig(
-        headless=headless,
-        verbose=debug_mode,
-        use_managed_browser=True,
-        user_data_dir="./browser_data/general",
-        extra_args=[
-            "--no-sandbox",
-            "--disable-gpu",
-            "--disable-dev-shm-usage",
-            "--remote-debugging-address=0.0.0.0",
-            "--remote-debugging-port=9222",
-        ],
-    )
-
-    crawler = AsyncWebCrawler(
-        config=browser_config,
-    )
-
     db_session = get_db_session()
     notification_service = NotificationService(notifications_on=notifications_enabled)
 
@@ -89,8 +72,29 @@ async def run_crawler_async(
 
             return True
 
+        # Initialize global configuration
+        config.initialize(debug_mode)
+
+        browser_config = BrowserConfig(
+            headless=headless,
+            verbose=config.debug_mode,
+            use_managed_browser=True,
+            user_data_dir="./browser_data/general",
+            extra_args=[
+                "--no-sandbox",
+                "--disable-gpu",
+                "--disable-dev-shm-usage",
+                "--remote-debugging-address=0.0.0.0",
+                "--remote-debugging-port=9222",
+            ],
+        )
+
+        crawler = AsyncWebCrawler(
+            config=browser_config,
+        )
+
         json_config_repo = JsonConfigRepository(db_session)
-        factory = ScraperFactory(json_config_repo, crawler, debug_mode)
+        factory = ScraperFactory(json_config_repo, crawler)
         results: List[Dict[str, Any]] = []
 
         try:
@@ -206,7 +210,7 @@ if __name__ == "__main__":
         if result:
             sys.exit(0)
         else:
-            if debug_mode:
+            if config.debug_mode:
                 logger.info(
                     "Debug mode enabled - keeping application running after crash"
                 )
@@ -219,7 +223,7 @@ if __name__ == "__main__":
         sys.exit(130)
     except Exception as e:
         logger.error(f"Unhandled exception: {str(e)}")
-        if debug_mode:
+        if config.debug_mode:
             logger.info("Debug mode enabled - keeping application running after crash")
             while True:
                 time.sleep(10)  # Keep process alive

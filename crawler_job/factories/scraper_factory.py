@@ -9,6 +9,8 @@ from crawler_job.services.logger_service import setup_logger
 
 from ..flexibleCrawlers.base_scraper import BaseWebsiteScraper
 from ..flexibleCrawlers.vesteda_scraper import VestedaScraper
+from ..flexibleCrawlers.huis_sleutel_scraper import HuisSleutelScraper
+from ..flexibleCrawlers.nmg_wonen_scraper import NmgWonenScraper
 from crawler_job.services.repositories.json_config_repository import (
     JsonConfigRepository,
 )
@@ -17,9 +19,13 @@ from crawler_job.services.repositories.json_config_repository import (
 SCRAPER_CLASSES: Dict[str, Type[BaseWebsiteScraper]] = {
     "vesteda": VestedaScraper,
     "de_huis_sleutel": HuisSleutelScraper,
-    "nmg_wonen": NmgWonenScraper,
+    "nmg_wonen":  # `NmgWonenScraper` is a class that likely contains the specific implementation for
+    # scraping data from the Nmg Wonen website. It is one of the scraper classes defined
+    # in the code snippet provided, along with `VestedaScraper` and `HuisSleutelScraper`.
+    # Each of these scraper classes is associated with a specific website identifier and
+    # is responsible for scraping data from the corresponding website.
+    NmgWonenScraper,
 }
-
 
 
 class ScraperFactory:
@@ -28,7 +34,6 @@ class ScraperFactory:
         self,
         json_config_repo: JsonConfigRepository,
         crawler: AsyncWebCrawler,
-        debug_mode: bool = False,
     ):
         """Initialize the scraper factory.
 
@@ -37,10 +42,14 @@ class ScraperFactory:
             json_config_repo: Repository for new JSON configurations.
         """
         self.json_config_repo = json_config_repo
-        self.debug_mode = debug_mode
         self.logger = setup_logger(__name__)
         self.crawler = crawler
-    async def get_scraper_async(self, website_name: str, notification_service: Optional[NotificationService] = None) -> BaseWebsiteScraper:
+
+    async def get_scraper_async(
+        self,
+        website_name: str,
+        notification_service: Optional[NotificationService] = None,
+    ) -> BaseWebsiteScraper:
         """Get a scraper instance for the given website identifier.
 
         Args:
@@ -68,7 +77,6 @@ class ScraperFactory:
                 session_id=website_config.session_id,
                 crawler=self.crawler,
                 notification_service=notification_service,
-                debug_mode=self.debug_mode,
             )
         else:
             error_msg = (
