@@ -39,6 +39,7 @@ from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.services.house_service import HouseService
 from crawler_job.services.llm_service import LLMProvider, LLMService
 from crawler_job.services.logger_service import setup_logger
+from crawler_job.services import config as global_config
 
 logger = setup_logger(__name__)
 
@@ -52,7 +53,6 @@ class BaseWebsiteScraper(ABC):
         session_id: str,
         crawler: AsyncWebCrawler,
         notification_service: Optional[NotificationService] = None,
-        debug_mode: bool = False,
     ):
         """Initialize the scraper.
 
@@ -63,7 +63,6 @@ class BaseWebsiteScraper(ABC):
         """
         self.website_config: WebsiteConfig = config
         self.notification_service = notification_service
-        self.debug_mode = debug_mode
 
         self.login_config: LoginConfig = self.website_config.strategy_config.login_config  # type: ignore
 
@@ -89,10 +88,10 @@ class BaseWebsiteScraper(ABC):
 
         self.session_id = session_id
 
-        self.standard_run_config = CrawlerRunConfig(
+        self._standard_run_config = CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS,
             session_id=self.session_id,
-            log_console=self.debug_mode,
+            log_console=global_config.debug_mode,
             js_only=False,
             magic=False,
             exclude_all_images=True,
@@ -126,16 +125,9 @@ class BaseWebsiteScraper(ABC):
         }
 
     def get_run_config(self) -> CrawlerRunConfig:
-        """
-        Returns a CrawlerRunConfig for a specific action, allowing subclasses to override.
-
-        Args:
-            action (str): The name of the action (e.g., "login", "navigate", "extract").
-
-        Returns:
-            CrawlerRunConfig: The configuration for the specified action.
-        """
-        return self.standard_run_config.clone()
+        if not self._standard_run_config:
+            raise Exception("Standard run config not initialized")
+        return self._standard_run_config.clone()
 
     def get_login_run_config(
         self, full_login_url: str, js_code: list[str], wait_for_condition: str
@@ -185,7 +177,7 @@ class BaseWebsiteScraper(ABC):
         check_config = CrawlerRunConfig(
             session_id=self.session_id,
             cache_mode=CacheMode.BYPASS,
-            log_console=self.debug_mode,
+            log_console=global_config.debug_mode,
             js_only=False,
             magic=False,
             user_agent_mode="random",
@@ -288,7 +280,7 @@ class BaseWebsiteScraper(ABC):
                         js_only=True,
                         wait_for="domcontentloaded",
                         page_timeout=15000,
-                        log_console=self.debug_mode,
+                        log_console=global_config.debug_mode,
                     )
 
                     stabilize_result: CrawlResult = await self.crawler.arun(
@@ -332,7 +324,7 @@ class BaseWebsiteScraper(ABC):
 
         result: CrawlResult = await self.crawler.arun(
             url,
-            config=self.standard_run_config,
+            config=self.get_run_config(),
         )  # type: ignore
 
         if not result.success:
@@ -489,7 +481,7 @@ class BaseWebsiteScraper(ABC):
             session_id=self.session_id,
             magic=False,
             user_agent_mode="random",
-            log_console=self.debug_mode,
+            log_console=global_config.debug_mode,
             exclude_all_images=True,
             exclude_social_media_links=True,
         )
@@ -634,7 +626,7 @@ class BaseWebsiteScraper(ABC):
             min_word_threshold=3,
         )
         config = CrawlerRunConfig(
-            log_console=self.debug_mode,
+            log_console=global_config.debug_mode,
             exclude_domains=self.detail_page_extraction_config.ignore_domains or [],
             mean_delay=1,
             markdown_generator=DefaultMarkdownGenerator(
@@ -710,7 +702,7 @@ class BaseWebsiteScraper(ABC):
     async def process_details_xpath_css(self, houses: List[House]) -> List[House]:
         logger.info(f"Processing details with xpath/css for {len(houses)} houses...")
 
-        config = self.standard_run_config
+        config = self.get_run_config()
         schema = self.detail_page_extraction_config.schema
         dispatcher = self.standard_dispatcher
         dispatcher.semaphore_count = 1

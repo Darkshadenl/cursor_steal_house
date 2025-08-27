@@ -9,7 +9,9 @@ from crawler_job.services.logger_service import setup_logger
 from crawler_job.helpers.decorators import (
     requires_crawler_initialized,
     requires_cookies_accepted,
+    requires_filtering_config,
 )
+from crawler_job.services import config as global_config
 
 logger = setup_logger(__name__)
 
@@ -23,17 +25,16 @@ class NmgWonenScraper(BaseWebsiteScraper):
         session_id: str,
         crawler: AsyncWebCrawler,
         notification_service: Optional[NotificationService] = None,
-        debug_mode: bool = False,
     ):
-        super().__init__(config, session_id, crawler, notification_service, debug_mode)
+        super().__init__(config, session_id, crawler, notification_service)
         logger.info("Nmg Wonen scraper initialized...")
 
-    def get_run_config(self, action: str) -> CrawlerRunConfig:
+    def get_run_config(self) -> CrawlerRunConfig:
         """Overrides the base run config for NMG Wonen specific actions."""
-        config = super().get_run_config(action)
+        config = super().get_run_config()
         config.exclude_all_images = False
         config.exclude_social_media_links = False
-        if self.debug_mode:
+        if global_config.debug_mode:
             config.screenshot = True
             config.log_console = True
         return config
@@ -58,11 +59,11 @@ class NmgWonenScraper(BaseWebsiteScraper):
             raise Exception("Crawler not initialized")
 
         url = f"{self.website_config.base_url}/huur"
-        config = self.get_run_config("navigate_to_gallery")
+        config = self.get_run_config()
 
         result: CrawlResult = await self.crawler.arun(url, config=config)  # type: ignore
 
-        if self.debug_mode:
+        if global_config.debug_mode:
             save_screenshot_from_crawl_result(result, "navigate_to_gallery")
 
         if (
@@ -83,12 +84,8 @@ class NmgWonenScraper(BaseWebsiteScraper):
             logger.error(f"Navigating to gallery failed: {error_message}")
             logger.error(f"Redirected URL: {redirected_url}")
 
+    @requires_filtering_config
     async def apply_filters_async(self) -> None:
-        """Apply filters if filtering configuration is provided."""
-        if not self.filtering_config:
-            logger.info("No filtering configuration provided.")
-            return
-
         logger.info(f"Applying filters to {self.current_url}")
         search_city = self._get_search_city()
         logger.info(f"Applying filters with search city: {search_city}")
@@ -108,7 +105,7 @@ class NmgWonenScraper(BaseWebsiteScraper):
         }})();
         """
 
-        config = self.get_run_config("apply_filters")
+        config = self.get_run_config()
         config.css_selector = self.filtering_config.filters_container_selector or ""
         config.js_code = js
 
@@ -150,7 +147,7 @@ class NmgWonenScraper(BaseWebsiteScraper):
             }})();
             """
 
-        cookie_config = self.get_run_config("accept_cookies")
+        cookie_config = self.get_run_config()
         cookie_config.js_code = js
 
         result: CrawlResult = await self.crawler.arun(
@@ -228,7 +225,7 @@ class NmgWonenScraper(BaseWebsiteScraper):
                         } catch (e) { return false; }
                     })()
                     """
-                    stabilize_config = self.get_run_config("stabilize_login")
+                    stabilize_config = self.get_run_config()
                     stabilize_config.js_only = True
                     stabilize_config.js_code = stabilize_js
                     stabilize_config.page_timeout = 15000

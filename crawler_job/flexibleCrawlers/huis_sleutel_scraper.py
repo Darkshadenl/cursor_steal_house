@@ -22,9 +22,8 @@ class HuisSleutelScraper(BaseWebsiteScraper):
         session_id: str,
         crawler: AsyncWebCrawler,
         notification_service: Optional[NotificationService] = None,
-        debug_mode: bool = False,
     ):
-        super().__init__(config, session_id, crawler, notification_service, debug_mode)
+        super().__init__(config, session_id, crawler, notification_service)
 
         logger.info("HuisSleutel scraper initialized...")
 

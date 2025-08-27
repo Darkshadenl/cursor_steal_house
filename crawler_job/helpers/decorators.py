@@ -33,3 +33,14 @@ def requires_login_config(func):
         return await func(self, *args, **kwargs)
 
     return wrapper
+
+
+def requires_filtering_config(func):
+    @functools.wraps(func)
+    async def wrapper(self, *args, **kwargs):
+        if not self.filtering_config:
+            logger.info("No filtering configuration provided.")
+            return
+        return await func(self, *args, **kwargs)
+
+    return wrapper
