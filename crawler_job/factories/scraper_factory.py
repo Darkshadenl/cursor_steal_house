@@ -15,16 +15,10 @@ from crawler_job.services.repositories.json_config_repository import (
     JsonConfigRepository,
 )
 
-# Map website identifiers to their specific scraper classes
 SCRAPER_CLASSES: Dict[str, Type[BaseWebsiteScraper]] = {
     "vesteda": VestedaScraper,
     "de_huis_sleutel": HuisSleutelScraper,
-    "nmg_wonen":  # `NmgWonenScraper` is a class that likely contains the specific implementation for
-    # scraping data from the Nmg Wonen website. It is one of the scraper classes defined
-    # in the code snippet provided, along with `VestedaScraper` and `HuisSleutelScraper`.
-    # Each of these scraper classes is associated with a specific website identifier and
-    # is responsible for scraping data from the corresponding website.
-    NmgWonenScraper,
+    "nmg_wonen": NmgWonenScraper,
 }
 
 
@@ -35,12 +29,6 @@ class ScraperFactory:
         json_config_repo: JsonConfigRepository,
         crawler: AsyncWebCrawler,
     ):
-        """Initialize the scraper factory.
-
-        Args:
-            crawler: The crawl4ai crawler instance to use.
-            json_config_repo: Repository for new JSON configurations.
-        """
         self.json_config_repo = json_config_repo
         self.logger = setup_logger(__name__)
         self.crawler = crawler
@@ -50,17 +38,6 @@ class ScraperFactory:
         website_name: str,
         notification_service: Optional[NotificationService] = None,
     ) -> BaseWebsiteScraper:
-        """Get a scraper instance for the given website identifier.
-
-        Args:
-            identifier: The unique identifier of the website.
-            notification_service: The notification service to use.
-        Returns:
-            BaseWebsiteScraper: A configured scraper instance.
-
-        Raises:
-            ValueError: If no valid configuration is found for the website.
-        """
         website_config = await self.json_config_repo.get_config_by_website_name_async(
             website_name
         )

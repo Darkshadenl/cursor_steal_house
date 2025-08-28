@@ -25,7 +25,7 @@ class HuisSleutelScraper(BaseWebsiteScraper):
     ):
         super().__init__(config, session_id, crawler, notification_service)
 
-        logger.info("HuisSleutel scraper initialized...")
+        logger.debug("HuisSleutel scraper initialized...")
 
     @requires_crawler_initialized
     async def navigate_to_gallery_async(self) -> None:

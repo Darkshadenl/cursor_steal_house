@@ -38,7 +38,7 @@ class VestedaScraper(BaseWebsiteScraper):
     ):
         super().__init__(config, session_id, crawler, notification_service)
 
-        logger.info("Vesteda scraper initialized...")
+        logger.debug("Vesteda scraper initialized...")
 
     async def _accept_cookies(self, current_url: str) -> bool:
         if not self.cookies_config:
