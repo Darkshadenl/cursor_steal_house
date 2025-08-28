@@ -3,7 +3,7 @@ from typing import Optional
 from crawl4ai import AsyncWebCrawler, CrawlResult, CrawlerRunConfig
 from crawler_job.flexibleCrawlers.base_scraper import BaseWebsiteScraper
 from crawler_job.helpers.utils import save_screenshot_from_crawl_result
-from crawler_job.models.db_config_models import WebsiteConfig
+from crawler_job.models.pydantic_models import WebsiteScrapeConfigJson
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.services.logger_service import setup_logger
 from crawler_job.helpers.decorators import (
@@ -21,7 +21,7 @@ class NmgWonenScraper(BaseWebsiteScraper):
 
     def __init__(
         self,
-        config: WebsiteConfig,
+        config: WebsiteScrapeConfigJson,
         session_id: str,
         crawler: AsyncWebCrawler,
         notification_service: Optional[NotificationService] = None,
