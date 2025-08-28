@@ -34,7 +34,7 @@ async def _run_single_scraper_with_session(
         scraper = await factory.get_scraper_async(website_name, notification_service)
         logger.info(f"Starting crawl for website: {website_name}")
 
-        result = await scraper.run_async()
+        result = await scraper.run_async(scraper.website_config.scrape_strategy)
 
         result.setdefault("total_houses_count", 0)
         result.setdefault("new_houses_count", 0)

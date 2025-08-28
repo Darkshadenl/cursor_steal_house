@@ -34,6 +34,7 @@ from crawler_job.models.pydantic_models import (
     GalleryExtractionConfig,
     LoginConfig,
     SitemapExtractionConfig,
+    WebsiteConfig,
     WebsiteScrapeConfigJson,
 )
 from crawler_job.models.house_models import House, FetchedPage
@@ -783,27 +784,13 @@ class BaseWebsiteScraper(ABC):
             self.accepted_cookies = True
             return self.accepted_cookies
 
-    async def run_async(self) -> Dict[str, Any]:
-        """Run the complete scraping process.
-
-        Returns:
-            List[Dict[str, Any]]: The collected data from all listings.
-        """
+    async def run_async(self, strategy: ScrapeStrategy) -> Dict[str, Any]:
         from crawler_job.helpers.strategy_executor import StrategyExecutor
 
-        strategy = self.website_config.scrape_strategy
         executor = StrategyExecutor(self)
 
         logger.info(
             f"Choosing strategy {strategy} for {self.website_config.website_name}"
         )
-        result = None
 
-        if strategy == ScrapeStrategy.GALLERY.value:
-            result = await executor.run_gallery_scrape()
-        elif strategy == ScrapeStrategy.SITEMAP.value:
-            result = await executor.run_sitemap_scrape()
-        else:
-            raise Exception(f"Invalid scrape strategy: {strategy}")
-
-        return result
+        return await executor.run_scraper()
