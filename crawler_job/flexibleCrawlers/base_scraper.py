@@ -34,6 +34,7 @@ from crawler_job.models.pydantic_models import (
     GalleryExtractionConfig,
     LoginConfig,
     SitemapExtractionConfig,
+    StrategyConfig,
     WebsiteConfig,
     WebsiteScrapeConfigJson,
 )
@@ -60,10 +61,12 @@ class BaseWebsiteScraper(ABC):
         notification_service: Optional[NotificationService] = None,
     ):
         self.website_config: WebsiteScrapeConfigJson = config
+        self.website_info: WebsiteConfig = self.website_config.website_info
         self.notification_service = notification_service
         self.logger = logger
 
         self.login_config: LoginConfig = self.website_config.strategy_config.login_config  # type: ignore
+        self.strategy_config: StrategyConfig = self.website_config.strategy_config
 
         self.detail_page_extraction_config: DetailPageExtractionConfig = (
             self.website_config.strategy_config.detail_page_extraction_config
@@ -197,11 +200,11 @@ class BaseWebsiteScraper(ABC):
             bool: True if login was successful or not required, False if login failed.
         """
         if self.navigated_to_gallery and not self.login_config.login_required:
-            logger.warn(f"Skipping login for {self.website_config.website_name}")
+            logger.warn(f"Skipping login for {self.website_info.name}")
             return True
 
         try:
-            base_url = self.website_config.base_url
+            base_url = self.website_info.base_url
             full_login_url = ""
 
             if self.login_config.login_url:
@@ -211,12 +214,10 @@ class BaseWebsiteScraper(ABC):
                 full_login_url = f"{base_url}{login_url_path}"
 
             logger.info(
-                f"Navigating to login page of {self.website_config.website_name} and logging in."
+                f"Navigating to login page of {self.website_info.name} and logging in."
             )
-            email = os.getenv(self.website_config.website_identifier.upper() + "_EMAIL")
-            password = os.getenv(
-                self.website_config.website_identifier.upper() + "_PASSWORD"
-            )
+            email = os.getenv(self.website_info.name.upper() + "_EMAIL")
+            password = os.getenv(self.website_info.name.upper() + "_PASSWORD")
 
             js_code = [
                 f"document.querySelector('{self.login_config.username_selector}').value = '{email}';",
@@ -255,7 +256,7 @@ class BaseWebsiteScraper(ABC):
                     in login_result.error_message
                 ):
                     logger.info(
-                        f"Navigation in progress detected. Waiting for page to stabilize for {self.website_config.website_name}."
+                        f"Navigation in progress detected. Waiting for page to stabilize for {self.website_info.name}."
                     )
 
                     # Try again with a different wait strategy
@@ -274,7 +275,7 @@ class BaseWebsiteScraper(ABC):
 
                     if stabilize_result.success:
                         logger.info(
-                            f"Page stabilized successfully for {self.website_config.website_name}"
+                            f"Page stabilized successfully for {self.website_info.name}"
                         )
                         self.current_url = stabilize_result.url
                         return True
@@ -305,7 +306,7 @@ class BaseWebsiteScraper(ABC):
             )
 
         logger.info("Navigating to and extracting sitemap...")
-        url = f"{self.website_config.base_url}{self.website_config.strategy_config.navigation_config.sitemap}"
+        url = f"{self.website_info.base_url}{self.strategy_config.navigation_config.sitemap}"
 
         result: CrawlResult = await self.crawler.arun(
             url,
@@ -315,7 +316,7 @@ class BaseWebsiteScraper(ABC):
         if not result.success:
             raise Exception(f"Failed to navigate to sitemap: {result.error_message}")
 
-        full_sitemap_url = f"{self.website_config.base_url}{self.website_config.strategy_config.navigation_config.sitemap}"
+        full_sitemap_url = f"{self.website_info.base_url}{self.strategy_config.navigation_config.sitemap}"
 
         if result.redirected_url == full_sitemap_url or result.url == full_sitemap_url:
             self.navigated_to_sitemap = True
@@ -334,7 +335,7 @@ class BaseWebsiteScraper(ABC):
             return
 
         logger.info("Navigating to gallery...")
-        url = f"{self.website_config.base_url}{self.website_config.strategy_config.navigation_config.gallery}"
+        url = f"{self.website_info.base_url}{self.strategy_config.navigation_config.gallery}"
 
         run_config = self.get_run_config()
         result: CrawlResult = await self.crawler.arun(
@@ -343,7 +344,7 @@ class BaseWebsiteScraper(ABC):
         )  # type: ignore
 
         full_login_url = (
-            f"{self.website_config.base_url}{self.login_config.login_url_path or ''}"
+            f"{self.website_info.base_url}{self.login_config.login_url_path or ''}"
         )
 
         if result and result.success and result.redirected_url != full_login_url:
@@ -523,9 +524,7 @@ class BaseWebsiteScraper(ABC):
         if not self.navigated_to_gallery:
             raise Exception("Not navigated to gallery")
 
-        logger.info(
-            f"Extracting property listings of {self.website_config.website_name} step..."
-        )
+        logger.info(f"Extracting property listings of {self.website_info.name} step...")
         gallery_extraction_config = (
             self.website_config.strategy_config.gallery_extraction_config
         )
@@ -533,7 +532,7 @@ class BaseWebsiteScraper(ABC):
 
         assert gallery_extraction_config.correct_urls_paths is not None
         correct_urls = [
-            f"{self.website_config.base_url}{path}"
+            f"{self.website_info.base_url}{path}"
             for path in gallery_extraction_config.correct_urls_paths
         ]
 
@@ -636,7 +635,7 @@ class BaseWebsiteScraper(ABC):
         urls = []
         for house in houses:
             if house.detail_url:
-                url = f"{self.website_config.base_url}{house.detail_url}"
+                url = f"{self.website_info.base_url}{house.detail_url}"
                 urls.append(url)
 
         logger.info(f"Starting fetch for {len(urls)} properties...")
@@ -737,7 +736,7 @@ class BaseWebsiteScraper(ABC):
             logger.info("Cookies already accepted.")
             return self.accepted_cookies
 
-        logger.info(f"Accepting cookies for {self.website_config.website_name}...")
+        logger.info(f"Accepting cookies for {self.website_info.name}...")
 
         js = f"""
             (async () => {{
@@ -783,14 +782,3 @@ class BaseWebsiteScraper(ABC):
             logger.info("Cookie popup not found or already accepted")
             self.accepted_cookies = True
             return self.accepted_cookies
-
-    async def run_async(self, strategy: ScrapeStrategy) -> Dict[str, Any]:
-        from crawler_job.helpers.strategy_executor import StrategyExecutor
-
-        executor = StrategyExecutor(self)
-
-        logger.info(
-            f"Choosing strategy {strategy} for {self.website_config.website_name}"
-        )
-
-        return await executor.run_scraper()
