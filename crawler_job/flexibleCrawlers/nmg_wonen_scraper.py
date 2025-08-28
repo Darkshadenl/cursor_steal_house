@@ -27,7 +27,7 @@ class NmgWonenScraper(BaseWebsiteScraper):
         notification_service: Optional[NotificationService] = None,
     ):
         super().__init__(config, session_id, crawler, notification_service)
-        logger.info("Nmg Wonen scraper initialized...")
+        logger.debug("Nmg Wonen scraper initialized...")
 
     def get_run_config(self) -> CrawlerRunConfig:
         """Overrides the base run config for NMG Wonen specific actions."""
