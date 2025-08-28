@@ -4,6 +4,11 @@ from sqlalchemy import (
     String,
     Boolean,
     Text,
+    DateTime,
+    ForeignKey,
+    JSON,
+    func,
+    TIMESTAMP,
 )
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -96,7 +101,43 @@ class DbHouse(Base):
         return False
 
 
+class DbWebsite(Base):
+    """
+    SQLAlchemy model for website configurations.
+    """
+
+    __tablename__ = "websites"
+    __table_args__ = {"schema": "steal_house"}
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False, unique=True)
+    base_url = Column(String(255), nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(TIMESTAMP, default=func.now())
+    updated_at = Column(TIMESTAMP, default=func.now(), onupdate=func.now())
+
+
+class DbWebsiteScrapeConfig(Base):
+    """SQLAlchemy model for storing website scraping configurations in JSON format."""
+
+    __tablename__ = "website_scrape_configs"
+    __table_args__ = {"schema": "steal_house"}
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    website_identifier = Column(
+        Integer, ForeignKey("steal_house.websites.id"), unique=True, nullable=False
+    )
+    config_json = Column(JSON, nullable=False)
+    version = Column(Integer, nullable=True, default=1)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(
+        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
 __all__ = [
     "DbHouse",
+    "DbWebsite",
+    "DbWebsiteScrapeConfig",
     "Base",
 ]

@@ -17,7 +17,7 @@ from crawl4ai import (
 from crawler_job.models.house_models import FetchedPage, House
 from crawler_job.notifications.notification_service import NotificationService
 
-from ..models.db_config_models import WebsiteConfig
+from ..models.pydantic_models import WebsiteScrapeConfigJson
 from .base_scraper import BaseWebsiteScraper
 from crawler_job.services.logger_service import setup_logger
 from crawler_job.helpers.decorators import requires_crawler_initialized
@@ -31,7 +31,7 @@ class VestedaScraper(BaseWebsiteScraper):
 
     def __init__(
         self,
-        config: WebsiteConfig,
+        config: WebsiteScrapeConfigJson,
         session_id: str,
         crawler: AsyncWebCrawler,
         notification_service: Optional[NotificationService] = None,

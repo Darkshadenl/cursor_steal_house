@@ -1,12 +1,12 @@
-from .house_models import House, FetchedPage
-from .db_config_models import WebsiteConfig
-from .db_models import DbHouse
-from .db_config_models import DbWebsiteScrapeConfig
+from .pydantic_models import WebsiteScrapeConfigJson, House, FetchedPage, WebsiteConfig
+from .db_models import DbHouse, DbWebsite, DbWebsiteScrapeConfig
 
 __all__ = [
     "House",
     "FetchedPage",
+    "WebsiteScrapeConfigJson",
     "WebsiteConfig",
     "DbHouse",
+    "DbWebsite",
     "DbWebsiteScrapeConfig",
 ]

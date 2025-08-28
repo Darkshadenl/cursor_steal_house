@@ -27,14 +27,14 @@ from crawl4ai import (
     RateLimiter,
     SemaphoreDispatcher,
 )
-from crawler_job.models.db_config_models import (
+from crawler_job.models.pydantic_models import (
     CookiesConfig,
     DetailPageExtractionConfig,
     FilteringConfig,
     GalleryExtractionConfig,
     LoginConfig,
     SitemapExtractionConfig,
-    WebsiteConfig,
+    WebsiteScrapeConfigJson,
 )
 from crawler_job.models.house_models import House, FetchedPage
 from crawler_job.notifications.notification_service import NotificationService
@@ -53,7 +53,7 @@ class BaseWebsiteScraper(ABC):
 
     def __init__(
         self,
-        config: WebsiteConfig,
+        config: WebsiteScrapeConfigJson,
         session_id: str,
         crawler: AsyncWebCrawler,
         notification_service: Optional[NotificationService] = None,
@@ -65,7 +65,7 @@ class BaseWebsiteScraper(ABC):
             config: The validated website configuration.
             notification_service: The notification service to use.
         """
-        self.website_config: WebsiteConfig = config
+        self.website_config: WebsiteScrapeConfigJson = config
         self.notification_service = notification_service
         self.logger = logger
 

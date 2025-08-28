@@ -36,7 +36,7 @@ def parse_args():
         "--websites",
         type=parse_websites,
         help="Comma-separated list of websites to crawl (e.g., 'Vesteda,Sleutel')",
-        default=os.getenv("CRAWLER_WEBSITES", "Vesteda"),
+        default=os.getenv("CRAWLER_WEBSITES", ""),
     )
     parser.add_argument(
         "--notifications-enabled",
