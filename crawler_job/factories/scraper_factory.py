@@ -47,7 +47,7 @@ class ScraperFactory:
                 website_name.lower(), BaseWebsiteScraper
             )
             self.logger.info(
-                f"Using scraper class {scraper_class.__name__} for identifier '{website_name}' with JSON config."
+                f"Using scraper class {scraper_class.__name__} for identifier '{website_config.website_name}' with JSON config."
             )
             return scraper_class(
                 config=website_config,

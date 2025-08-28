@@ -14,7 +14,7 @@ class WebsiteConfigValidator:
         if not self.config:
             raise Exception("Website configuration not provided")
 
-        if not self.config.base_url:
+        if not self.config.website_info.base_url:
             raise Exception("Base URL not provided in website configuration")
 
         if not self.config.strategy_config:

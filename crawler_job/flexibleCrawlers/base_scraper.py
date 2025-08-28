@@ -58,13 +58,6 @@ class BaseWebsiteScraper(ABC):
         crawler: AsyncWebCrawler,
         notification_service: Optional[NotificationService] = None,
     ):
-        """Initialize the scraper.
-
-        Args:
-            crawler: The crawl4ai crawler instance to use.
-            config: The validated website configuration.
-            notification_service: The notification service to use.
-        """
         self.website_config: WebsiteScrapeConfigJson = config
         self.notification_service = notification_service
         self.logger = logger
