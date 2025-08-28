@@ -25,10 +25,26 @@ def upgrade() -> None:
     # These tables no longer exist in the database, so we just drop them
     # to keep the migration history consistent
     # Drop in reverse dependency order (child tables first)
-    op.drop_table("field_mappings", schema="steal_house")
-    op.drop_table("extraction_configs", schema="steal_house")
-    op.drop_table("navigation_configs", schema="steal_house")
-    op.drop_table("login_configs", schema="steal_house")
+
+    # Get connection and inspector to check if tables exist
+    connection = op.get_bind()
+    inspector = sa.inspect(connection)
+
+    # Check and drop field_mappings if it exists
+    if inspector.has_table("field_mappings", schema="steal_house"):
+        op.drop_table("field_mappings", schema="steal_house")
+
+    # Check and drop extraction_configs if it exists
+    if inspector.has_table("extraction_configs", schema="steal_house"):
+        op.drop_table("extraction_configs", schema="steal_house")
+
+    # Check and drop navigation_configs if it exists
+    if inspector.has_table("navigation_configs", schema="steal_house"):
+        op.drop_table("navigation_configs", schema="steal_house")
+
+    # Check and drop login_configs if it exists
+    if inspector.has_table("login_configs", schema="steal_house"):
+        op.drop_table("login_configs", schema="steal_house")
 
 
 def downgrade() -> None:

@@ -131,9 +131,7 @@ class WebsiteScrapeConfigJson(BaseModel):
     Pydantic model for the complete website configuration.
     """
 
-    website_identifier: str
     website_name: str
-    base_url: str
     scrape_strategy: str = "gallery" or "sitemap"
     strategy_config: StrategyConfig
     session_id: str
