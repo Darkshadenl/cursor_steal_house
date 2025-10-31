@@ -403,12 +403,6 @@ class BaseWebsiteScraper(ABC):
         logger.info("Applied filters")
 
     async def extract_sitemap_async(self, sitemap_html: str) -> List[House]:
-        """
-        Fetch the sitemap page using an HTTP request, apply the configured regex, and return a list of House objects.
-
-        Returns:
-            List[House]: List of extracted House objects from the sitemap.
-        """
         regex = self.sitemap_extraction_config.regex
         schema = self.sitemap_extraction_config.schema
         llm_instructions = self.sitemap_extraction_config.extra_llm_instructions
@@ -416,10 +410,9 @@ class BaseWebsiteScraper(ABC):
         assert regex is not None
         assert schema is not None
 
-        logger.info(f"Extracting sitemap with regex: {regex}")
-
+        logger.info(f"Extracting sitemap")
         urls = re.findall(regex, sitemap_html)
-        logger.info(
+        logger.debug(
             "Done with regex. Let's check if it already exists in the database using the urls!"
         )
 
@@ -475,15 +468,12 @@ class BaseWebsiteScraper(ABC):
 
                 data = json.loads(result.extracted_content)
                 data_str = json.dumps(data, indent=2, ensure_ascii=False)
-                logger.info(
-                    f"Extracting data from the crawler using LLM for {result.url}..."
-                )
-                extra_instructions = f"Determine for yourself if the property is a parking spot and fill in is_parkingspot based on that. \n The detail url is: {result.url}\n {llm_instructions}"
+                logger.info(f"Extracting data for {result.url}...")
+
                 extracted_data: Optional[Dict[str, Any]] = await llm_service.extract(
                     data_str,
                     schema,
-                    LLMProvider.GEMINI,
-                    extra_instructions=extra_instructions,
+                    extra_instructions=llm_instructions,
                 )
                 logger.info(
                     f"Done extracting data from the crawler using LLM for {result.url}."
