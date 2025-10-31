@@ -7,6 +7,8 @@
 # echo "Contents of $PLAYWRIGHT_BROWSERS_PATH:"
 # ls -lR "$PLAYWRIGHT_BROWSERS_PATH" || echo "Browser path not found or empty."
 
+crawl4ai-doctor
+
 echo "Starting crawler..."
 
 python -m crawler_job.main --notifications-enabled

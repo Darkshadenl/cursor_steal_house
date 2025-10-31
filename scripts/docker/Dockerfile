@@ -45,7 +45,7 @@ USER appuser
 
 # Create .crawl4ai directory and chromium.path for crawl4ai
 RUN mkdir -p /home/appuser/.crawl4ai \
-    && printf "/home/appuser/.cache/ms-playwright/chromium-1179/chrome-linux/chrome" > /home/appuser/.crawl4ai/chromium.path \
+    && printf "/home/appuser/.cache/ms-playwright/chromium-1187/chrome-linux/chrome" > /home/appuser/.crawl4ai/chromium.path \
     && chmod 444 /home/appuser/.crawl4ai/chromium.path
 
 # Default command to run the start script

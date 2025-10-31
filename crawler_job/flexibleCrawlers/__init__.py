@@ -1,6 +1,11 @@
+from .base_scraper import BaseWebsiteScraper
+from .vesteda_scraper import VestedaScraper
+from .huis_sleutel_scraper import HuisSleutelScraper
+from .nmg_wonen_scraper import NmgWonenScraper
+
 __all__ = [
-    "vesteda_scraper",
-    "base_scraper",
-    "huis_sleutel_scraper",
-    "nmg_wonen_scraper",
+    "BaseWebsiteScraper",
+    "VestedaScraper",
+    "HuisSleutelScraper",
+    "NmgWonenScraper",
 ]
