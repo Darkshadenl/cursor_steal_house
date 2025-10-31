@@ -213,11 +213,13 @@ class HouseService:
 
         for house in houses:
             existing_house = await repo.get_by_address(house.address, house.city)
-            if existing_house:
-                if existing_house.status != house.status:
-                    old_status = existing_house.status
-                    existing_house.status = house.status
-                    await repo.update(existing_house.id, house)
+            if existing_house is not None:
+                existing_status_value: str = str(existing_house.status)  # type: ignore
+                new_status_value: str = str(house.status)
+                if existing_status_value != new_status_value:
+                    old_status: str = existing_status_value
+                    existing_house.status = house.status  # type: ignore
+                    await repo.update(existing_house.id, house)  # type: ignore
                     # Store house and its old status for notification
                     house_obj = await db_houses_to_pydantic_async([existing_house])
                     if house_obj:

@@ -21,7 +21,7 @@ class LLMService:
         self.api_key = os.getenv("OPENROUTER_API_KEY")
         self.provider = provider
         if provider == LLMProvider.GEMINI:
-            self.model = "openrouter/gemini/gemini-2.5-flash"
+            self.model = "openrouter/google/gemini-2.5-flash"
         elif provider == LLMProvider.DEEPSEEK:
             self.model = "openrouter/deepseek/deepseek-v3.1-terminus"
         elif provider == LLMProvider.GROK:
@@ -87,20 +87,12 @@ Rules:
         self,
         markdown: str,
         schema: dict[str, Any],
-        provider: LLMProvider,
         extra_instructions: Optional[str] = None,
     ) -> Optional[dict[str, Any]]:
         """Extract structured data from markdown using specified LLM provider"""
         try:
-            if provider == LLMProvider.DEEPSEEK:
-                model = "openrouter/deepseek/deepseek-chat"
-            elif provider == LLMProvider.GEMINI:
-                model = "openrouter/gemini/gemini-2.5"
-            elif provider == LLMProvider.GROK:
-                model = "openrouter/x-ai/grok-4-fast"
-
             response = await acompletion(
-                model=model,
+                model=self.model,
                 messages=[
                     {
                         "role": "system",
@@ -134,7 +126,7 @@ Rules:
 
             return self.remove_markdown_block_syntax(content)  # type: ignore
         except Exception as e:
-            print(f"Error in {provider.value} extraction: {str(e)}")
+            print(f"Error in {self.model} extraction: {str(e)}")
             return None
 
 
