@@ -26,8 +26,6 @@ class LLMService:
             self.model = "openrouter/deepseek/deepseek-v3.1-terminus"
         elif provider == LLMProvider.GROK:
             self.model = "openrouter/x-ai/grok-4-fast"
-        else:
-            raise ValueError(f"Invalid provider: {provider}")
 
     def remove_markdown_block_syntax(self, markdown: str) -> str:
         # First remove any markdown block syntax (```json, ```, etc)
@@ -89,7 +87,6 @@ Rules:
         schema: dict[str, Any],
         extra_instructions: Optional[str] = None,
     ) -> Optional[dict[str, Any]]:
-        """Extract structured data from markdown using specified LLM provider"""
         try:
             response = await acompletion(
                 model=self.model,

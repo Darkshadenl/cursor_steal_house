@@ -1,4 +1,4 @@
-FROM crawl4ai:arm64
+FROM crawl4ai-base:arm64
 
 # Set working directory
 WORKDIR /app
