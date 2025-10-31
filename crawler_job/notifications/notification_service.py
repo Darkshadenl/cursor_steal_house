@@ -57,7 +57,7 @@ class NotificationService:
             channel_names: List of channel names to initialize
             email_recipients_file: Path to file containing email recipients (one per line)
         """
-        llm_service = LLMService(provider=LLMProvider.GEMINI)
+        llm_service = LLMService()
 
         for channel_name in channel_names:
             try:

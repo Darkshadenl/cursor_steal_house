@@ -174,7 +174,10 @@ class EmailNotificationChannel(AbstractNotificationChannel):
                 house, personal_metrics=metrics
             )
 
-            # Send email
+            if analysis == "":
+                logger.warning(f"No analysis generated for {email}")
+                return False
+
             success = await asyncio.to_thread(
                 self._send_email_sync, subject, analysis, email
             )
