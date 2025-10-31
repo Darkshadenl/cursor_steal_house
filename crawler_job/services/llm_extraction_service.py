@@ -14,16 +14,6 @@ class LlmExtractionService:
     async def execute_llm_extraction(
         self, fetched_pages: List[FetchedPage], provider: LLMProvider
     ) -> List[House]:
-        """
-        Extract structured data from markdown using LLM
-
-        Args:
-            fetched_pages: List of fetched detail pages
-            provider: LLM provider to use
-
-        Returns:
-            List[House]: List of House objects with extracted data
-        """
         schema = House.model_json_schema()
         houses: List[House] = []
 
@@ -60,6 +50,7 @@ class LlmExtractionService:
                     continue
 
                 house = House.from_dict(json_data)
+                house.detail_url = page.url
                 houses.append(house)
                 logger.info(f"Successfully extracted data for {page.url}")
             except Exception as e:

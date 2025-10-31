@@ -122,17 +122,6 @@ class BaseWebsiteScraper(ABC):
     def get_login_run_config(
         self, full_login_url: str, js_code: list[str], wait_for_condition: str
     ) -> CrawlerRunConfig:
-        """
-        Returns a CrawlerRunConfig for the login action, allowing easy overriding.
-
-        Args:
-            full_login_url (str): The full URL for the login page.
-            js_code (list[str]): The JavaScript code to execute for login.
-            wait_for_condition (str): The condition to wait for after login.
-
-        Returns:
-            CrawlerRunConfig: The configuration for the login action.
-        """
         return CrawlerConfigFactory.create_login_run_config(
             self.get_run_config(), full_login_url, js_code, wait_for_condition
         )
@@ -194,13 +183,8 @@ class BaseWebsiteScraper(ABC):
     @requires_cookies_accepted
     @requires_login_config
     async def login_async(self) -> bool:
-        """Perform login if login configuration is provided.
-
-        Returns:
-            bool: True if login was successful or not required, False if login failed.
-        """
         if self.navigated_to_gallery and not self.login_config.login_required:
-            logger.warn(f"Skipping login for {self.website_info.name}")
+            logger.warning(f"Skipping login for {self.website_info.name}")
             return True
 
         try:
@@ -225,7 +209,6 @@ class BaseWebsiteScraper(ABC):
                 f"document.querySelector('{self.login_config.submit_selector}').click();",
             ]
 
-            # Configure wait condition based on login config
             wait_for_condition = None
             if self.login_config.success_indicator_selector:
                 wait_for_condition = (
@@ -437,7 +420,7 @@ class BaseWebsiteScraper(ABC):
 
         urls = re.findall(regex, sitemap_html)
         logger.info(
-            "Done with regex. Let's check if it already exists in the database!"
+            "Done with regex. Let's check if it already exists in the database using the urls!"
         )
 
         async with HouseService(

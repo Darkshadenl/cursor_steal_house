@@ -153,6 +153,7 @@ async def run_crawler_async(
                                 "updated_houses_count": 0,
                             }
                         )
+            results.extend(all_results)
 
     except Exception as e:
         logger.error(f"Error starting crawler: {str(e)}")
@@ -163,7 +164,7 @@ async def run_crawler_async(
     successful_results = [r for r in results if r and r.get("success")]
     success = len(successful_results) == len(websites)
 
-    if results:
+    if success:
         total_houses = sum(r.get("total_houses_count", 0) for r in results if r)
         new_houses = sum(r.get("new_houses_count", 0) for r in results if r)
         updated_houses = sum(r.get("updated_houses_count", 0) for r in results if r)

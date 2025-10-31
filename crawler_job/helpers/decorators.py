@@ -18,7 +18,7 @@ def requires_cookies_accepted(func):
     @functools.wraps(func)
     async def wrapper(self, *args, **kwargs):
         if not self.accepted_cookies:
-            await self._accept_cookies(self.current_url or self.website_config.base_url)
+            await self._accept_cookies(self.current_url or self.website_info.base_url)
             self.accepted_cookies = True
         return await func(self, *args, **kwargs)
 
