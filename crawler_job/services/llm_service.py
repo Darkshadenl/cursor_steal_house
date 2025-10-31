@@ -19,7 +19,7 @@ class LLMProvider(Enum):
 class LLMService:
     def __init__(self, provider: LLMProvider = LLMProvider.GROK):
         self.api_key = os.getenv("OPENROUTER_API_KEY")
-
+        self.provider = provider
         if provider == LLMProvider.GEMINI:
             self.model = "openrouter/gemini/gemini-2.5-flash"
         elif provider == LLMProvider.DEEPSEEK:
@@ -30,7 +30,6 @@ class LLMService:
             raise ValueError(f"Invalid provider: {provider}")
 
     def remove_markdown_block_syntax(self, markdown: str) -> str:
-        """Remove markdown block syntax + newlines from markdown string"""
         # First remove any markdown block syntax (```json, ```, etc)
         markdown = re.sub(r"^```.*\s*", "", markdown, flags=re.MULTILINE)
         # Then remove any remaining newlines
@@ -39,8 +38,6 @@ class LLMService:
     async def analyse_house(
         self, house: House, personal_metrics: Optional[str] = None
     ) -> str:
-        """Analyse a house using the LLM"""
-
         house_readable_string = house.to_readable_string()
 
         prompt = prompt_template.format(
@@ -74,15 +71,12 @@ Rules:
                 ],
                 api_key=self.api_key,
                 temperature=0.1,
-                reasoning_effort=(
-                    "low" if self.model == "gemini/gemini-2.5-flash" else None
-                ),
             )
 
-            content = response.choices[0].message.content
+            content = response.choices[0].message.content  # type: ignore
 
             if content == "null" or content is None:
-                return None
+                return ""
 
             return self.remove_markdown_block_syntax(content)
         except Exception as e:
@@ -104,8 +98,6 @@ Rules:
                 model = "openrouter/gemini/gemini-2.5"
             elif provider == LLMProvider.GROK:
                 model = "openrouter/x-ai/grok-4-fast"
-
-            api_key = "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"
 
             response = await acompletion(
                 model=model,
@@ -130,7 +122,7 @@ Rules:
                     },
                     {"role": "user", "content": markdown},
                 ],
-                api_key=api_key,
+                api_key=self.api_key,
                 temperature=0.1,
                 response_format=schema,
             )
