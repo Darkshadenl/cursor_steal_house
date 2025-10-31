@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 from litellm import acompletion
 import os
 from dotenv import load_dotenv
@@ -7,25 +7,27 @@ from enum import Enum
 
 from crawler_job.models.house_models import House
 
-load_dotenv()
+_ = load_dotenv()
 
 
 class LLMProvider(Enum):
     DEEPSEEK = "deepseek"
     GEMINI = "gemini"
+    GROK = "grok"
 
 
 class LLMService:
-    def __init__(self, provider: LLMProvider = LLMProvider.DEEPSEEK):
-        self.deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
-        self.google_api_key = os.getenv("GOOGLE_API_KEY")
-
-        self.model = "deepseek/deepseek-chat"
-        self.api_key = self.deepseek_api_key
+    def __init__(self, provider: LLMProvider = LLMProvider.GROK):
+        self.api_key = os.getenv("OPENROUTER_API_KEY")
 
         if provider == LLMProvider.GEMINI:
-            self.model = "gemini/gemini-2.5-flash"
-            self.api_key = self.google_api_key
+            self.model = "openrouter/gemini/gemini-2.5-flash"
+        elif provider == LLMProvider.DEEPSEEK:
+            self.model = "openrouter/deepseek/deepseek-v3.1-terminus"
+        elif provider == LLMProvider.GROK:
+            self.model = "openrouter/x-ai/grok-4-fast"
+        else:
+            raise ValueError(f"Invalid provider: {provider}")
 
     def remove_markdown_block_syntax(self, markdown: str) -> str:
         """Remove markdown block syntax + newlines from markdown string"""
@@ -77,31 +79,33 @@ Rules:
                 ),
             )
 
-            content = response.choices[0].message.content  # type: ignore
+            content = response.choices[0].message.content
 
-            if content == "null":
-                return None  # type: ignore
+            if content == "null" or content is None:
+                return None
 
-            return self.remove_markdown_block_syntax(content)  # type: ignore
+            return self.remove_markdown_block_syntax(content)
         except Exception as e:
             print(f"Error in {self.model} extraction: {str(e)}")
-            return None  # type: ignore
+            return None  # pyright: ignore[reportReturnType]
 
     async def extract(
         self,
         markdown: str,
-        schema: Dict[str, Any],
+        schema: dict[str, Any],
         provider: LLMProvider,
         extra_instructions: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """Extract structured data from markdown using specified LLM provider"""
         try:
             if provider == LLMProvider.DEEPSEEK:
-                model = "deepseek/deepseek-chat"
-                api_key = self.deepseek_api_key
+                model = "openrouter/deepseek/deepseek-chat"
             elif provider == LLMProvider.GEMINI:
-                model = "gemini/gemini-2.0-flash-001"
-                api_key = self.google_api_key
+                model = "openrouter/gemini/gemini-2.5"
+            elif provider == LLMProvider.GROK:
+                model = "openrouter/x-ai/grok-4-fast"
+
+            api_key = "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"
 
             response = await acompletion(
                 model=model,

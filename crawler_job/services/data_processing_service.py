@@ -12,16 +12,20 @@ class DataProcessingService:
         self.notification_service = notification_service
 
     async def check_if_houses_exist(self, houses: List[House]) -> List[House]:
-        async with HouseService(
-            notification_service=self.notification_service
-        ) as house_service:
-            new_houses = await house_service.identify_new_houses_async(houses)
+        try:
+            async with HouseService(
+                notification_service=self.notification_service
+            ) as house_service:
+                new_houses = await house_service.identify_new_houses_async(houses)
 
-            if not new_houses:
-                return []
+                if not new_houses:
+                    return []
 
-            logger.info(f"Fetching details for {len(new_houses)} new houses...")
-            return new_houses
+                logger.info(f"Fetching details for {len(new_houses)} new houses...")
+                return new_houses
+        except Exception as e:
+            logger.error(f"Error checking if houses exist: {e}")
+            return []
 
     @staticmethod
     def merge_detailed_houses(

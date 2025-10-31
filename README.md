@@ -27,21 +27,30 @@ The system consists of:
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.13+ (managed via Conda)
 - Node.js 16+
 - Docker and Docker Compose
 - Git
+- Conda (Miniconda or Anaconda)
 
 ### Backend Setup
 
-1. **Create and activate a virtual environment**:
+1. **Create and activate a Conda environment**:
+   ```bash
+   conda env create -f environment.yml
+   conda activate steal_house
+   ```
+
+   Or if the environment already exists:
+   ```bash
+   conda env update -f environment.yml --prune
+   conda activate steal_house
+   ```
+
+2. **Alternative: Using pip (if not using Conda)**:
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-2. **Install dependencies**:
-   ```bash
    pip install -r requirements.txt
    ```
 

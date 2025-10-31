@@ -68,7 +68,7 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    websites: List[str] = args.websites
+    websites: list[str] = args.websites
     test_notifications_only: bool = args.test_notifications_only
     notifications_enabled: bool = args.notifications_enabled
     debug_mode: bool = args.debug_mode

@@ -58,7 +58,7 @@ class NmgWonenScraper(BaseWebsiteScraper):
         if not self.crawler:
             raise Exception("Crawler not initialized")
 
-        url = f"{self.website_config.base_url}/huur"
+        url = f"{self.website_info.base_url}/huur"
         config = self.get_run_config()
 
         result: CrawlResult = await self.crawler.arun(url, config=config)  # type: ignore
@@ -169,23 +169,21 @@ class NmgWonenScraper(BaseWebsiteScraper):
         if not self.login_config or (
             self.navigated_to_gallery and not self.login_config.login_required
         ):
-            logger.warning(f"Skipping login for {self.website_config.website_name}")
+            logger.warning(f"Skipping login for {self.website_info.name}")
             return True
 
         try:
-            base_url = self.website_config.base_url
+            base_url = self.website_info.base_url
             full_login_url = (
                 self.login_config.login_url
                 or f"{base_url}{self.login_config.login_url_path}"
             )
 
             logger.info(
-                f"Navigating to login page of {self.website_config.website_name} and logging in."
+                f"Navigating to login page of {self.website_info.name} and logging in."
             )
-            email = os.getenv(f"{self.website_config.website_identifier.upper()}_EMAIL")
-            password = os.getenv(
-                f"{self.website_config.website_identifier.upper()}_PASSWORD"
-            )
+            email = os.getenv(f"{self.website_info.name.upper()}_EMAIL")
+            password = os.getenv(f"{self.website_info.name.upper()}_PASSWORD")
 
             js_code = [
                 f"document.querySelector('{self.login_config.username_selector}').value = '{email}';",

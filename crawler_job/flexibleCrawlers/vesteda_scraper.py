@@ -115,7 +115,7 @@ class VestedaScraper(BaseWebsiteScraper):
         assert gallery_extraction_config.correct_urls_paths is not None
 
         correct_urls = [
-            f"{self.website_config.base_url}{path}"
+            f"{self.website_info.base_url}{path}"
             for path in gallery_extraction_config.correct_urls_paths
         ]
 
@@ -241,7 +241,7 @@ class VestedaScraper(BaseWebsiteScraper):
         urls = []
         for house in houses:
             if house.detail_url:
-                url = f"{self.website_config.base_url}{house.detail_url}"
+                url = f"{self.website_info.base_url}{house.detail_url}"
                 urls.append(url)
 
         logger.info(f"Starting fetch for {len(urls)} properties...")
