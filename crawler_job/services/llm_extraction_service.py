@@ -12,7 +12,7 @@ class LlmExtractionService:
         self.llm_service = LLMService()
 
     async def execute_llm_extraction(
-        self, fetched_pages: List[FetchedPage], provider: LLMProvider
+        self, fetched_pages: List[FetchedPage]
     ) -> List[House]:
         schema = House.model_json_schema()
         houses: List[House] = []
@@ -29,7 +29,7 @@ class LlmExtractionService:
 
             try:
                 extracted_data: Optional[Dict[str, Any]] = (
-                    await self.llm_service.extract(page.markdown, schema, provider)
+                    await self.llm_service.extract(page.markdown, schema)
                 )
 
                 if extracted_data is None or len(extracted_data) == 0:

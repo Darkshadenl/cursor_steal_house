@@ -49,7 +49,7 @@ class StrategyExecutor:
             fetched_pages = await self.scraper.extract_fetched_pages_async(new_houses)
             detailed_houses = (
                 await self.scraper.llm_extraction_service.execute_llm_extraction(
-                    fetched_pages, provider=LLMProvider.GEMINI
+                    fetched_pages
                 )
             )
 
