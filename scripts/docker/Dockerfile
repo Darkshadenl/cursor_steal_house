@@ -29,7 +29,7 @@ ENV PYTHONPATH=/app
 # Environment variable for verbose mode (can be overridden at runtime)
 ENV CRAWLER_VERBOSE=False
 
-ENV PLAYWRIGHT_BROWSERS_PATH=/home/appuser/.cache/ms-playwright
+# ENV PLAYWRIGHT_BROWSERS_PATH=/home/appuser/.cache/ms-playwright
 
 # Create directories for data and logs
 RUN mkdir -p /app/logs \
@@ -44,9 +44,9 @@ RUN chmod +x /app/start.sh
 USER appuser
 
 # Create .crawl4ai directory and chromium.path for crawl4ai
-RUN mkdir -p /home/appuser/.crawl4ai \
-    && printf "/home/appuser/.cache/ms-playwright/chromium-1187/chrome-linux/chrome" > /home/appuser/.crawl4ai/chromium.path \
-    && chmod 444 /home/appuser/.crawl4ai/chromium.path
+# RUN mkdir -p /home/appuser/.crawl4ai \
+#     && printf "/home/appuser/.cache/ms-playwright/chromium-1187/chrome-linux/chrome" > /home/appuser/.crawl4ai/chromium.path \
+#     && chmod 444 /home/appuser/.crawl4ai/chromium.path
 
 # Default command to run the start script
 CMD ["/app/start.sh"]

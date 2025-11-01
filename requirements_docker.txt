@@ -30,7 +30,6 @@ faust-cchardet==2.1.19
 filelock==3.18.0
 frozenlist==1.6.0
 fsspec==2025.5.0
-greenlet==3.2.2
 h11==0.16.0
 h2==4.2.0
 hpack==4.1.0
@@ -62,7 +61,6 @@ openai==1.82.0
 packaging==25.0
 pathspec==0.12.1
 pillow==10.4.0
-playwright==1.52.0
 pluggy==1.6.0
 propcache==0.3.1
 psutil==7.0.0
@@ -71,7 +69,6 @@ pycparser==2.22
 pydantic==2.11.4
 pydantic-core==2.33.2
 pydantic-settings==2.9.1
-pyee==13.0.0
 pygments==2.19.1
 pyopenssl==25.1.0
 pyperclip==1.9.0

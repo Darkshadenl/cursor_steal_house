@@ -46,12 +46,24 @@ from crawler_job.services.llm_extraction_service import LlmExtractionService
 from crawler_job.services.llm_service import LLMProvider, LLMService
 from crawler_job.services.logger_service import setup_logger
 from crawler_job.services import config as global_config
+import asyncio
 
 logger = setup_logger(__name__)
 
+_hook_lock = asyncio.Lock()
+
 
 class BaseWebsiteScraper(ABC):
-    """Base class for website scrapers using the hybrid configuration system."""
+    """
+    Base class for website scrapers using the hybrid configuration system.
+
+    Login Verification:
+        The scraper supports flexible login verification through cookies. Configure
+        auth_cookie_names in LoginConfig to enable automatic cookie-based verification.
+
+        To implement custom verification logic, override _create_login_verification_hook_async()
+        in derived classes. See method documentation for examples.
+    """
 
     def __init__(
         self,
@@ -115,8 +127,6 @@ class BaseWebsiteScraper(ABC):
         validator.validate()
 
     def get_run_config(self) -> CrawlerRunConfig:
-        if not self._standard_run_config:
-            raise Exception("Standard run config not initialized")
         return self._standard_run_config.clone()
 
     def get_login_run_config(
@@ -179,6 +189,47 @@ class BaseWebsiteScraper(ABC):
 
         return True
 
+    def _create_login_verification_hook_async(self):
+        if not self.login_config.auth_cookie_names:
+            return None
+
+        cookie_names = self.login_config.auth_cookie_names
+
+        async def verify_login_hook(page, context, url, response, **kwargs):
+            js_checks = []
+            for name in cookie_names:
+                js_checks.append(f"{name}: getCookie('{name}')")
+
+            cookies = await page.evaluate(
+                f"""() => {{
+                const getCookie = (name) => {{
+                    const value = document.cookie
+                        .split('; ')
+                        .find(row => row.startsWith(name + '='))
+                        ?.split('=')[1];
+                    return value && value.length > 0 ? value : null;
+                }};
+                return {{
+                    {', '.join(js_checks)},
+                    all_cookies: document.cookie
+                }};
+            }}"""
+            )
+
+            logger.debug(f"Login verification - Found cookies: {cookies}")
+
+            found_cookies = [name for name in cookie_names if cookies.get(name)]
+            if not found_cookies:
+                raise Exception(
+                    f"Login failed - none of required cookies found: {cookie_names}. "
+                    f"All cookies: {cookies.get('all_cookies')}"
+                )
+
+            logger.debug(f"Login verified - found auth cookies: {found_cookies}")
+            return page
+
+        return verify_login_hook
+
     @requires_crawler_initialized
     @requires_cookies_accepted
     @requires_login_config
@@ -188,14 +239,8 @@ class BaseWebsiteScraper(ABC):
             return True
 
         try:
-            base_url = self.website_info.base_url
-            full_login_url = ""
-
-            if self.login_config.login_url:
-                full_login_url = self.login_config.login_url
-            else:
-                login_url_path = self.login_config.login_url_path
-                full_login_url = f"{base_url}{login_url_path}"
+            full_login_url = self.login_config.login_url
+            assert full_login_url is not None
 
             logger.info(
                 f"Navigating to login page of {self.website_info.name} and logging in."
@@ -209,70 +254,25 @@ class BaseWebsiteScraper(ABC):
                 f"document.querySelector('{self.login_config.submit_selector}').click();",
             ]
 
-            wait_for_condition = None
-            if self.login_config.success_indicator_selector:
-                wait_for_condition = (
-                    f"css:{self.login_config.success_indicator_selector}"
-                )
-            elif self.login_config.expected_url:
-                # Wait for URL change or a reasonable delay
-                wait_for_condition = (
-                    "js:() => window.location.pathname !== '"
-                    + (self.login_config.login_url_path or "")
-                    + "'"
-                )
-            else:
-                wait_for_condition = ""
+            run_config = self.get_login_run_config(full_login_url, js_code, "")
+            verification_hook = self._create_login_verification_hook_async()
 
-            run_config = self.get_login_run_config(
-                full_login_url, js_code, wait_for_condition
-            )
+            async with _hook_lock:
+                if verification_hook:
+                    self.crawler.crawler_strategy.set_hook("after_goto", verification_hook)  # type: ignore
 
-            login_result: CrawlResult = await self.crawler.arun(
-                full_login_url, config=run_config
-            )  # type: ignore
+                try:
+                    login_result: CrawlResult = await self.crawler.arun(
+                        full_login_url, config=run_config
+                    )  # type: ignore
+                finally:
+                    if verification_hook:
+                        self.crawler.crawler_strategy.set_hook("after_goto", None)  # type: ignore
 
             if not login_result.success:
-                if (
-                    login_result.error_message
-                    and "Page.content: Unable to retrieve content because the page is navigating and changing the content"
-                    in login_result.error_message
-                ):
-                    logger.info(
-                        f"Navigation in progress detected. Waiting for page to stabilize for {self.website_info.name}."
-                    )
-
-                    # Try again with a different wait strategy
-                    stabilize_config = CrawlerRunConfig(
-                        session_id=self.session_id,
-                        cache_mode=CacheMode.BYPASS,
-                        js_only=True,
-                        wait_for="domcontentloaded",
-                        page_timeout=15000,
-                        log_console=global_config.debug_mode,
-                    )
-
-                    stabilize_result: CrawlResult = await self.crawler.arun(
-                        self.current_url or full_login_url, config=stabilize_config
-                    )  # type: ignore
-
-                    if stabilize_result.success:
-                        logger.info(
-                            f"Page stabilized successfully for {self.website_info.name}"
-                        )
-                        self.current_url = stabilize_result.url
-                        return True
-                    else:
-                        logger.warning(
-                            f"Page stabilization attempt failed: {stabilize_result.error_message}"
-                        )
-                        return (
-                            True  # Assume login succeeded despite stabilization issues
-                        )
-                else:
-                    raise Exception(
-                        f"Login form submission failed: {login_result.error_message}"
-                    )
+                raise Exception(
+                    f"Login form submission failed: {login_result.error_message}"
+                )
 
             self.current_url = login_result.url
             return True
@@ -326,9 +326,7 @@ class BaseWebsiteScraper(ABC):
             config=run_config,
         )  # type: ignore
 
-        full_login_url = (
-            f"{self.website_info.base_url}{self.login_config.login_url_path or ''}"
-        )
+        full_login_url = f"{self.login_config.login_url or ''}"
 
         if result and result.success and result.redirected_url != full_login_url:
             logger.info(f"Navigating to gallery successful: {result.url}")

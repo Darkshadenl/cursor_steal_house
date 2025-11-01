@@ -40,6 +40,71 @@ class VestedaScraper(BaseWebsiteScraper):
 
         logger.debug("Vesteda scraper initialized...")
 
+    def _create_login_verification_hook_async(self):
+        """
+        Vesteda-specific login verification using localStorage.
+
+        Checks for browsing data in localStorage that contains previous_page (login)
+        and current_page (logged in area) to verify successful login.
+        """
+
+        async def verify_login_hook(page, context, url, response, **kwargs):
+            result = await page.evaluate(
+                """() => {
+                const storageKey = '5da451d1e48514.00659317_bre';
+                const storageData = localStorage.getItem(storageKey);
+                
+                if (!storageData) {
+                    return {
+                        success: false,
+                        error: `localStorage key '${storageKey}' not found`,
+                        allKeys: Object.keys(localStorage)
+                    };
+                }
+                
+                try {
+                    const data = JSON.parse(storageData);
+                    const previousPage = data?.v?.previous_page || '';
+                    const currentPage = data?.v?.current_page || '';
+                    
+                    const isFromLogin = previousPage.includes('/login/');
+                    const isLoggedIn = currentPage.includes('hurenbij.vesteda.com') && 
+                                      !currentPage.includes('/login/');
+                    
+                    return {
+                        success: isFromLogin && isLoggedIn,
+                        previousPage: previousPage,
+                        currentPage: currentPage,
+                        storageData: data
+                    };
+                } catch (e) {
+                    return {
+                        success: false,
+                        error: `Failed to parse localStorage data: ${e.message}`,
+                        rawData: storageData
+                    };
+                }
+            }"""
+            )
+
+            logger.debug(f"Vesteda login verification result: {result}")
+
+            if not result.get("success"):
+                error_msg = result.get("error", "Unknown error")
+                logger.error(f"Vesteda login verification failed: {error_msg}")
+                raise Exception(
+                    f"Vesteda login verification failed: {error_msg}. "
+                    f"Result: {result}"
+                )
+
+            logger.debug(
+                f"Vesteda login verified - previous: {result.get('previousPage')}, "
+                f"current: {result.get('currentPage')}"
+            )
+            return page
+
+        return verify_login_hook
+
     async def _accept_cookies(self, current_url: str) -> bool:
         if not self.cookies_config:
             logger.info("Accepting cookies not required/enabled.")

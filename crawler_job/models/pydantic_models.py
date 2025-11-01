@@ -78,17 +78,16 @@ class LoginConfig(BaseModel):
     Pydantic model for login configuration.
     """
 
-    login_url_path: Optional[str] = None
     login_url: Optional[str] = None
     username_selector: str
     password_selector: str
     submit_selector: str
-    success_check_url_path: Optional[str] = None
-    expected_url_path: Optional[str] = None
+    success_check_url: Optional[str] = None
     expected_url: Optional[str] = None
     success_indicator_selector: Optional[str] = None
     validate_login: bool = True
     login_required: bool = True
+    auth_cookie_names: Optional[List[str]] = None
 
     model_config = ConfigDict(from_attributes=True)
 
