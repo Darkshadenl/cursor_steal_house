@@ -27,6 +27,7 @@ from crawl4ai import (
     RateLimiter,
     SemaphoreDispatcher,
 )
+from crawler_job.helpers.utils import save_screenshot_from_crawl_result
 from crawler_job.models.pydantic_models import (
     CookiesConfig,
     DetailPageExtractionConfig,
@@ -46,24 +47,11 @@ from crawler_job.services.llm_extraction_service import LlmExtractionService
 from crawler_job.services.llm_service import LLMProvider, LLMService
 from crawler_job.services.logger_service import setup_logger
 from crawler_job.services import config as global_config
-import asyncio
 
 logger = setup_logger(__name__)
 
-_hook_lock = asyncio.Lock()
-
 
 class BaseWebsiteScraper(ABC):
-    """
-    Base class for website scrapers using the hybrid configuration system.
-
-    Login Verification:
-        The scraper supports flexible login verification through cookies. Configure
-        auth_cookie_names in LoginConfig to enable automatic cookie-based verification.
-
-        To implement custom verification logic, override _create_login_verification_hook_async()
-        in derived classes. See method documentation for examples.
-    """
 
     def __init__(
         self,
@@ -216,16 +204,20 @@ class BaseWebsiteScraper(ABC):
             }}"""
             )
 
-            logger.debug(f"Login verification - Found cookies: {cookies}")
-
             found_cookies = [name for name in cookie_names if cookies.get(name)]
+
+            logger.debug(
+                f"Login verification for {self.website_info.name} - {found_cookies}"
+            )
             if not found_cookies:
-                raise Exception(
-                    f"Login failed - none of required cookies found: {cookie_names}. "
+                logger.error(
+                    f"Login failed for {self.website_info.name} - none of required cookies found: {cookie_names}. "
                     f"All cookies: {cookies.get('all_cookies')}"
                 )
 
-            logger.debug(f"Login verified - found auth cookies: {found_cookies}")
+            logger.debug(
+                f"Login verified for {self.website_info.name} - found auth cookies: {found_cookies}"
+            )
             return page
 
         return verify_login_hook
@@ -257,22 +249,25 @@ class BaseWebsiteScraper(ABC):
             run_config = self.get_login_run_config(full_login_url, js_code, "")
             verification_hook = self._create_login_verification_hook_async()
 
-            async with _hook_lock:
-                if verification_hook:
-                    self.crawler.crawler_strategy.set_hook("after_goto", verification_hook)  # type: ignore
+            if verification_hook:
+                self.crawler.crawler_strategy.set_hook("before_retrieve_html", verification_hook)  # type: ignore
 
-                try:
-                    login_result: CrawlResult = await self.crawler.arun(
-                        full_login_url, config=run_config
-                    )  # type: ignore
-                finally:
-                    if verification_hook:
-                        self.crawler.crawler_strategy.set_hook("after_goto", None)  # type: ignore
+            try:
+                login_result: CrawlResult = await self.crawler.arun(
+                    full_login_url, config=run_config
+                )  # type: ignore
+
+                save_screenshot_from_crawl_result(
+                    login_result, f"login_{self.website_info.name}"
+                )
+
+            finally:
+                if verification_hook:
+                    self.crawler.crawler_strategy.set_hook("after_goto", None)  # type: ignore
 
             if not login_result.success:
-                raise Exception(
-                    f"Login form submission failed: {login_result.error_message}"
-                )
+                logger.error(f"Login form submission failed...")
+                return False
 
             self.current_url = login_result.url
             return True
@@ -313,8 +308,10 @@ class BaseWebsiteScraper(ABC):
     @requires_crawler_initialized
     @requires_login_config
     async def navigate_to_gallery_async(self, force_navigation: bool = False) -> None:
-        """Navigate to the listings/gallery page."""
         if self.navigated_to_gallery and not force_navigation:
+            logger.warning(
+                f"Skipping navigation to gallery for {self.website_info.name}"
+            )
             return
 
         logger.info("Navigating to gallery...")

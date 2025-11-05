@@ -74,10 +74,6 @@ class StrategyExecutor:
     async def _run_sitemap_scrape(self) -> Dict[str, Any]:
         await self.scraper.login_async()
 
-        # if not await self.scraper.validate_login():
-        #     self.scraper.logger.error("Login failed, aborting scrape")
-        #     return self.scraper.default_results
-
         sitemap_html = await self.scraper.navigate_to_sitemap_async()
         await self.scraper.apply_filters_async()
         houses = await self.scraper.extract_sitemap_async(sitemap_html)
