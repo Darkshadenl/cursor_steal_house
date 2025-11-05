@@ -82,35 +82,37 @@ async def run_crawler_async(
 
     config.initialize(debug_mode)
 
-    browser_config = BrowserConfig(
-        headless=headless,
-        verbose=config.debug_mode,
-        use_managed_browser=True,
-        user_data_dir="./browser_data/general",
-        extra_args=[
-            "--no-sandbox",
-            "--disable-gpu",
-            "--disable-dev-shm-usage",
-            "--remote-debugging-address=0.0.0.0",
-            "--remote-debugging-port=9222",
-        ],
-    )
+    def create_browser_config(website_name: str) -> BrowserConfig:
+        """Create browser config with website-specific user data directory"""
+        return BrowserConfig(
+            headless=headless,
+            verbose=config.debug_mode,
+            use_managed_browser=False,
+            user_data_dir=f"./browser_data/{website_name}",
+            extra_args=[
+                "--no-sandbox",
+                "--disable-gpu",
+                "--disable-dev-shm-usage",
+            ],
+        )
 
-    crawler = AsyncWebCrawler(config=browser_config)
     results: List[Dict[str, Any]] = []
+    crawlers: List[AsyncWebCrawler] = []
 
     try:
-        await crawler.start()
-
         tasks = []
         for website_name in websites:
+            browser_config = create_browser_config(website_name)
+            crawler = AsyncWebCrawler(config=browser_config)
+            await crawler.start()
+            crawlers.append(crawler)
+
             task = _run_single_scraper_with_session(
                 website_name, crawler, notification_service
             )
             tasks.append(task)
 
         # Execute scrapers in batches with limited concurrency
-        # crawl4ai recommends max 2-3 concurrent tasks to avoid resource conflicts
         MAX_CONCURRENT = 3
         all_results = []
 
@@ -159,7 +161,11 @@ async def run_crawler_async(
         logger.error(f"Error starting crawler: {str(e)}")
         return False
     finally:
-        await crawler.close()
+        for crawler in crawlers:
+            try:
+                await crawler.close()
+            except Exception as e:
+                logger.warning(f"Error closing crawler: {e}")
 
     successful_results = [r for r in results if r and r.get("success")]
     success = len(successful_results) == len(websites)

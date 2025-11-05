@@ -173,12 +173,8 @@ class NmgWonenScraper(BaseWebsiteScraper):
             return True
 
         try:
-            base_url = self.website_info.base_url
-            full_login_url = (
-                self.login_config.login_url
-                or f"{base_url}{self.login_config.login_url_path}"
-            )
-
+            full_login_url = self.login_config.login_url
+            assert full_login_url is not None
             logger.info(
                 f"Navigating to login page of {self.website_info.name} and logging in."
             )

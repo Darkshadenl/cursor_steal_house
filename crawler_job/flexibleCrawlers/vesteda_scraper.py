@@ -41,14 +41,7 @@ class VestedaScraper(BaseWebsiteScraper):
         logger.debug("Vesteda scraper initialized...")
 
     def _create_login_verification_hook_async(self):
-        """
-        Vesteda-specific login verification using localStorage.
-
-        Checks for browsing data in localStorage that contains previous_page (login)
-        and current_page (logged in area) to verify successful login.
-        """
-
-        async def verify_login_hook(page, context, url, response, **kwargs):
+        async def verify_login_hook(page, context, url="", response=None, **kwargs):
             result = await page.evaluate(
                 """() => {
                 const storageKey = '5da451d1e48514.00659317_bre';
@@ -86,8 +79,6 @@ class VestedaScraper(BaseWebsiteScraper):
                 }
             }"""
             )
-
-            logger.debug(f"Vesteda login verification result: {result}")
 
             if not result.get("success"):
                 error_msg = result.get("error", "Unknown error")
