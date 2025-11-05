@@ -250,7 +250,7 @@ class BaseWebsiteScraper(ABC):
             verification_hook = self._create_login_verification_hook_async()
 
             if verification_hook:
-                self.crawler.crawler_strategy.set_hook("before_retrieve_html", verification_hook)  # type: ignore
+                self.crawler.crawler_strategy.set_hook("after_goto", verification_hook)  # type: ignore
 
             try:
                 login_result: CrawlResult = await self.crawler.arun(
@@ -708,24 +708,13 @@ class BaseWebsiteScraper(ABC):
 
         js = f"""
             (async () => {{
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 const cookieButton = document.querySelector('{self.cookies_config.accept_cookies_selector}');
-                
                 if (cookieButton) {{
                     cookieButton.click();
                     console.log("Cookie button clicked");
                 }} else {{
                     console.log("Cookie button not found");
-                    return true;
-                }}
-                
-                while (true) {{
-                    await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
-                    const cookieButton = document.querySelector('{self.cookies_config.accept_cookies_selector}');
-                    if (cookieButton) {{
-                        cookieButton.click();
-                        console.log("Cookie button clicked");
-                        return true;
-                    }}
                 }}
             }})();
             """
