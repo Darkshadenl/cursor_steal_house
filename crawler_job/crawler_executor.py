@@ -1,4 +1,5 @@
 import asyncio
+import os
 from typing import Dict, Any, List
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 
@@ -15,15 +16,29 @@ from crawler_job.services import config
 logger = setup_logger(__name__)
 
 
+def _create_browser_config(website_name: str, headless: bool) -> BrowserConfig:
+    return BrowserConfig(
+        headless=headless,
+        verbose=config.debug_mode,
+        use_managed_browser=False,
+        user_data_dir=f"./browser_data/{website_name}",
+        extra_args=[
+            "--no-sandbox",
+            "--disable-gpu",
+            "--disable-dev-shm-usage",
+        ],
+    )
+
+
+def _setup_notifications(notifications_enabled: bool) -> NotificationService:
+    return NotificationService(notifications_on=notifications_enabled)
+
+
 async def _run_single_scraper_with_session(
     website_name: str,
     crawler: AsyncWebCrawler,
     notification_service: NotificationService,
 ) -> Dict[str, Any]:
-    """
-    Runs a scraper for a single website using a shared browser instance.
-    The session_id is handled by the ScraperFactory from the website config.
-    """
     db_session = None
     try:
         # Each scraper gets its own database session
@@ -58,6 +73,104 @@ async def _run_single_scraper_with_session(
                 )
 
 
+async def _execute_scrapers_concurrent_async(
+    websites: List[str],
+    crawlers: List[AsyncWebCrawler],
+    notification_service: NotificationService,
+    max_concurrent: int = 3,
+) -> List[Dict[str, Any]]:
+    tasks = []
+    for i, website_name in enumerate(websites):
+        task = _run_single_scraper_with_session(
+            website_name, crawlers[i], notification_service
+        )
+        tasks.append(task)
+
+    all_results = []
+    for i in range(0, len(tasks), max_concurrent):
+        batch = tasks[i : i + max_concurrent]
+        batch_websites = websites[i : i + max_concurrent]
+
+        logger.info(f"Processing batch {i//max_concurrent + 1}: {batch_websites}")
+        batch_results = await asyncio.gather(*batch, return_exceptions=True)
+
+        for j, result in enumerate(batch_results):
+            if isinstance(result, Exception):
+                logger.error(
+                    f"Exception in concurrent execution for {batch_websites[j]}: {result}"
+                )
+                all_results.append(
+                    {
+                        "success": False,
+                        "error": str(result),
+                        "website": batch_websites[j],
+                        "total_houses_count": 0,
+                        "new_houses_count": 0,
+                        "updated_houses_count": 0,
+                    }
+                )
+            else:
+                if isinstance(result, dict):
+                    all_results.append(result)
+                else:
+                    logger.error(
+                        f"Unexpected result type for {batch_websites[j]}: {type(result)}"
+                    )
+                    all_results.append(
+                        {
+                            "success": False,
+                            "error": f"Unexpected result type: {type(result)}",
+                            "website": batch_websites[j],
+                            "total_houses_count": 0,
+                            "new_houses_count": 0,
+                            "updated_houses_count": 0,
+                        }
+                    )
+
+    return all_results
+
+
+async def _execute_scrapers_sequential_async(
+    websites: List[str],
+    crawlers: List[AsyncWebCrawler],
+    notification_service: NotificationService,
+) -> List[Dict[str, Any]]:
+    results = []
+    for i, website_name in enumerate(websites):
+        logger.info(f"Processing website {i + 1}/{len(websites)}: {website_name}")
+        result = await _run_single_scraper_with_session(
+            website_name, crawlers[i], notification_service
+        )
+        results.append(result)
+
+    return results
+
+
+def _log_results(results: List[Dict[str, Any]], websites: List[str]) -> bool:
+    successful_results = [r for r in results if r and r.get("success")]
+    success = len(successful_results) == len(websites)
+
+    if success:
+        total_houses = sum(r.get("total_houses_count", 0) for r in results if r)
+        new_houses = sum(r.get("new_houses_count", 0) for r in results if r)
+        updated_houses = sum(r.get("updated_houses_count", 0) for r in results if r)
+
+        logger.info(f"Crawl completed for websites: {', '.join(websites)}")
+        logger.info(f"Total houses found: {total_houses}")
+        logger.info(f"New houses: {new_houses}")
+        logger.info(f"Updated houses: {updated_houses}")
+    else:
+        logger.error("Crawl failed for all websites. No results to process.")
+        failed_websites = [
+            r.get("website", "Unknown")
+            for r in results
+            if not r or not r.get("success")
+        ]
+        logger.error(f"Crawl failed for websites: {', '.join(failed_websites)}")
+
+    return success
+
+
 async def run_crawler_async(
     websites: List[str],
     notifications_enabled: bool,
@@ -65,7 +178,7 @@ async def run_crawler_async(
     debug_mode: bool,
     headless: bool,
 ) -> bool:
-    notification_service = NotificationService(notifications_on=notifications_enabled)
+    notification_service = _setup_notifications(notifications_enabled)
 
     if test_notifications_only:
         logger.info("Running in test notifications only mode")
@@ -82,79 +195,30 @@ async def run_crawler_async(
 
     config.initialize(debug_mode)
 
-    def create_browser_config(website_name: str) -> BrowserConfig:
-        return BrowserConfig(
-            headless=headless,
-            verbose=config.debug_mode,
-            use_managed_browser=False,
-            user_data_dir=f"./browser_data/{website_name}",
-            extra_args=[
-                "--no-sandbox",
-                "--disable-gpu",
-                "--disable-dev-shm-usage",
-            ],
-        )
+    concurrent_scrapers = os.getenv("CONCURRENT_SCRAPERS", "true").lower() == "true"
+    max_concurrent = int(os.getenv("MAX_CONCURRENT_SCRAPERS", "3"))
 
-    results: List[Dict[str, Any]] = []
     crawlers: List[AsyncWebCrawler] = []
 
     try:
-        tasks = []
         for website_name in websites:
-            browser_config = create_browser_config(website_name)
+            browser_config = _create_browser_config(website_name, headless)
             crawler = AsyncWebCrawler(config=browser_config)
             await crawler.start()
             crawlers.append(crawler)
 
-            task = _run_single_scraper_with_session(
-                website_name, crawler, notification_service
+        if concurrent_scrapers:
+            logger.info(
+                f"Running scrapers concurrently (max {max_concurrent} at a time)"
             )
-            tasks.append(task)
-
-        # Execute scrapers in batches with limited concurrency
-        MAX_CONCURRENT = 3
-        all_results = []
-
-        for i in range(0, len(tasks), MAX_CONCURRENT):
-            batch = tasks[i : i + MAX_CONCURRENT]
-            batch_websites = websites[i : i + MAX_CONCURRENT]
-
-            logger.info(f"Processing batch {i//MAX_CONCURRENT + 1}: {batch_websites}")
-            batch_results = await asyncio.gather(*batch, return_exceptions=True)
-
-            for j, result in enumerate(batch_results):
-                if isinstance(result, Exception):
-                    logger.error(
-                        f"Exception in parallel execution for {batch_websites[j]}: {result}"
-                    )
-                    all_results.append(
-                        {
-                            "success": False,
-                            "error": str(result),
-                            "website": batch_websites[j],
-                            "total_houses_count": 0,
-                            "new_houses_count": 0,
-                            "updated_houses_count": 0,
-                        }
-                    )
-                else:
-                    if isinstance(result, dict):
-                        all_results.append(result)
-                    else:
-                        logger.error(
-                            f"Unexpected result type for {batch_websites[j]}: {type(result)}"
-                        )
-                        all_results.append(
-                            {
-                                "success": False,
-                                "error": f"Unexpected result type: {type(result)}",
-                                "website": batch_websites[j],
-                                "total_houses_count": 0,
-                                "new_houses_count": 0,
-                                "updated_houses_count": 0,
-                            }
-                        )
-            results.extend(all_results)
+            results = await _execute_scrapers_concurrent_async(
+                websites, crawlers, notification_service, max_concurrent
+            )
+        else:
+            logger.info("Running scrapers sequentially")
+            results = await _execute_scrapers_sequential_async(
+                websites, crawlers, notification_service
+            )
 
     except Exception as e:
         logger.error(f"Error starting crawler: {str(e)}")
@@ -166,27 +230,4 @@ async def run_crawler_async(
             except Exception as e:
                 logger.warning(f"Error closing crawler: {e}")
 
-    successful_results = [r for r in results if r and r.get("success")]
-    success = len(successful_results) == len(websites)
-
-    if success:
-        total_houses = sum(r.get("total_houses_count", 0) for r in results if r)
-        new_houses = sum(r.get("new_houses_count", 0) for r in results if r)
-        updated_houses = sum(r.get("updated_houses_count", 0) for r in results if r)
-
-        logger.info(f"Crawl completed for websites: {', '.join(websites)}")
-        logger.info(f"Total houses found: {total_houses}")
-        logger.info(f"New houses: {new_houses}")
-        logger.info(f"Updated houses: {updated_houses}")
-    else:
-        logger.error("Crawl failed for all websites. No results to process.")
-
-    if not success:
-        failed_websites = [
-            r.get("website", "Unknown")
-            for r in results
-            if not r or not r.get("success")
-        ]
-        logger.error(f"Crawl failed for websites: {', '.join(failed_websites)}")
-
-    return success
+    return _log_results(results, websites)

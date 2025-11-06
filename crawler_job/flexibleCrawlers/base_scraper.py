@@ -120,10 +120,10 @@ class BaseWebsiteScraper(ABC):
         return self._standard_run_config.clone()
 
     def get_login_run_config(
-        self, full_login_url: str, js_code: list[str], wait_for_condition: str
+        self, js_code: list[str], wait_for_condition: str
     ) -> CrawlerRunConfig:
         return CrawlerConfigFactory.create_login_run_config(
-            self.get_run_config(), full_login_url, js_code, wait_for_condition
+            self.get_run_config(), js_code, wait_for_condition
         )
 
     def _get_search_city(self) -> str:
@@ -248,7 +248,7 @@ class BaseWebsiteScraper(ABC):
                 f"document.querySelector('{self.login_config.submit_selector}').click();",
             ]
 
-            run_config = self.get_login_run_config(full_login_url, js_code, "")
+            run_config = self.get_login_run_config(js_code, "")
             verification_hook = self._create_login_verification_hook_async()
 
             if verification_hook:
@@ -537,7 +537,6 @@ class BaseWebsiteScraper(ABC):
 
         for house_data in raw_data:
             house = House.from_dict(house_data)
-            house.detail_url = f"{self.website_info.base_url}{house.detail_url}"
             houses.append(house)
 
         logger.info(f"Successfully extracted {len(houses)} properties")
@@ -591,8 +590,7 @@ class BaseWebsiteScraper(ABC):
         urls = []
         for house in houses:
             if house.detail_url:
-                url = f"{self.website_info.base_url}{house.detail_url}"
-                urls.append(url)
+                urls.append(house.detail_url)
 
         logger.info(f"Starting fetch for {len(urls)} properties...")
 
