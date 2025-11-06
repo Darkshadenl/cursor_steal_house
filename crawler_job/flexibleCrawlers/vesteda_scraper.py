@@ -20,7 +20,10 @@ from crawler_job.notifications.notification_service import NotificationService
 from ..models.pydantic_models import WebsiteScrapeConfigJson
 from .base_scraper import BaseWebsiteScraper
 from crawler_job.services.logger_service import setup_logger
-from crawler_job.helpers.decorators import requires_crawler_initialized
+from crawler_job.helpers.decorators import (
+    requires_crawler_initialized,
+    requires_navigated_to_gallery,
+)
 from crawler_job.services import config as global_config
 
 logger = setup_logger(__name__)
@@ -110,10 +113,8 @@ class VestedaScraper(BaseWebsiteScraper):
         return verify_login_hook
 
     @requires_crawler_initialized
+    @requires_navigated_to_gallery
     async def extract_gallery_async(self) -> List[House]:
-        if not self.navigated_to_gallery:
-            raise Exception("Not navigated to gallery")
-
         logger.info("Extracting property listings of Vesteda step...")
         gallery_extraction_config = (
             self.website_config.strategy_config.gallery_extraction_config
@@ -199,6 +200,7 @@ class VestedaScraper(BaseWebsiteScraper):
 
             # Create House object using from_dict
             house = House.from_dict(processed_data)
+            house.detail_url = f"{self.website_info.base_url}{house.detail_url}"
             houses.append(house)
 
         logger.info(f"Successfully extracted {len(houses)} properties")

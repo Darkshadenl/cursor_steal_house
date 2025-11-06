@@ -43,9 +43,7 @@ class NmgWonenScraper(BaseWebsiteScraper):
         self, full_login_url: str, js_code: list[str], wait_for_condition: str
     ) -> CrawlerRunConfig:
         """Overrides the base login run config for NMG Wonen."""
-        config = super().get_login_run_config(
-            full_login_url, js_code, wait_for_condition
-        )
+        config = super().get_login_run_config(js_code, wait_for_condition)
         config.screenshot = True  # Always take screenshot on login for debugging
         return config
 

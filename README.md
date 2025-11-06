@@ -80,9 +80,21 @@ The system consists of:
 ### Running the Crawler Locally
 
 ```bash
-# Run the Vesteda crawler directly
-python -m crawler_job.crawlers.vesteda.vesteda_crawler
+# Run the crawler
+python -m crawler_job.main --websites "Vesteda,Sleutel"
 ```
+
+### Crawler Execution Modes
+
+The crawler supports two execution modes:
+
+1. **Concurrent Mode** (default): Multiple scrapers run in parallel batches
+   - Set `CONCURRENT_SCRAPERS=true` in your `.env` file
+   - Control batch size with `MAX_CONCURRENT_SCRAPERS=3` (default)
+
+2. **Sequential Mode**: Scrapers run one after another
+   - Set `CONCURRENT_SCRAPERS=false` in your `.env` file
+   - Useful for debugging or when websites have rate limits
 
 ### Notification System
 
