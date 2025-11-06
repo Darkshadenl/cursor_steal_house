@@ -8,7 +8,9 @@ from crawler_job.enums import ScrapeStrategy, SchemaType
 from crawler_job.helpers.decorators import (
     requires_crawler_initialized,
     requires_cookies_accepted,
+    requires_filtering_config,
     requires_login_config,
+    requires_navigated_to_gallery,
 )
 from crawler_job.helpers.config_validator import WebsiteConfigValidator
 from crawler_job.helpers.crawler_config_factory import CrawlerConfigFactory
@@ -335,12 +337,8 @@ class BaseWebsiteScraper(ABC):
             logger.error(f"Redirected URL: {result.redirected_url}")
 
     @requires_crawler_initialized
+    @requires_filtering_config
     async def apply_filters_async(self) -> None:
-        """Apply filters if filtering configuration is provided."""
-        if not self.filtering_config:
-            logger.info("No filtering configuration provided.")
-            return
-
         search_city = self._get_search_city()
         logger.info(f"Applying filters with search city: {search_city}")
 
@@ -488,17 +486,15 @@ class BaseWebsiteScraper(ABC):
         return houses
 
     @requires_crawler_initialized
+    @requires_navigated_to_gallery
     async def extract_gallery_async(self) -> List[House]:
-        if not self.navigated_to_gallery:
-            raise Exception("Not navigated to gallery")
-
         logger.info(f"Extracting property listings of {self.website_info.name} step...")
         gallery_extraction_config = (
             self.website_config.strategy_config.gallery_extraction_config
         )
         assert gallery_extraction_config is not None
-
         assert gallery_extraction_config.correct_urls_paths is not None
+
         correct_urls = [
             f"{self.website_info.base_url}{path}"
             for path in gallery_extraction_config.correct_urls_paths
@@ -541,6 +537,7 @@ class BaseWebsiteScraper(ABC):
 
         for house_data in raw_data:
             house = House.from_dict(house_data)
+            house.detail_url = f"{self.website_info.base_url}{house.detail_url}"
             houses.append(house)
 
         logger.info(f"Successfully extracted {len(houses)} properties")
@@ -550,15 +547,6 @@ class BaseWebsiteScraper(ABC):
     async def extract_fetched_pages_async(
         self, houses: List[House]
     ) -> List[FetchedPage]:
-        """
-        Extract detailed property information for the given houses
-
-        Args:
-            houses: List of House objects with basic info
-
-        Returns:
-            List[FetchedPage]: List of fetched detail pages
-        """
         extraction_type = self.detail_page_extraction_config.schema_type
         if extraction_type not in ["llm"]:
             raise Exception("Invalid extraction type")

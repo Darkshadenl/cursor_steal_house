@@ -44,3 +44,13 @@ def requires_filtering_config(func):
         return await func(self, *args, **kwargs)
 
     return wrapper
+
+
+def requires_navigated_to_gallery(func):
+    @functools.wraps(func)
+    async def wrapper(self, *args, **kwargs):
+        if not self.navigated_to_gallery:
+            raise Exception("Not navigated to gallery")
+        return await func(self, *args, **kwargs)
+
+    return wrapper
