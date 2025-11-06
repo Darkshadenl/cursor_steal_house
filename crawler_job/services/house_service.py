@@ -228,7 +228,6 @@ class HouseService:
             else:
                 new_db_houses.append(await repo.create(house))
 
-        # Commit all changes at once
         await repo.session.commit()
 
         new_houses = await db_houses_to_pydantic_async(new_db_houses)

@@ -25,6 +25,7 @@ class EmailNotificationChannel(AbstractNotificationChannel):
             llm_service: An instance of the LLMService for generating analyses.
         """
         self.llm_service = llm_service
+        self.analysis_semaphore = asyncio.Semaphore(5)
         self.smtp_server = os.getenv("SMTP_SERVER")
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
         self.email_user = os.getenv("EMAIL_USER")
@@ -169,10 +170,11 @@ class EmailNotificationChannel(AbstractNotificationChannel):
             bool: True if successful, False otherwise
         """
         try:
-            # Generate personalized analysis
-            analysis = await self.llm_service.analyse_house(
-                house, personal_metrics=metrics
-            )
+            # Generate personalized analysis (with semaphore to limit concurrent analyses)
+            async with self.analysis_semaphore:
+                analysis = await self.llm_service.analyse_house(
+                    house, personal_metrics=metrics
+                )
 
             if analysis == "":
                 logger.warning(f"No analysis generated for {email}")

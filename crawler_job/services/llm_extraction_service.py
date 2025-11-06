@@ -34,7 +34,7 @@ class LlmExtractionService:
 
                 if extracted_data is None or len(extracted_data) == 0:
                     logger.warning(
-                        f"No data extracted for {page.url}. extracted_data is None or empty"
+                        f"No data extracted for {page.url} extracted_data is None or empty"
                     )
                     continue
 
@@ -42,7 +42,7 @@ class LlmExtractionService:
 
                 if json_data is None:
                     logger.warning(
-                        f"No data extracted for {page.url}. json_data is None"
+                        f"No data extracted for {page.url} json_data is None"
                     )
                     logger.debug(
                         f"Page.markdown: {page.markdown}, Extracted data: {extracted_data}"

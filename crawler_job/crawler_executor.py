@@ -83,7 +83,6 @@ async def run_crawler_async(
     config.initialize(debug_mode)
 
     def create_browser_config(website_name: str) -> BrowserConfig:
-        """Create browser config with website-specific user data directory"""
         return BrowserConfig(
             headless=headless,
             verbose=config.debug_mode,
