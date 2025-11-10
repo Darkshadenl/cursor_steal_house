@@ -474,6 +474,7 @@ class BaseWebsiteScraper(ABC):
                 if extracted_data is None:
                     logger.warning(f"No data extracted for {result.url}")
                     continue
+                
                 json_data = json.loads(extracted_data)  # type: ignore
                 house = House.from_dict(json_data)
                 houses.append(house)
@@ -495,13 +496,13 @@ class BaseWebsiteScraper(ABC):
         assert gallery_extraction_config is not None
         assert gallery_extraction_config.correct_urls_paths is not None
 
-        correct_urls = [
-            f"{self.website_info.base_url}{path}"
-            for path in gallery_extraction_config.correct_urls_paths
-        ]
+        # correct_urls = [
+        #     f"{self.website_info.base_url}{path}"
+        #     for path in gallery_extraction_config.correct_urls_paths
+        # ]
 
-        if not any(correct_url in self.current_url for correct_url in correct_urls):  # type: ignore
-            raise Exception(f"Invalid URL: {self.current_url}")
+        # if not any(correct_url in self.current_url for correct_url in correct_urls):  # type: ignore
+        #     raise Exception(f"Invalid URL: {self.current_url}")
 
         schema = gallery_extraction_config.schema
         assert schema is not None
