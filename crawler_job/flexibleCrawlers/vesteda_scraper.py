@@ -122,13 +122,13 @@ class VestedaScraper(BaseWebsiteScraper):
         assert gallery_extraction_config is not None
         assert gallery_extraction_config.correct_urls_paths is not None
 
-        correct_urls = [
-            f"{self.website_info.base_url}{path}"
-            for path in gallery_extraction_config.correct_urls_paths
-        ]
+        # correct_urls = [
+        #     f"{self.website_info.base_url}{path}"
+        #     for path in gallery_extraction_config.correct_urls_paths
+        # ]
 
-        if self.current_url not in correct_urls:
-            raise Exception(f"Invalid URL: {self.current_url}")
+        # if self.current_url not in correct_urls:
+        #     raise Exception(f"Invalid URL: {self.current_url}")
 
         schema = gallery_extraction_config.schema
         assert schema is not None
