@@ -3,7 +3,7 @@ from typing import Optional
 from crawl4ai import AsyncWebCrawler, CrawlResult, CrawlerRunConfig
 from crawler_job.flexibleCrawlers.base_scraper import BaseWebsiteScraper
 from crawler_job.helpers.utils import save_screenshot_from_crawl_result
-from crawler_job.models.db_config_models import WebsiteConfig
+from crawler_job.models.pydantic_models import WebsiteScrapeConfigJson
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.services.logger_service import setup_logger
 from crawler_job.helpers.decorators import (
@@ -21,7 +21,7 @@ class NmgWonenScraper(BaseWebsiteScraper):
 
     def __init__(
         self,
-        config: WebsiteConfig,
+        config: WebsiteScrapeConfigJson,
         session_id: str,
         crawler: AsyncWebCrawler,
         notification_service: Optional[NotificationService] = None,
@@ -43,9 +43,7 @@ class NmgWonenScraper(BaseWebsiteScraper):
         self, full_login_url: str, js_code: list[str], wait_for_condition: str
     ) -> CrawlerRunConfig:
         """Overrides the base login run config for NMG Wonen."""
-        config = super().get_login_run_config(
-            full_login_url, js_code, wait_for_condition
-        )
+        config = super().get_login_run_config(js_code, wait_for_condition)
         config.screenshot = True  # Always take screenshot on login for debugging
         return config
 
@@ -58,7 +56,7 @@ class NmgWonenScraper(BaseWebsiteScraper):
         if not self.crawler:
             raise Exception("Crawler not initialized")
 
-        url = f"{self.website_config.base_url}/huur"
+        url = f"{self.website_info.base_url}/huur"
         config = self.get_run_config()
 
         result: CrawlResult = await self.crawler.arun(url, config=config)  # type: ignore
@@ -169,23 +167,17 @@ class NmgWonenScraper(BaseWebsiteScraper):
         if not self.login_config or (
             self.navigated_to_gallery and not self.login_config.login_required
         ):
-            logger.warning(f"Skipping login for {self.website_config.website_name}")
+            logger.warning(f"Skipping login for {self.website_info.name}")
             return True
 
         try:
-            base_url = self.website_config.base_url
-            full_login_url = (
-                self.login_config.login_url
-                or f"{base_url}{self.login_config.login_url_path}"
-            )
-
+            full_login_url = self.login_config.login_url
+            assert full_login_url is not None
             logger.info(
-                f"Navigating to login page of {self.website_config.website_name} and logging in."
+                f"Navigating to login page of {self.website_info.name} and logging in."
             )
-            email = os.getenv(f"{self.website_config.website_identifier.upper()}_EMAIL")
-            password = os.getenv(
-                f"{self.website_config.website_identifier.upper()}_PASSWORD"
-            )
+            email = os.getenv(f"{self.website_info.name.upper()}_EMAIL")
+            password = os.getenv(f"{self.website_info.name.upper()}_PASSWORD")
 
             js_code = [
                 f"document.querySelector('{self.login_config.username_selector}').value = '{email}';",

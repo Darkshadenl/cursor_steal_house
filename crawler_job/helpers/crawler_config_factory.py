@@ -42,7 +42,6 @@ class CrawlerConfigFactory:
     @staticmethod
     def create_login_run_config(
         standard_config: CrawlerRunConfig,
-        full_login_url: str,
         js_code: list[str],
         wait_for_condition: str,
     ) -> CrawlerRunConfig:

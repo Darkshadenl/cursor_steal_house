@@ -1,12 +1,12 @@
 from crawler_job.flexibleCrawlers.base_scraper import ScrapeStrategy
-from crawler_job.models.db_config_models import WebsiteConfig
+from crawler_job.models.pydantic_models import WebsiteScrapeConfigJson
 from crawler_job.services.logger_service import setup_logger
 
 logger = setup_logger(__name__)
 
 
 class WebsiteConfigValidator:
-    def __init__(self, config: WebsiteConfig):
+    def __init__(self, config: WebsiteScrapeConfigJson):
         self.config = config
 
     def validate(self) -> None:
@@ -14,7 +14,7 @@ class WebsiteConfigValidator:
         if not self.config:
             raise Exception("Website configuration not provided")
 
-        if not self.config.base_url:
+        if not self.config.website_info.base_url:
             raise Exception("Base URL not provided in website configuration")
 
         if not self.config.strategy_config:

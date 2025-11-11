@@ -18,7 +18,7 @@ def requires_cookies_accepted(func):
     @functools.wraps(func)
     async def wrapper(self, *args, **kwargs):
         if not self.accepted_cookies:
-            await self._accept_cookies(self.current_url or self.website_config.base_url)
+            await self._accept_cookies(self.current_url or self.website_info.base_url)
             self.accepted_cookies = True
         return await func(self, *args, **kwargs)
 
@@ -41,6 +41,16 @@ def requires_filtering_config(func):
         if not self.filtering_config:
             logger.info("No filtering configuration provided.")
             return
+        return await func(self, *args, **kwargs)
+
+    return wrapper
+
+
+def requires_navigated_to_gallery(func):
+    @functools.wraps(func)
+    async def wrapper(self, *args, **kwargs):
+        if not self.navigated_to_gallery:
+            raise Exception("Not navigated to gallery")
         return await func(self, *args, **kwargs)
 
     return wrapper

@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 from litellm import acompletion
 import os
 from dotenv import load_dotenv
@@ -7,28 +7,27 @@ from enum import Enum
 
 from crawler_job.models.house_models import House
 
-load_dotenv()
+_ = load_dotenv()
 
 
 class LLMProvider(Enum):
     DEEPSEEK = "deepseek"
     GEMINI = "gemini"
+    GROK = "grok"
 
 
 class LLMService:
-    def __init__(self, provider: LLMProvider = LLMProvider.DEEPSEEK):
-        self.deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
-        self.google_api_key = os.getenv("GOOGLE_API_KEY")
-
-        self.model = "deepseek/deepseek-chat"
-        self.api_key = self.deepseek_api_key
-
+    def __init__(self, provider: LLMProvider = LLMProvider.GROK):
+        self.api_key = os.getenv("OPENROUTER_API_KEY")
+        self.provider = provider
         if provider == LLMProvider.GEMINI:
-            self.model = "gemini/gemini-2.5-flash"
-            self.api_key = self.google_api_key
+            self.model = "openrouter/google/gemini-2.5-flash"
+        elif provider == LLMProvider.DEEPSEEK:
+            self.model = "openrouter/deepseek/deepseek-v3.1-terminus"
+        elif provider == LLMProvider.GROK:
+            self.model = "openrouter/x-ai/grok-4-fast"
 
     def remove_markdown_block_syntax(self, markdown: str) -> str:
-        """Remove markdown block syntax + newlines from markdown string"""
         # First remove any markdown block syntax (```json, ```, etc)
         markdown = re.sub(r"^```.*\s*", "", markdown, flags=re.MULTILINE)
         # Then remove any remaining newlines
@@ -37,8 +36,6 @@ class LLMService:
     async def analyse_house(
         self, house: House, personal_metrics: Optional[str] = None
     ) -> str:
-        """Analyse a house using the LLM"""
-
         house_readable_string = house.to_readable_string()
 
         prompt = prompt_template.format(
@@ -72,39 +69,27 @@ Rules:
                 ],
                 api_key=self.api_key,
                 temperature=0.1,
-                reasoning_effort=(
-                    "low" if self.model == "gemini/gemini-2.5-flash" else None
-                ),
             )
 
             content = response.choices[0].message.content  # type: ignore
 
-            if content == "null":
-                return None  # type: ignore
+            if content == "null" or content is None:
+                return ""
 
-            return self.remove_markdown_block_syntax(content)  # type: ignore
+            return self.remove_markdown_block_syntax(content)
         except Exception as e:
             print(f"Error in {self.model} extraction: {str(e)}")
-            return None  # type: ignore
+            return None  # pyright: ignore[reportReturnType]
 
     async def extract(
         self,
         markdown: str,
-        schema: Dict[str, Any],
-        provider: LLMProvider,
+        schema: dict[str, Any],
         extra_instructions: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
-        """Extract structured data from markdown using specified LLM provider"""
+    ) -> Optional[dict[str, Any]]:
         try:
-            if provider == LLMProvider.DEEPSEEK:
-                model = "deepseek/deepseek-chat"
-                api_key = self.deepseek_api_key
-            elif provider == LLMProvider.GEMINI:
-                model = "gemini/gemini-2.0-flash-001"
-                api_key = self.google_api_key
-
             response = await acompletion(
-                model=model,
+                model=self.model,
                 messages=[
                     {
                         "role": "system",
@@ -126,7 +111,7 @@ Rules:
                     },
                     {"role": "user", "content": markdown},
                 ],
-                api_key=api_key,
+                api_key=self.api_key,
                 temperature=0.1,
                 response_format=schema,
             )
@@ -138,7 +123,7 @@ Rules:
 
             return self.remove_markdown_block_syntax(content)  # type: ignore
         except Exception as e:
-            print(f"Error in {provider.value} extraction: {str(e)}")
+            print(f"Error in {self.model} extraction: {str(e)}")
             return None
 
 
