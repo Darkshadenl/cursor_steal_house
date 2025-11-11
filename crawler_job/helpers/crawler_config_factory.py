@@ -22,6 +22,7 @@ class CrawlerRunConfigFactory:
             exclude_all_images=True,
             exclude_social_media_links=True,
             user_agent_mode="random",
+            screenshot=debug_mode,
         )
 
     @staticmethod
@@ -38,15 +39,3 @@ class CrawlerRunConfigFactory:
                 rate_limit_codes=[429, 503],
             ),
         )
-
-    @staticmethod
-    def create_login_run_config(
-        standard_config: CrawlerRunConfig,
-        js_code: list[str],
-        wait_for_condition: str,
-    ) -> CrawlerRunConfig:
-        run_config = standard_config.clone()
-        run_config.js_code = js_code
-        run_config.wait_for = wait_for_condition
-        run_config.page_timeout = 10000  # 10 seconds timeout
-        return run_config

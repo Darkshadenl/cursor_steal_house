@@ -76,8 +76,8 @@ class HuisSleutelScraper(BaseWebsiteScraper):
     def get_login_run_config(
         self, full_login_url: str, js_code: list[str], wait_for_condition: str
     ) -> CrawlerRunConfig:
-        run_config = CrawlerRunConfigFactory.create_login_run_config(
-            self.get_run_config(), js_code, wait_for_condition
-        )
-        run_config.screenshot = True
+        run_config = self.get_run_config()
+        run_config.js_code = js_code
+        run_config.wait_for = wait_for_condition
+        run_config.page_timeout = 10000
         return run_config
