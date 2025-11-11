@@ -5,16 +5,13 @@ from crawl4ai import (
     AsyncWebCrawler,
     CacheMode,
     CrawlResult,
-    CrawlerMonitor,
     CrawlerRunConfig,
-    DefaultMarkdownGenerator,
     JsonCssExtractionStrategy,
-    PruningContentFilter,
-    RateLimiter,
     SemaphoreDispatcher,
 )
 
-from crawler_job.models.house_models import FetchedPage, House
+from crawler_job.crawl4ai_wrappers.CustomAsyncWebCrawler import CustomAsyncWebCrawler
+from crawler_job.models.house_models import House
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.services.data_processing_service import DataProcessingService
 from crawler_job.services.llm_extraction_service import LlmExtractionService
@@ -39,7 +36,7 @@ class VestedaScraper(BaseWebsiteScraper):
         self,
         config: WebsiteScrapeConfigJson,
         session_id: str,
-        crawler: AsyncWebCrawler,
+        crawler: CustomAsyncWebCrawler,
         standard_run_config: CrawlerRunConfig,
         standard_dispatcher: SemaphoreDispatcher,
         data_processing_service: DataProcessingService,

@@ -4,6 +4,7 @@ import os
 from abc import ABC
 import re
 
+from crawler_job.crawl4ai_wrappers.CustomAsyncWebCrawler import CustomAsyncWebCrawler
 from crawler_job.enums import ScrapeStrategy, SchemaType
 from crawler_job.helpers.decorators import (
     requires_crawler_initialized,
@@ -29,7 +30,6 @@ from crawl4ai import (
     RateLimiter,
     SemaphoreDispatcher,
 )
-from crawler_job.helpers.utils import save_screenshot_from_crawl_result
 from crawler_job.models.pydantic_models import (
     CookiesConfig,
     DetailPageExtractionConfig,
@@ -59,7 +59,7 @@ class BaseWebsiteScraper(ABC):
         self,
         config: WebsiteScrapeConfigJson,
         session_id: str,
-        crawler: AsyncWebCrawler,
+        crawler: CustomAsyncWebCrawler,
         standard_run_config: CrawlerRunConfig,
         standard_dispatcher: SemaphoreDispatcher,
         data_processing_service: DataProcessingService,
@@ -261,12 +261,10 @@ class BaseWebsiteScraper(ABC):
 
             try:
                 login_result: CrawlResult = await self.crawler.arun(
-                    full_login_url, config=run_config
+                    full_login_url,
+                    config=run_config,
+                    filename_prefix=f"login_{self.website_info.name}",
                 )  # type: ignore
-
-                save_screenshot_from_crawl_result(
-                    login_result, f"login_{self.website_info.name}"
-                )
 
             finally:
                 if verification_hook:

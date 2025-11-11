@@ -1,8 +1,8 @@
 import os
 from typing import Optional
-from crawl4ai import AsyncWebCrawler, CrawlResult, CrawlerRunConfig, SemaphoreDispatcher
+from crawl4ai import CrawlResult, CrawlerRunConfig, SemaphoreDispatcher
+from crawler_job.crawl4ai_wrappers.CustomAsyncWebCrawler import CustomAsyncWebCrawler
 from crawler_job.flexibleCrawlers.base_scraper import BaseWebsiteScraper
-from crawler_job.helpers.utils import save_screenshot_from_crawl_result
 from crawler_job.models.pydantic_models import WebsiteScrapeConfigJson
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.services.logger_service import setup_logger
@@ -26,7 +26,7 @@ class NmgWonenScraper(BaseWebsiteScraper):
         self,
         config: WebsiteScrapeConfigJson,
         session_id: str,
-        crawler: AsyncWebCrawler,
+        crawler: CustomAsyncWebCrawler,
         standard_run_config: CrawlerRunConfig,
         standard_dispatcher: SemaphoreDispatcher,
         data_processing_service: DataProcessingService,
@@ -52,9 +52,6 @@ class NmgWonenScraper(BaseWebsiteScraper):
         config = super().get_run_config()
         config.exclude_all_images = False
         config.exclude_social_media_links = False
-        if global_config.debug_mode:
-            config.screenshot = True
-            config.log_console = True
         return config
 
     def get_login_run_config(
@@ -62,7 +59,6 @@ class NmgWonenScraper(BaseWebsiteScraper):
     ) -> CrawlerRunConfig:
         """Overrides the base login run config for NMG Wonen."""
         config = super().get_login_run_config(js_code, wait_for_condition)
-        config.screenshot = True  # Always take screenshot on login for debugging
         return config
 
     @requires_crawler_initialized
@@ -71,16 +67,9 @@ class NmgWonenScraper(BaseWebsiteScraper):
         if self.navigated_to_gallery and not force_navigation:
             return
 
-        if not self.crawler:
-            raise Exception("Crawler not initialized")
-
-        url = f"{self.website_info.base_url}/huur"
+        url = f"{self.website_info.base_url}{self.strategy_config.navigation_config.gallery}"
         config = self.get_run_config()
-
-        result: CrawlResult = await self.crawler.arun(url, config=config)  # type: ignore
-
-        if global_config.debug_mode:
-            save_screenshot_from_crawl_result(result, "navigate_to_gallery")
+        result: CrawlResult = await self.crawler.arun(url, config=config, filename_prefix="navigate_to_gallery")  # type: ignore
 
         if (
             result
@@ -88,13 +77,10 @@ class NmgWonenScraper(BaseWebsiteScraper):
             and result.redirected_url
             and "/huur" in result.redirected_url
         ):
-            logger.info(
-                f"Navigated to gallery (huur) successfully: {result.redirected_url}"
-            )
+            logger.info(f"Navigated to gallery successfully: {result.redirected_url}")
             self.navigated_to_gallery = True
             self.current_url = result.redirected_url
         else:
-            self.current_url = getattr(result, "redirected_url", None)
             error_message = getattr(result, "error_message", "Unknown error")
             redirected_url = getattr(result, "redirected_url", None)
             logger.error(f"Navigating to gallery failed: {error_message}")
@@ -124,9 +110,9 @@ class NmgWonenScraper(BaseWebsiteScraper):
         config = self.get_run_config()
         config.css_selector = self.filtering_config.filters_container_selector or ""
         config.js_code = js
-
+        assert self.current_url is not None
         result: CrawlResult = await self.crawler.arun(
-            url=self.current_url.replace("https://", "") if self.current_url else "",
+            url="https://nmgwonen.nl/huur/",
             config=config,  # type: ignore
         )
         if not result.success:
@@ -181,13 +167,6 @@ class NmgWonenScraper(BaseWebsiteScraper):
     @requires_crawler_initialized
     @requires_cookies_accepted
     async def login_async(self) -> bool:
-        """Perform login if login configuration is provided."""
-        if not self.login_config or (
-            self.navigated_to_gallery and not self.login_config.login_required
-        ):
-            logger.warning(f"Skipping login for {self.website_info.name}")
-            return True
-
         try:
             full_login_url = self.login_config.login_url
             assert full_login_url is not None
@@ -203,20 +182,13 @@ class NmgWonenScraper(BaseWebsiteScraper):
                 f"document.querySelector('{self.login_config.submit_selector}').click();",
             ]
 
-            wait_for_condition = ""
-            if self.login_config.success_indicator_selector:
-                wait_for_condition = (
-                    f"css:{self.login_config.success_indicator_selector}"
-                )
-            elif self.login_config.expected_url:
-                wait_for_condition = f"js:() => window.location.pathname !== new URL('{full_login_url}').pathname"
+            wait_for_condition = f"js:() => window.location.pathname !== new URL('{full_login_url}').pathname"
 
             run_config = self.get_login_run_config(
                 full_login_url, js_code, wait_for_condition
             )
 
-            login_result: CrawlResult = await self.crawler.arun(full_login_url, config=run_config)  # type: ignore
-            save_screenshot_from_crawl_result(login_result, "login")
+            login_result: CrawlResult = await self.crawler.arun(full_login_url, config=run_config, filename_prefix="login")  # type: ignore
 
             if not login_result.success:
                 if "Page.content: Unable to retrieve content" in (

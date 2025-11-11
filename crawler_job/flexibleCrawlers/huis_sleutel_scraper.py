@@ -5,6 +5,7 @@ from crawl4ai import (
     SemaphoreDispatcher,
 )
 
+from crawler_job.crawl4ai_wrappers.CustomAsyncWebCrawler import CustomAsyncWebCrawler
 from crawler_job.helpers.crawler_config_factory import CrawlerRunConfigFactory
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.services.data_processing_service import DataProcessingService
@@ -28,7 +29,7 @@ class HuisSleutelScraper(BaseWebsiteScraper):
         self,
         config: WebsiteScrapeConfigJson,
         session_id: str,
-        crawler: AsyncWebCrawler,
+        crawler: CustomAsyncWebCrawler,
         standard_run_config: CrawlerRunConfig,
         standard_dispatcher: SemaphoreDispatcher,
         data_processing_service: DataProcessingService,
@@ -76,8 +77,6 @@ class HuisSleutelScraper(BaseWebsiteScraper):
     def get_login_run_config(
         self, full_login_url: str, js_code: list[str], wait_for_condition: str
     ) -> CrawlerRunConfig:
-        run_config = self.get_run_config()
-        run_config.js_code = js_code
-        run_config.wait_for = wait_for_condition
-        run_config.page_timeout = 10000
-        return run_config
+        config = super().get_login_run_config(js_code, wait_for_condition)
+        config.page_timeout = 10000
+        return config

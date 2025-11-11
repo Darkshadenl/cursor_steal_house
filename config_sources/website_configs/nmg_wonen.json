@@ -2,6 +2,12 @@
     "website_name": "NMG Wonen",
     "scrape_strategy": "gallery",
     "session_id": "nmg_session",
+    "website_info": {
+        "id": 1,
+        "name": "NMG Wonen",
+        "base_url": "https://nmgwonen.mijnklantdossier.nl",
+        "is_active": true
+    },
     "strategy_config": {
         "navigation_config": {
             "gallery": "/huur"
