@@ -1,0 +1,158 @@
+{
+    "website_name": "NMG Wonen",
+    "scrape_strategy": "gallery",
+    "session_id": "nmg_session",
+    "strategy_config": {
+        "navigation_config": {
+            "gallery": "/huur"
+        },
+        "cookies_config": {
+            "accept_cookies_selector": "#cn-accept-cookie"
+        },
+        "filtering_config": {
+            "filters_container_selector": ".search-default",
+            "js_code": "",
+            "filter_url_suffix": "/#q1ZKTClKLY4vyElMLAFS-cUlyfkpqUpWSiGZOUmlRelKOkoFiempxUCRjNLSIqVaAA"
+        },
+        "login_config": {
+            "login_url": "https://auth.eye-move.nl/account/login?returnUrl=%2Fconnect%2Fauthorize%2Fcallback%3Fclient_id%3Dwebsite_ACM%26response_type%3Dcode%2520id_token%26scope%3Dopenid%2520profile%2520Files%2520scopes%2520roles%2520users%2520EmailStore%2520PushNotificationSend%2520PushNotificationSubscribe%2520offline_access%26redirect_uri%3Dhttps%253A%252F%252Fnmgwonen.mijnklantdossier.nl%252Fconnect%26state%3DuSZzI8W8mDethdBrtwxlyM0Wp%252BPCWxw7M9jquAAIbpn1X7WUsIzFybf6v%252BAQGicoHygb4WXK8tt5JwqynBm8O%252FNTbd4CnHfjY8XZHyOREfOe72BsvDgwSp%252FY7rmkunLnkpK%252FlrckeqIqUtBYHkKlEVPZ4K5RwVCwDuuTfHSETtRoXi5rmRR8RTmEDJHCSYE%252Bv%252Fn7j7GcrMog%252B7ca44Si3KQRv5pQOI9VmrHZEicneHwPwWwp8QBXaVKVh2O3cBnySvkVg9UjDOCIaFSA8GpNDlo5Vds%252BRcsJuw%252BBH9IV7%252B6Bnow3rdyOomrBYDShHpFe%26nonce%3D24527e9805083d3c2219bd686ec332ba033b509cad3a2b7ec435560b1c862fe7%26acr_values%3Dtenant%253AACM%26response_mode%3Dform_post",
+            "username_selector": "input[type=\"text\"]",
+            "password_selector": "input[type=\"password\"]",
+            "submit_selector": "button[aria-label=\"Inloggen\"]",
+            "expected_url": "https://nmgwonen.mijnklantdossier.nl/dossier/RelatieDossier.aspx",
+            "success_check_url_path": "/login",
+            "login_required": true,
+            "validate_login": false
+        },
+        "gallery_extraction_config": {
+            "extra_llm_instructions": "",
+            "correct_urls_paths": [
+                "/huur"
+            ],
+            "gallery_container_selector": "#entity-results",
+            "schema_type": "xpath",
+            "schema": {
+                "name": "NMG Wonen Huurwoningen",
+                "baseSelector": "//article[@class='house huur']",
+                "fields": [
+                    {
+                        "name": "address",
+                        "selector": ".//h2",
+                        "type": "text",
+                        "transform": "address_extraction"
+                    },
+                    {
+                        "name": "city",
+                        "selector": ".//h2/span",
+                        "type": "text"
+                    },
+                    {
+                        "name": "rental_price",
+                        "selector": ".//li[contains(@class, 'house__list-item')][1]/span[2]",
+                        "type": "text",
+                        "transform": "price_extraction"
+                    },
+                    {
+                        "name": "square_meters",
+                        "selector": ".//li[contains(@class, 'house__list-item')][2]/span[2]",
+                        "type": "text",
+                        "transform": "area_extraction"
+                    },
+                    {
+                        "name": "bedrooms",
+                        "selector": ".//li[contains(@class, 'house__list-item')][3]/span[2]",
+                        "type": "text",
+                        "transform": "bedroom_extraction"
+                    },
+                    {
+                        "name": "image_url",
+                        "selector": ".//img",
+                        "type": "attribute",
+                        "attribute": "src"
+                    },
+                    {
+                        "name": "detail_url",
+                        "selector": ".//a[@class='house__overlay']",
+                        "type": "attribute",
+                        "attribute": "href"
+                    },
+                    {
+                        "name": "available_from",
+                        "selector": ".//span[@class='house__rent-label']",
+                        "type": "text",
+                        "transform": "date_extraction"
+                    },
+                    {
+                        "name": "is_new",
+                        "selector": ".//span[@class='house__label']",
+                        "type": "text"
+                    }
+                ]
+            }
+        },
+        "detail_page_extraction_config": {
+            "extra_llm_instructions": "",
+            "schema_type": "xpath",
+            "detail_container_selector": ".woning__content",
+            "schema": {
+                "name": "Rental Property Details",
+                "baseSelector": "//div[@class='woning__content']",
+                "fields": [
+                    {
+                        "name": "description",
+                        "selector": ".//div[@class='woning__description js--has-toggler']/div[@class='js--toggler__target woning__prose']",
+                        "type": "text"
+                    },
+                    {
+                        "name": "rental_price",
+                        "selector": ".//div[@class='woning__features']//dt[contains(text(), 'Huurprijs')]/following-sibling::dd[1]",
+                        "type": "text",
+                        "transform": "strip"
+                    },
+                    {
+                        "name": "status",
+                        "selector": ".//div[@class='woning__features']//dt[contains(text(), 'Status')]/following-sibling::dd[1]",
+                        "type": "text",
+                        "transform": "strip"
+                    },
+                    {
+                        "name": "available_from",
+                        "selector": ".//div[@class='woning__features']//dt[contains(text(), 'Aanvaarding datum')]/following-sibling::dd[1]",
+                        "type": "text",
+                        "transform": "strip"
+                    },
+                    {
+                        "name": "square_meters",
+                        "selector": ".//div[@class='woning__features']//dt[contains(text(), 'Woonoppervlakte')]/following-sibling::dd[1]",
+                        "type": "text",
+                        "transform": "strip"
+                    },
+                    {
+                        "name": "year_of_construction",
+                        "selector": ".//div[@class='woning__features']//dt[contains(text(), 'Bouwjaar')]/following-sibling::dd[1]",
+                        "type": "text",
+                        "transform": "strip"
+                    },
+                    {
+                        "name": "number_of_rooms",
+                        "selector": ".//div[@class='woning__features']//dt[contains(text(), 'Aantal kamers')]/following-sibling::dd[1]",
+                        "type": "text",
+                        "transform": "strip"
+                    },
+                    {
+                        "name": "number_of_bedrooms",
+                        "selector": ".//div[@class='woning__features']//dt[contains(text(), 'Aantal slaapkamers')]/following-sibling::dd[1]",
+                        "type": "text",
+                        "transform": "strip"
+                    },
+                    {
+                        "name": "service_costs",
+                        "selector": ".//div[@class='woning__description js--has-toggler']/div[@class='js--toggler__target woning__prose']/p[contains(text(), 'Servicekosten')]",
+                        "type": "regex",
+                        "pattern": "€\\s*([\\d\\.,]+)\\s*per maand"
+                    }
+                ]
+            }
+        }
+    }
+}

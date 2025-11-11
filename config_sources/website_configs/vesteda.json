@@ -1,0 +1,85 @@
+{
+    "website_name": "Vesteda",
+    "scrape_strategy": "gallery",
+    "session_id": "vesteda_session",
+    "strategy_config": {
+        "navigation_config": {
+            "gallery": "/zoekopdracht"
+        },
+        "cookies_config": {
+            "accept_cookies_selector": "a[href=\"javascript:Cookiebot.submitCustomConsent(false, true, false); Cookiebot.hide()\"]"
+        },
+        "login_config": {
+            "login_url": "https://hurenbij.vesteda.com/login",
+            "username_selector": "input[type=\"email\"]",
+            "password_selector": "input[type=\"password\"]",
+            "submit_selector": "button[type=\"submit\"]",
+            "expected_url": "https://hurenbij.vesteda.com/",
+            "success_check_url": "https://hurenbij.vesteda.com/login",
+            "validate_login": true,
+            "auth_cookie_names": [
+                "login_token"
+            ]
+        },
+        "gallery_extraction_config": {
+            "extra_llm_instructions": "",
+            "correct_urls_paths": [
+                "/zoekopdracht/",
+                "/zoekopdracht",
+                "/zoekopdracht/#tab-content-inloggen"
+            ],
+            "schema_type": "css",
+            "schema": {
+                "name": "Houses",
+                "baseSelector": "div.card.card-result-list",
+                "fields": [
+                    {
+                        "name": "address",
+                        "selector": "h5.card-title a",
+                        "type": "text"
+                    },
+                    {
+                        "name": "city",
+                        "selector": "div.card-text",
+                        "type": "text"
+                    },
+                    {
+                        "name": "price",
+                        "selector": "div.object-price span.value",
+                        "type": "text"
+                    },
+                    {
+                        "name": "bedrooms",
+                        "selector": "div.object-rooms span.value",
+                        "type": "text"
+                    },
+                    {
+                        "name": "area",
+                        "selector": "div.object-area span.value",
+                        "type": "text"
+                    },
+                    {
+                        "name": "status",
+                        "selector": "div.card-image-label span",
+                        "type": "text"
+                    },
+                    {
+                        "name": "demand_message",
+                        "selector": "div.card-body.pt-0 p.text-muted",
+                        "type": "text"
+                    },
+                    {
+                        "name": "detail_url",
+                        "selector": "h5.card-title a",
+                        "type": "attribute",
+                        "attribute": "href"
+                    }
+                ]
+            }
+        },
+        "detail_page_extraction_config": {
+            "extra_llm_instructions": "",
+            "schema_type": "llm"
+        }
+    }
+}

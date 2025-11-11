@@ -13,9 +13,7 @@ from crawler_job.services import config as global_config
 from crawler_job.services.data_processing_service import DataProcessingService
 from crawler_job.services.llm_extraction_service import LlmExtractionService
 from crawler_job.services.logger_service import setup_logger
-from crawler_job.services.repositories.json_config_repository import (
-    JsonConfigRepository,
-)
+from crawler_job.services.config_provider import ConfigProvider
 
 SCRAPER_CLASSES: Dict[str, Type[BaseWebsiteScraper]] = {
     "vesteda": VestedaScraper,
@@ -28,10 +26,10 @@ class ScraperFactory:
 
     def __init__(
         self,
-        json_config_repo: JsonConfigRepository,
+        config_provider: ConfigProvider,
         crawler: AsyncWebCrawler,
     ):
-        self.json_config_repo = json_config_repo
+        self.config_provider = config_provider
         self.logger = setup_logger(__name__)
         self.crawler = crawler
 
@@ -40,9 +38,7 @@ class ScraperFactory:
         website_name: str,
         notification_service: Optional[NotificationService] = None,
     ) -> BaseWebsiteScraper:
-        website_config = await self.json_config_repo.get_config_by_website_name_async(
-            website_name
-        )
+        website_config = await self.config_provider.get_config_async(website_name)
 
         if website_config:
             scraper_class = SCRAPER_CLASSES.get(

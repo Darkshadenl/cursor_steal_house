@@ -1,6 +1,7 @@
 import asyncio
 import os
-from typing import Dict, Any, List
+from pathlib import Path
+from typing import Dict, Any, List, Optional
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 
 from crawler_job.services.db_connection import get_db_session
@@ -10,6 +11,7 @@ from crawler_job.factories import ScraperFactory
 from crawler_job.services.repositories.json_config_repository import (
     JsonConfigRepository,
 )
+from crawler_job.services.config_provider import ConfigProviderFactory
 from crawler_job.services import config
 
 
@@ -40,11 +42,16 @@ async def _run_single_scraper_with_session(
     notification_service: NotificationService,
 ) -> Dict[str, Any]:
     db_session = None
+    json_config_repo: Optional[JsonConfigRepository] = None
     try:
-        # Each scraper gets its own database session
-        db_session = get_db_session()
-        json_config_repo = JsonConfigRepository(db_session)
-        factory = ScraperFactory(json_config_repo, crawler)
+        if config.config_source == "db":
+            db_session = get_db_session()
+            json_config_repo = JsonConfigRepository(db_session)
+
+        config_provider = ConfigProviderFactory.create_provider(
+            config.config_source, json_config_repository=json_config_repo
+        )
+        factory = ScraperFactory(config_provider, crawler)
 
         scraper = await factory.get_scraper_async(website_name, notification_service)
         logger.info(f"Starting crawl for website: {website_name}")

@@ -1,0 +1,55 @@
+{
+    "website_name": "De Huis Sleutel",
+    "scrape_strategy": "sitemap",
+    "session_id": "huis_sleutel_session",
+    "strategy_config": {
+        "navigation_config": {
+            "sitemap": "/sitemap.xml"
+        },
+        "login_config": {
+            "login_url": "https://www.dehuissleutel.nl/nl/mijn-account",
+            "username_selector": "input[type=\"email\"]",
+            "password_selector": "input[type=\"password\"]",
+            "submit_selector": "button[type=\"submit\"]",
+            "expected_url": "https://www.dehuissleutel.nl/nl/mijn-account#login",
+            "success_check_url": "",
+            "validate_login": false,
+            "auth_cookie_names": [
+                "login_token"
+            ]
+        },
+        "sitemap_extraction_config": {
+            "extra_llm_instructions": "The description on the page contains many details. Try to fill in the schema that was provided with these details. Then remove them from the description in the final filled in schema. For example, if the description had details about the surface area, and there's a spot in the schema for that, fill it in in that spot. Then remove it from the description text before filling in the description in the description spot of the schema. Determine for yourself if the property is a parking spot and fill in is_parkingspot based on that!",
+            "regex": "<loc>(https:\\/\\/www\\.dehuissleutel\\.nl\\/nl\\/woning\\/.*?)<\\/loc>",
+            "schema": {
+                "name": "Woninginformatie De Huissleutel",
+                "baseSelector": "div.wrapper.my-5.text-box.page-wrapper",
+                "fields": [
+                    {
+                        "name": "over_deze_woonruimte",
+                        "selector": "div.row[data-inviewport='slide-in']:not(.mb-5) div.col-lg-8 div.card--large > div.card-section",
+                        "type": "text"
+                    },
+                    {
+                        "name": "details_woonruimte",
+                        "type": "list",
+                        "selector": "div.row[data-inviewport='slide-in']:not(.mb-5) div.col-lg-4 div.card--highlighted div.card-section div.mt-2",
+                        "fields": [
+                            {
+                                "name": "detail",
+                                "selector": "div.d-inline-block.align-middle",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "aanmelden_kijkmoment_knop_target",
+                        "selector": "div.row.mb-5[data-inviewport='slide-in'] div.col-lg-4 div.card--dark div.card-footer button.button1[data-target='#subscribe-modal']",
+                        "type": "attribute",
+                        "attribute": "data-target"
+                    }
+                ]
+            }
+        }
+    }
+}
