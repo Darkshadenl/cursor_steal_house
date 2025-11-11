@@ -3,11 +3,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from crawler_job.models.db_models import DbWebsite, DbWebsiteScrapeConfig
+from crawler_job.services.logger_service import setup_logger
 
 from ...models.pydantic_models import (
     WebsiteConfig,
     WebsiteScrapeConfigJson,
 )
+
+
+logger = setup_logger(__name__)
 
 
 class JsonConfigRepository:
@@ -24,7 +28,7 @@ class JsonConfigRepository:
         self, website_name: Optional[str] = None
     ) -> Optional[WebsiteScrapeConfigJson]:
         if website_name is None:
-            print("Website name must be provided")
+            logger.error("Website name must be provided")
             return None
 
         try:
@@ -35,7 +39,7 @@ class JsonConfigRepository:
             website = website_result.scalar_one_or_none()
 
             if not website:
-                print(f"Website with name '{website_name}' not found")
+                logger.error(f"Website with name '{website_name}' not found")
                 return None
 
             query = select(DbWebsiteScrapeConfig).where(
@@ -63,11 +67,13 @@ class JsonConfigRepository:
 
                 return WebsiteScrapeConfigJson.model_validate(config_data)
             except Exception as e:
-                print(f"Error parsing configuration for '{website_name}': {str(e)}")
+                logger.error(
+                    f"Error parsing configuration for '{website_name}': {str(e)}"
+                )
                 return None
 
         except Exception as e:
-            print(
+            logger.error(
                 f"Database error while retrieving configuration for '{website_name}': {str(e)}"
             )
             return None

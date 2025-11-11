@@ -8,7 +8,7 @@ from crawl4ai import (
 )
 
 
-class CrawlerConfigFactory:
+class CrawlerRunConfigFactory:
     @staticmethod
     def create_standard_run_config(
         session_id: str, debug_mode: bool

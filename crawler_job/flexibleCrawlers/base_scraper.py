@@ -13,7 +13,7 @@ from crawler_job.helpers.decorators import (
     requires_navigated_to_gallery,
 )
 from crawler_job.helpers.config_validator import WebsiteConfigValidator
-from crawler_job.helpers.crawler_config_factory import CrawlerConfigFactory
+from crawler_job.helpers.crawler_config_factory import CrawlerRunConfigFactory
 
 
 from crawl4ai import (
@@ -60,6 +60,11 @@ class BaseWebsiteScraper(ABC):
         config: WebsiteScrapeConfigJson,
         session_id: str,
         crawler: AsyncWebCrawler,
+        standard_run_config: CrawlerRunConfig,
+        standard_dispatcher: SemaphoreDispatcher,
+        data_processing_service: DataProcessingService,
+        llm_extraction_service: LlmExtractionService,
+        config_validator: WebsiteConfigValidator,
         notification_service: Optional[NotificationService] = None,
     ):
         self.website_config: WebsiteScrapeConfigJson = config
@@ -92,15 +97,13 @@ class BaseWebsiteScraper(ABC):
 
         self.session_id = session_id
 
-        self._standard_run_config = CrawlerConfigFactory.create_standard_run_config(
-            self.session_id, global_config.debug_mode
-        )
-        self.standard_dispatcher = CrawlerConfigFactory.create_standard_dispatcher()
+        self._standard_run_config = standard_run_config
+        self.standard_dispatcher = standard_dispatcher
 
         self.crawler: AsyncWebCrawler = crawler
         assert self.notification_service is not None
-        self.data_processing_service = DataProcessingService(self.notification_service)
-        self.llm_extraction_service = LlmExtractionService()
+        self.data_processing_service = data_processing_service
+        self.llm_extraction_service = llm_extraction_service
         self.accepted_cookies = False
         self.navigated_to_gallery = False
         self.navigated_to_sitemap = False
@@ -113,8 +116,8 @@ class BaseWebsiteScraper(ABC):
         }
 
         # Validate configuration at initialization
-        validator = WebsiteConfigValidator(self.website_config)
-        validator.validate()
+        self._config_validator = config_validator
+        self._config_validator.validate()
 
     def get_run_config(self) -> CrawlerRunConfig:
         return self._standard_run_config.clone()
@@ -122,7 +125,7 @@ class BaseWebsiteScraper(ABC):
     def get_login_run_config(
         self, js_code: list[str], wait_for_condition: str
     ) -> CrawlerRunConfig:
-        return CrawlerConfigFactory.create_login_run_config(
+        return CrawlerRunConfigFactory.create_login_run_config(
             self.get_run_config(), js_code, wait_for_condition
         )
 

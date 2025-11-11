@@ -16,6 +16,9 @@ from crawl4ai import (
 
 from crawler_job.models.house_models import FetchedPage, House
 from crawler_job.notifications.notification_service import NotificationService
+from crawler_job.services.data_processing_service import DataProcessingService
+from crawler_job.services.llm_extraction_service import LlmExtractionService
+from crawler_job.helpers.config_validator import WebsiteConfigValidator
 
 from ..models.pydantic_models import WebsiteScrapeConfigJson
 from .base_scraper import BaseWebsiteScraper
@@ -37,9 +40,24 @@ class VestedaScraper(BaseWebsiteScraper):
         config: WebsiteScrapeConfigJson,
         session_id: str,
         crawler: AsyncWebCrawler,
+        standard_run_config: CrawlerRunConfig,
+        standard_dispatcher: SemaphoreDispatcher,
+        data_processing_service: DataProcessingService,
+        llm_extraction_service: LlmExtractionService,
+        config_validator: WebsiteConfigValidator,
         notification_service: Optional[NotificationService] = None,
     ):
-        super().__init__(config, session_id, crawler, notification_service)
+        super().__init__(
+            config=config,
+            session_id=session_id,
+            crawler=crawler,
+            standard_run_config=standard_run_config,
+            standard_dispatcher=standard_dispatcher,
+            data_processing_service=data_processing_service,
+            llm_extraction_service=llm_extraction_service,
+            config_validator=config_validator,
+            notification_service=notification_service,
+        )
 
         logger.debug("Vesteda scraper initialized...")
 
