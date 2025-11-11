@@ -474,9 +474,10 @@ class BaseWebsiteScraper(ABC):
                 if extracted_data is None:
                     logger.warning(f"No data extracted for {result.url}")
                     continue
-                
+
                 json_data = json.loads(extracted_data)  # type: ignore
                 house = House.from_dict(json_data)
+                house.detail_url = result.url
                 houses.append(house)
 
         except Exception as e:
