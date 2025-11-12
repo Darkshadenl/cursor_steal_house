@@ -84,5 +84,7 @@ full-deployment.sh
 
 prompts/
 implementation_plans/
+config_sources/**/*.json
+.gemini/
 .pytest_cache/
 test_*.*
