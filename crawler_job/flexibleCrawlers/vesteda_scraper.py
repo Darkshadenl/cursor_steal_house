@@ -15,7 +15,6 @@ from crawler_job.models.house_models import House
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.services.data_processing_service import DataProcessingService
 from crawler_job.services.llm_extraction_service import LlmExtractionService
-from crawler_job.helpers.config_validator import WebsiteConfigValidator
 
 from ..models.pydantic_models import WebsiteScrapeConfigJson
 from .base_scraper import BaseWebsiteScraper
@@ -41,7 +40,6 @@ class VestedaScraper(BaseWebsiteScraper):
         standard_dispatcher: SemaphoreDispatcher,
         data_processing_service: DataProcessingService,
         llm_extraction_service: LlmExtractionService,
-        config_validator: WebsiteConfigValidator,
         notification_service: Optional[NotificationService] = None,
     ):
         super().__init__(
@@ -52,7 +50,6 @@ class VestedaScraper(BaseWebsiteScraper):
             standard_dispatcher=standard_dispatcher,
             data_processing_service=data_processing_service,
             llm_extraction_service=llm_extraction_service,
-            config_validator=config_validator,
             notification_service=notification_service,
         )
 
@@ -131,21 +128,8 @@ class VestedaScraper(BaseWebsiteScraper):
     @requires_navigated_to_gallery
     async def extract_gallery_async(self) -> List[House]:
         logger.info("Extracting property listings of Vesteda step...")
-        gallery_extraction_config = (
-            self.website_config.strategy_config.gallery_extraction_config
-        )
-        assert gallery_extraction_config is not None
-        assert gallery_extraction_config.correct_urls_paths is not None
-
-        # correct_urls = [
-        #     f"{self.website_info.base_url}{path}"
-        #     for path in gallery_extraction_config.correct_urls_paths
-        # ]
-
-        # if self.current_url not in correct_urls:
-        #     raise Exception(f"Invalid URL: {self.current_url}")
-
-        schema = gallery_extraction_config.schema
+        assert self.gallery_extraction_config is not None
+        schema = self.gallery_extraction_config.schema
         assert schema is not None
 
         gallery_config = CrawlerRunConfig(

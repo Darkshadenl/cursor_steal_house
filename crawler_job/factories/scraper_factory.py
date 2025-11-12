@@ -2,11 +2,11 @@ from typing import Dict, Optional, Type
 
 from crawl4ai import AsyncWebCrawler
 
+from crawler_job.crawl4ai_wrappers.CustomAsyncWebCrawler import CustomAsyncWebCrawler
 from crawler_job.flexibleCrawlers.base_scraper import BaseWebsiteScraper
 from crawler_job.flexibleCrawlers.huis_sleutel_scraper import HuisSleutelScraper
 from crawler_job.flexibleCrawlers.nmg_wonen_scraper import NmgWonenScraper
 from crawler_job.flexibleCrawlers.vesteda_scraper import VestedaScraper
-from crawler_job.helpers.config_validator import WebsiteConfigValidator
 from crawler_job.helpers.crawler_config_factory import CrawlerRunConfigFactory
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.services import config as global_config
@@ -27,7 +27,7 @@ class ScraperFactory:
     def __init__(
         self,
         config_provider: ConfigProvider,
-        crawler: AsyncWebCrawler,
+        crawler: CustomAsyncWebCrawler,
     ):
         self.config_provider = config_provider
         self.logger = setup_logger(__name__)
@@ -57,7 +57,6 @@ class ScraperFactory:
             standard_dispatcher = CrawlerRunConfigFactory.create_standard_dispatcher()
             data_processing_service = DataProcessingService(notification_service)
             llm_extraction_service = LlmExtractionService()
-            config_validator = WebsiteConfigValidator(website_config)
             return scraper_class(
                 config=website_config,
                 session_id=website_config.session_id,
@@ -66,7 +65,6 @@ class ScraperFactory:
                 standard_dispatcher=standard_dispatcher,
                 data_processing_service=data_processing_service,
                 llm_extraction_service=llm_extraction_service,
-                config_validator=config_validator,
                 notification_service=notification_service,
             )
         else:

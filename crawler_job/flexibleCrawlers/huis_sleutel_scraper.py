@@ -1,16 +1,13 @@
 from typing import Optional
 from crawl4ai import (
-    AsyncWebCrawler,
     CrawlerRunConfig,
     SemaphoreDispatcher,
 )
 
 from crawler_job.crawl4ai_wrappers.CustomAsyncWebCrawler import CustomAsyncWebCrawler
-from crawler_job.helpers.crawler_config_factory import CrawlerRunConfigFactory
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.services.data_processing_service import DataProcessingService
 from crawler_job.services.llm_extraction_service import LlmExtractionService
-from crawler_job.helpers.config_validator import WebsiteConfigValidator
 
 from ..models.pydantic_models import WebsiteScrapeConfigJson
 from .base_scraper import BaseWebsiteScraper
@@ -34,7 +31,6 @@ class HuisSleutelScraper(BaseWebsiteScraper):
         standard_dispatcher: SemaphoreDispatcher,
         data_processing_service: DataProcessingService,
         llm_extraction_service: LlmExtractionService,
-        config_validator: WebsiteConfigValidator,
         notification_service: Optional[NotificationService] = None,
     ):
         super().__init__(
@@ -45,7 +41,6 @@ class HuisSleutelScraper(BaseWebsiteScraper):
             standard_dispatcher=standard_dispatcher,
             data_processing_service=data_processing_service,
             llm_extraction_service=llm_extraction_service,
-            config_validator=config_validator,
             notification_service=notification_service,
         )
 

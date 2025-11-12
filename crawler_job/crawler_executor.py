@@ -1,9 +1,9 @@
 import asyncio
 import os
-from pathlib import Path
 from typing import Dict, Any, List, Optional
-from crawl4ai import AsyncWebCrawler, BrowserConfig
+from crawl4ai import BrowserConfig
 
+from crawler_job.crawl4ai_wrappers.CustomAsyncWebCrawler import CustomAsyncWebCrawler
 from crawler_job.services.db_connection import get_db_session
 from crawler_job.notifications.notification_service import NotificationService
 from crawler_job.services.logger_service import setup_logger
@@ -38,7 +38,7 @@ def _setup_notifications(notifications_enabled: bool) -> NotificationService:
 
 async def _run_single_scraper_with_session(
     website_name: str,
-    crawler: AsyncWebCrawler,
+    crawler: CustomAsyncWebCrawler,
     notification_service: NotificationService,
 ) -> Dict[str, Any]:
     db_session = None
@@ -82,7 +82,7 @@ async def _run_single_scraper_with_session(
 
 async def _execute_scrapers_concurrent_async(
     websites: List[str],
-    crawlers: List[AsyncWebCrawler],
+    crawlers: List[CustomAsyncWebCrawler],
     notification_service: NotificationService,
     max_concurrent: int = 3,
 ) -> List[Dict[str, Any]]:
@@ -139,7 +139,7 @@ async def _execute_scrapers_concurrent_async(
 
 async def _execute_scrapers_sequential_async(
     websites: List[str],
-    crawlers: List[AsyncWebCrawler],
+    crawlers: List[CustomAsyncWebCrawler],
     notification_service: NotificationService,
 ) -> List[Dict[str, Any]]:
     results = []
@@ -205,12 +205,12 @@ async def run_crawler_async(
     concurrent_scrapers = os.getenv("CONCURRENT_SCRAPERS", "true").lower() == "true"
     max_concurrent = int(os.getenv("MAX_CONCURRENT_SCRAPERS", "3"))
 
-    crawlers: List[AsyncWebCrawler] = []
+    crawlers: List[CustomAsyncWebCrawler] = []
 
     try:
         for website_name in websites:
             browser_config = _create_browser_config(website_name, headless)
-            crawler = AsyncWebCrawler(config=browser_config)
+            crawler = CustomAsyncWebCrawler(config=browser_config)
             await crawler.start()
             crawlers.append(crawler)
 

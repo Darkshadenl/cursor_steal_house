@@ -1,6 +1,7 @@
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union, Literal
+from typing_extensions import Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from crawler_job.services.logger_service import setup_logger
 
 logger = setup_logger(__name__)
@@ -37,6 +38,15 @@ class DetailPageExtractionConfig(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     ignore_domains: Optional[List[str]] = None
 
+    @model_validator(mode="after")
+    def validate_detail_page_config(self) -> Self:
+        """Validate detail page extraction configuration requirements."""
+        if self.schema_type == "llm" and not self.extra_llm_instructions:
+            logger.warning(
+                "No extra LLM instructions provided for detail page extraction"
+            )
+        return self
+
 
 class SitemapExtractionConfig(BaseModel):
     """
@@ -56,6 +66,10 @@ class NavigationConfig(BaseModel):
 
     sitemap: Optional[str] = None
     gallery: Optional[str] = None
+    extraction_page_url: Optional[str] = None
+    extraction_page_correct_paths: Optional[List[str]] = None
+    login_page_url: Optional[str] = None
+    login_page_correct_paths: Optional[List[str]] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -78,12 +92,9 @@ class LoginConfig(BaseModel):
     Pydantic model for login configuration.
     """
 
-    login_url: Optional[str] = None
-    username_selector: str
-    password_selector: str
-    submit_selector: str
-    success_check_url: Optional[str] = None
-    expected_url: Optional[str] = None
+    username_selector: str = Field(..., min_length=1)
+    password_selector: str = Field(..., min_length=1)
+    submit_selector: str = Field(..., min_length=1)
     success_indicator_selector: Optional[str] = None
     validate_login: bool = True
     login_required: bool = True
@@ -108,21 +119,55 @@ class StrategyConfig(BaseModel):
     navigation_config: NavigationConfig
     cookies_config: Optional[CookiesConfig] = None
     filtering_config: Optional[FilteringConfig] = None
-    gallery_extraction_config: Optional[GalleryExtractionConfig] = None
+
+    extraction_config: Optional[
+        Union[GalleryExtractionConfig, SitemapExtractionConfig]
+    ] = None
     detail_page_extraction_config: Optional[DetailPageExtractionConfig] = None
     sitemap_extraction_config: Optional[SitemapExtractionConfig] = None
     login_config: Optional[LoginConfig] = None
 
     model_config = ConfigDict(from_attributes=True)
 
+    @model_validator(mode="before")
+    @classmethod
+    def preprocess_extraction_config(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            scrape_strategy = data.get("_scrape_strategy")
+            extraction_config = data.get("extraction_config")
+
+            if extraction_config is not None and isinstance(extraction_config, dict):
+                try:
+                    if scrape_strategy == "gallery":
+                        data["extraction_config"] = (
+                            GalleryExtractionConfig.model_validate(extraction_config)
+                        )
+                    elif scrape_strategy == "sitemap":
+                        data["extraction_config"] = (
+                            SitemapExtractionConfig.model_validate(extraction_config)
+                        )
+                except Exception as exc:
+                    raise ValueError(
+                        f"Failed to validate extraction_config for scrape_strategy='{scrape_strategy}': {exc}"
+                    ) from exc
+
+        return data
+
 
 class WebsiteConfig(BaseModel):
     id: int
     name: str
-    base_url: str
+    base_url: str = Field(..., min_length=1)
     is_active: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Base URL not provided in website configuration")
+        return v
 
 
 class WebsiteScrapeConfigJson(BaseModel):
@@ -131,12 +176,67 @@ class WebsiteScrapeConfigJson(BaseModel):
     """
 
     website_name: str
-    scrape_strategy: str = "gallery" or "sitemap"
-    strategy_config: StrategyConfig
+    strategy_config: StrategyConfig = Field(...)
     session_id: str
-    website_info: WebsiteConfig
+    website_info: WebsiteConfig = Field(...)
+    scrape_strategy: Literal["gallery", "sitemap"]
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def preprocess_extraction_config(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            scrape_strategy = data.get("scrape_strategy")
+            strategy_config = data.get("strategy_config")
+
+            if isinstance(strategy_config, dict) and scrape_strategy:
+                strategy_config["_scrape_strategy"] = scrape_strategy
+
+        return data
+
+    @model_validator(mode="after")
+    def validate_strategy_config(self) -> Self:
+        """Validate strategy-specific configuration requirements."""
+        if not self.strategy_config:
+            raise ValueError("Strategy configuration not provided")
+
+        if self.scrape_strategy == "gallery":
+            if not self.strategy_config.extraction_config:
+                raise ValueError("Gallery extraction configuration not provided")
+            extraction_config = self.strategy_config.extraction_config
+            if not isinstance(extraction_config, GalleryExtractionConfig):
+                raise ValueError(
+                    "Gallery extraction configuration must be a GalleryExtractionConfig"
+                )
+            if not extraction_config.schema:
+                raise ValueError(
+                    "No schema provided in gallery extraction configuration"
+                )
+            if not extraction_config.schema_type:
+                raise ValueError(
+                    "No schema type provided in gallery extraction configuration"
+                )
+        elif self.scrape_strategy == "sitemap":
+            if not self.strategy_config.sitemap_extraction_config:
+                raise ValueError("Sitemap extraction configuration not provided")
+            sitemap_config = self.strategy_config.sitemap_extraction_config
+            if not sitemap_config.regex:
+                raise ValueError(
+                    "No regex provided in sitemap extraction configuration"
+                )
+            if not sitemap_config.schema:
+                raise ValueError(
+                    "No schema provided in sitemap extraction configuration"
+                )
+        else:
+            raise ValueError(f"Unknown scrape strategy: {self.scrape_strategy}")
+
+        logger.info(
+            f"Website configuration validation completed successfully for {self.website_name}"
+        )
+
+        return self
 
 
 class ExtractionConfig(BaseModel):

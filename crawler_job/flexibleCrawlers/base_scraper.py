@@ -5,7 +5,7 @@ from abc import ABC
 import re
 
 from crawler_job.crawl4ai_wrappers.CustomAsyncWebCrawler import CustomAsyncWebCrawler
-from crawler_job.enums import ScrapeStrategy, SchemaType
+from crawler_job.enums import ScrapeStrategy, SchemaType, scrape_strategy
 from crawler_job.helpers.decorators import (
     requires_crawler_initialized,
     requires_cookies_accepted,
@@ -13,7 +13,6 @@ from crawler_job.helpers.decorators import (
     requires_login_config,
     requires_navigated_to_gallery,
 )
-from crawler_job.helpers.config_validator import WebsiteConfigValidator
 from crawler_job.helpers.crawler_config_factory import CrawlerRunConfigFactory
 
 
@@ -64,7 +63,6 @@ class BaseWebsiteScraper(ABC):
         standard_dispatcher: SemaphoreDispatcher,
         data_processing_service: DataProcessingService,
         llm_extraction_service: LlmExtractionService,
-        config_validator: WebsiteConfigValidator,
         notification_service: Optional[NotificationService] = None,
     ):
         self.website_config: WebsiteScrapeConfigJson = config
@@ -79,13 +77,27 @@ class BaseWebsiteScraper(ABC):
             self.website_config.strategy_config.detail_page_extraction_config
         )  # type: ignore
 
-        self.gallery_extraction_config: GalleryExtractionConfig = (
-            self.website_config.strategy_config.gallery_extraction_config
-        )  # type: ignore
+        scrape_strategy_type = self.website_config.scrape_strategy
+        untyped_extraction_config = (
+            self.website_config.strategy_config.extraction_config
+        )
 
-        self.sitemap_extraction_config: SitemapExtractionConfig = (
-            self.website_config.strategy_config.sitemap_extraction_config
-        )  # type: ignore
+        if scrape_strategy_type == ScrapeStrategy.GALLERY.value:
+            if not isinstance(untyped_extraction_config, GalleryExtractionConfig):
+                raise TypeError(
+                    f"Expected GalleryExtractionConfig for gallery strategy, got {type(untyped_extraction_config)}"
+                )
+            self.gallery_extraction_config: GalleryExtractionConfig = (
+                untyped_extraction_config
+            )
+        elif scrape_strategy_type == ScrapeStrategy.SITEMAP.value:
+            if not isinstance(untyped_extraction_config, SitemapExtractionConfig):
+                raise TypeError(
+                    f"Expected SitemapExtractionConfig for sitemap strategy, got {type(untyped_extraction_config)}"
+                )
+            self.sitemap_extraction_config = untyped_extraction_config
+        else:
+            raise ValueError(f"Invalid scrape strategy: {scrape_strategy_type}")
 
         self.filtering_config: FilteringConfig = (
             self.website_config.strategy_config.filtering_config
@@ -100,7 +112,7 @@ class BaseWebsiteScraper(ABC):
         self._standard_run_config = standard_run_config
         self.standard_dispatcher = standard_dispatcher
 
-        self.crawler: AsyncWebCrawler = crawler
+        self.crawler: CustomAsyncWebCrawler = crawler
         assert self.notification_service is not None
         self.data_processing_service = data_processing_service
         self.llm_extraction_service = llm_extraction_service
@@ -114,10 +126,6 @@ class BaseWebsiteScraper(ABC):
             "new_houses_count": 0,
             "updated_houses_count": 0,
         }
-
-        # Validate configuration at initialization
-        self._config_validator = config_validator
-        self._config_validator.validate()
 
     def get_run_config(self) -> CrawlerRunConfig:
         return self._standard_run_config.clone()
@@ -238,7 +246,7 @@ class BaseWebsiteScraper(ABC):
             return True
 
         try:
-            full_login_url = self.login_config.login_url
+            full_login_url = self.strategy_config.navigation_config.login_page_url
             assert full_login_url is not None
 
             logger.info(
@@ -320,17 +328,17 @@ class BaseWebsiteScraper(ABC):
             return
 
         logger.info("Navigating to gallery...")
-        url = f"{self.website_info.base_url}{self.strategy_config.navigation_config.gallery}"
+        url = self.strategy_config.navigation_config.extraction_page_url
+        assert url is not None
 
         run_config = self.get_run_config()
-        result: CrawlResult = await self.crawler.arun(
+        result: CrawlResult = await self.crawler.arun_verify_target_url(
             url,
             config=run_config,
+            target_paths=self.strategy_config.navigation_config.extraction_page_correct_paths,
         )  # type: ignore
 
-        full_login_url = f"{self.login_config.login_url or ''}"
-
-        if result and result.success and result.redirected_url != full_login_url:
+        if result.success:
             logger.info(f"Navigating to gallery successful: {result.url}")
             self.navigated_to_gallery = True
             self.current_url = result.url
@@ -494,11 +502,6 @@ class BaseWebsiteScraper(ABC):
     @requires_navigated_to_gallery
     async def extract_gallery_async(self) -> List[House]:
         logger.info(f"Extracting property listings of {self.website_info.name} step...")
-        gallery_extraction_config = (
-            self.website_config.strategy_config.gallery_extraction_config
-        )
-        assert gallery_extraction_config is not None
-        assert gallery_extraction_config.correct_urls_paths is not None
 
         # correct_urls = [
         #     f"{self.website_info.base_url}{path}"
@@ -508,7 +511,7 @@ class BaseWebsiteScraper(ABC):
         # if not any(correct_url in self.current_url for correct_url in correct_urls):  # type: ignore
         #     raise Exception(f"Invalid URL: {self.current_url}")
 
-        schema = gallery_extraction_config.schema
+        schema = self.gallery_extraction_config.schema
         assert schema is not None
 
         extraction_strategy = None

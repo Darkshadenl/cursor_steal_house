@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -60,7 +60,7 @@ class JsonConfigRepository:
             )
 
             try:
-                config_data = config_record.config_json
+                config_data: Dict[str, Any] = config_record.config_json  # type: ignore
 
                 if "website_info" not in config_data:
                     config_data["website_info"] = website_info.model_dump()  # type: ignore

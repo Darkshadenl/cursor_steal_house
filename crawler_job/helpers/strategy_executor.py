@@ -16,7 +16,7 @@ class StrategyExecutor:
 
         strategy = self.scraper.website_config.scrape_strategy
         logger.info(
-            f"Choosing strategy {strategy} for {self.scraper.website_info.name}"
+            f"Choosing strategy '{strategy}' for {self.scraper.website_info.name}"
         )
         if strategy == ScrapeStrategy.GALLERY.value:
             result = await self._run_gallery_scrape()
